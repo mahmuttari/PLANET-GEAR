@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Planet Dişli Seti Hesaplayıcı ve Çizici</title>
+<style>
+  :root {
+    --bg: #0f172a;
+    --panel: #1e293b;
+    --panel-2: #273449;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --accent: #38bdf8;
+    --accent-2: #22d3ee;
+    --ok: #4ade80;
+    --warn: #facc15;
+    --err: #f87171;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+    background: linear-gradient(180deg, var(--bg) 0%, #0b1224 100%);
+    color: var(--text);
+    min-height: 100vh;
+  }
+  header {
+    padding: 18px 24px;
+    border-bottom: 1px solid var(--border);
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(6px);
+    position: sticky;
+    top: 0;
+    z-index: 10;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 20px;
+    letter-spacing: 0.2px;
+  }
+  header p {
+    margin: 4px 0 0;
+    color: var(--muted);
+    font-size: 13px;
+  }
+  .layout {
+    display: grid;
+    grid-template-columns: 380px 1fr;
+    gap: 18px;
+    padding: 18px;
+    max-width: 1500px;
+    margin: 0 auto;
+  }
+  @media (max-width: 980px) {
+    .layout { grid-template-columns: 1fr; }
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+  }
+  .panel h2 {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+  }
+  .row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 10px;
+  }
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .field label {
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .field input, .field select {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 14px;
+    font-family: inherit;
+    outline: none;
+    transition: border-color 0.15s;
+  }
+  .field input:focus, .field select:focus {
+    border-color: var(--accent);
+  }
+  .field.full { grid-column: 1 / -1; }
+  .preset-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .preset-btn {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .preset-btn:hover {
+    border-color: var(--accent);
+    background: #2d3b54;
+  }
+  .preset-btn .ptitle {
+    font-weight: 600;
+    display: block;
+    color: var(--accent-2);
+  }
+  .preset-btn .pdesc {
+    color: var(--muted);
+    font-size: 11px;
+  }
+  .actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+  .btn {
+    flex: 1;
+    background: var(--accent);
+    color: #08111f;
+    border: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: 600;
+    font-family: inherit;
+    font-size: 14px;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--accent-2); }
+  .btn.secondary {
+    background: var(--panel-2);
+    color: var(--text);
+    border: 1px solid var(--border);
+  }
+  .btn.secondary:hover { background: #2d3b54; }
+  .results {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+    font-size: 13px;
+  }
+  .result-item {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 8px 10px;
+  }
+  .result-item .lbl {
+    color: var(--muted);
+    font-size: 11px;
+    display: block;
+  }
+  .result-item .val {
+    color: var(--text);
+    font-weight: 600;
+    font-size: 14px;
+    margin-top: 2px;
+  }
+  .validation {
+    margin-top: 10px;
+    padding: 10px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+  .validation.ok {
+    background: rgba(74, 222, 128, 0.12);
+    border: 1px solid rgba(74, 222, 128, 0.4);
+    color: var(--ok);
+  }
+  .validation.err {
+    background: rgba(248, 113, 113, 0.12);
+    border: 1px solid rgba(248, 113, 113, 0.4);
+    color: var(--err);
+  }
+  .validation ul { margin: 4px 0 0 16px; padding: 0; }
+  .canvas-wrap {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    min-height: 600px;
+  }
+  .canvas-tools {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+  .canvas-tools label {
+    font-size: 12px;
+    color: var(--muted);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .canvas-tools input[type="range"] {
+    width: 120px;
+  }
+  svg { display: block; width: 100%; height: auto; background: #0a1020; border-radius: 8px; }
+  .legend {
+    margin-top: 12px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    font-size: 12px;
+    color: var(--muted);
+  }
+  .legend .dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    margin-right: 6px;
+    vertical-align: middle;
+  }
+  footer {
+    text-align: center;
+    color: var(--muted);
+    font-size: 12px;
+    padding: 16px;
+  }
+  .section-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 14px 0;
+  }
+  .toggle-row {
+    display: flex;
+    gap: 4px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 4px;
+  }
+  .toggle-row button {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 6px 8px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .toggle-row button.active {
+    background: var(--accent);
+    color: #08111f;
+    font-weight: 600;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Planet Dişli Seti Hesaplayıcı ve Çizici</h1>
+  <p>Hazır endüstri konfigürasyonları arasından seçin veya kendi değerlerinizi girerek hesaplayın ve görselleştirin.</p>
+</header>
+
+<div class="layout">
+
+  <div>
+    <!-- Hazır Seçenekler -->
+    <div class="panel">
+      <h2>Hazır Konfigürasyonlar</h2>
+      <div class="preset-grid" id="presetGrid"></div>
+    </div>
+
+    <!-- Parametre Girişleri -->
+    <div class="panel" style="margin-top: 14px;">
+      <h2>Parametreler</h2>
+
+      <div class="row">
+        <div class="field">
+          <label>Güneş Dişli Diş Sayısı (Zs)</label>
+          <input type="number" id="zs" value="20" min="6" step="1">
+        </div>
+        <div class="field">
+          <label>Planet Dişli Diş Sayısı (Zp)</label>
+          <input type="number" id="zp" value="20" min="6" step="1">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Ring (İç Dişli) Zr <span style="color:var(--muted)">(otomatik)</span></label>
+          <input type="number" id="zr" value="60" min="6" step="1">
+        </div>
+        <div class="field">
+          <label>Planet Sayısı (N)</label>
+          <input type="number" id="np" value="3" min="2" max="8" step="1">
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Modül (m) [mm]</label>
+          <select id="modulePreset">
+            <option value="0.5">0.5</option>
+            <option value="0.75">0.75</option>
+            <option value="1">1</option>
+            <option value="1.25">1.25</option>
+            <option value="1.5">1.5</option>
+            <option value="2" selected>2</option>
+            <option value="2.5">2.5</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+            <option value="8">8</option>
+            <option value="10">10</option>
+            <option value="custom">Özel...</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Özel Modül (mm)</label>
+          <input type="number" id="moduleCustom" value="2" min="0.1" step="0.1" disabled>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="field">
+          <label>Basınç Açısı α (°)</label>
+          <select id="alpha">
+            <option value="14.5">14.5°</option>
+            <option value="20" selected>20° (Standart)</option>
+            <option value="25">25°</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Giriş Devri n [d/dk]</label>
+          <input type="number" id="rpm" value="1500" min="0" step="10">
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <div class="field full" style="margin-bottom: 10px;">
+        <label>Çalışma Modu (Sabit Eleman / Giriş → Çıkış)</label>
+        <div class="toggle-row" id="modeToggle">
+          <button data-mode="ring_fixed" class="active">Ring Sabit · Güneş→Taşıyıcı</button>
+          <button data-mode="carrier_fixed">Taşıyıcı Sabit · Güneş→Ring</button>
+          <button data-mode="sun_fixed">Güneş Sabit · Ring→Taşıyıcı</button>
+        </div>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="calcBtn">Hesapla & Çiz</button>
+        <button class="btn secondary" id="resetBtn">Sıfırla</button>
+      </div>
+    </div>
+
+    <!-- Sonuçlar -->
+    <div class="panel" style="margin-top: 14px;">
+      <h2>Hesap Sonuçları</h2>
+      <div class="results" id="results"></div>
+      <div id="validation"></div>
+    </div>
+  </div>
+
+  <!-- Çizim Alanı -->
+  <div class="canvas-wrap">
+    <div class="canvas-tools">
+      <label>Animasyon
+        <input type="checkbox" id="anim" checked>
+      </label>
+      <label>Hız
+        <input type="range" id="speed" min="0" max="100" value="30">
+      </label>
+      <label>Dişli Detayı
+        <input type="checkbox" id="teethDetail" checked>
+      </label>
+      <button class="btn secondary" id="exportBtn" style="flex:0 0 auto;">SVG İndir</button>
+    </div>
+    <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
+    <div class="legend">
+      <span><span class="dot" style="background:#fbbf24"></span>Güneş Dişli (Sun)</span>
+      <span><span class="dot" style="background:#60a5fa"></span>Planet Dişliler</span>
+      <span><span class="dot" style="background:#a78bfa"></span>Ring (İç Dişli)</span>
+      <span><span class="dot" style="background:#4ade80"></span>Taşıyıcı (Carrier)</span>
+    </div>
+  </div>
+</div>
+
+<footer>
+  Planet dişli kinematik formülleri: i = 1 + Zr/Zs (Ring sabit, Güneş giriş, Taşıyıcı çıkış). Montaj koşulu: (Zs + Zr) / N ∈ ℤ.
+</footer>
+
+<script>
+// ---------------------------------------------------------------------------
+// Presetler — piyasada yaygın kullanılan planet dişli konfigürasyonları
+// ---------------------------------------------------------------------------
+const PRESETS = [
+  {
+    name: "Otomotiv Otomatik Şanzıman",
+    desc: "Zs=24, Zp=18, Zr=60, N=3, m=2",
+    values: { zs: 24, zp: 18, zr: 60, np: 3, m: 2 }
+  },
+  {
+    name: "Endüstriyel Redüktör 1:5",
+    desc: "Zs=18, Zp=27, Zr=72, N=3, m=3",
+    values: { zs: 18, zp: 27, zr: 72, np: 3, m: 3 }
+  },
+  {
+    name: "Robotik (Yüksek Hassasiyet)",
+    desc: "Zs=12, Zp=18, Zr=48, N=3, m=1",
+    values: { zs: 12, zp: 18, zr: 48, np: 3, m: 1 }
+  },
+  {
+    name: "Rüzgar Türbini 1. Kademe",
+    desc: "Zs=21, Zp=39, Zr=99, N=3, m=10",
+    values: { zs: 21, zp: 39, zr: 99, np: 3, m: 10 }
+  },
+  {
+    name: "Standart 1:4 Redüktör",
+    desc: "Zs=20, Zp=20, Zr=60, N=3, m=2",
+    values: { zs: 20, zp: 20, zr: 60, np: 3, m: 2 }
+  },
+  {
+    name: "Yüksek Tork (4 Planet)",
+    desc: "Zs=16, Zp=24, Zr=64, N=4, m=4",
+    values: { zs: 16, zp: 24, zr: 64, np: 4, m: 4 }
+  },
+  {
+    name: "Kompakt Servo Redüktör",
+    desc: "Zs=15, Zp=15, Zr=45, N=3, m=1",
+    values: { zs: 15, zp: 15, zr: 45, np: 3, m: 1 }
+  },
+  {
+    name: "Ağır Endüstri (5 Planet)",
+    desc: "Zs=20, Zp=30, Zr=80, N=5, m=6",
+    values: { zs: 20, zp: 30, zr: 80, np: 5, m: 6 }
+  }
+];
+
+// ---------------------------------------------------------------------------
+// UI Setup
+// ---------------------------------------------------------------------------
+const $ = (id) => document.getElementById(id);
+
+function renderPresets() {
+  const grid = $("presetGrid");
+  grid.innerHTML = "";
+  PRESETS.forEach((p, i) => {
+    const btn = document.createElement("button");
+    btn.className = "preset-btn";
+    btn.innerHTML = `<span class="ptitle">${p.name}</span><span class="pdesc">${p.desc}</span>`;
+    btn.addEventListener("click", () => applyPreset(p));
+    grid.appendChild(btn);
+  });
+}
+
+function applyPreset(p) {
+  $("zs").value = p.values.zs;
+  $("zp").value = p.values.zp;
+  $("zr").value = p.values.zr;
+  $("np").value = p.values.np;
+  const mSel = $("modulePreset");
+  const hasOpt = Array.from(mSel.options).some(o => parseFloat(o.value) === p.values.m);
+  if (hasOpt) {
+    mSel.value = String(p.values.m);
+    $("moduleCustom").disabled = true;
+    $("moduleCustom").value = p.values.m;
+  } else {
+    mSel.value = "custom";
+    $("moduleCustom").disabled = false;
+    $("moduleCustom").value = p.values.m;
+  }
+  calculateAndDraw();
+}
+
+// Modül seçimi
+$("modulePreset").addEventListener("change", () => {
+  const isCustom = $("modulePreset").value === "custom";
+  $("moduleCustom").disabled = !isCustom;
+  if (!isCustom) $("moduleCustom").value = $("modulePreset").value;
+});
+
+// Zr otomatik güncellensin
+function syncRing() {
+  const zs = parseInt($("zs").value) || 0;
+  const zp = parseInt($("zp").value) || 0;
+  $("zr").value = zs + 2 * zp;
+}
+$("zs").addEventListener("input", () => { syncRing(); });
+$("zp").addEventListener("input", () => { syncRing(); });
+
+// Mod toggle
+let currentMode = "ring_fixed";
+$("modeToggle").addEventListener("click", (e) => {
+  if (e.target.tagName === "BUTTON") {
+    document.querySelectorAll("#modeToggle button").forEach(b => b.classList.remove("active"));
+    e.target.classList.add("active");
+    currentMode = e.target.dataset.mode;
+    calculateAndDraw();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Hesaplama
+// ---------------------------------------------------------------------------
+function getModule() {
+  return $("modulePreset").value === "custom"
+    ? parseFloat($("moduleCustom").value) || 1
+    : parseFloat($("modulePreset").value);
+}
+
+function calculate() {
+  const zs = parseInt($("zs").value);
+  const zp = parseInt($("zp").value);
+  const zr = parseInt($("zr").value);
+  const N  = parseInt($("np").value);
+  const m  = getModule();
+  const alpha = parseFloat($("alpha").value);
+  const rpm = parseFloat($("rpm").value) || 0;
+
+  // Çap hesapları (taksimat / pitch çapları)
+  const ds = m * zs;
+  const dp = m * zp;
+  const dr = m * zr;
+
+  // Diş üstü çapları
+  const das = m * (zs + 2);
+  const dap = m * (zp + 2);
+  const dar = m * (zr - 2); // iç dişli için
+
+  // Diş dibi
+  const dfs = m * (zs - 2.5);
+  const dfp = m * (zp - 2.5);
+  const dfr = m * (zr + 2.5);
+
+  // Eksenler arası mesafe
+  const a = m * (zs + zp) / 2;
+
+  // Çevrim oranı (modu bağlı)
+  let ratio = 0, ratioFormula = "", outRpm = 0;
+  if (currentMode === "ring_fixed") {
+    // Sun giriş, Ring sabit → Carrier çıkış
+    ratio = 1 + zr / zs;
+    ratioFormula = "i = 1 + Zr/Zs";
+    outRpm = rpm / ratio;
+  } else if (currentMode === "carrier_fixed") {
+    // Sun giriş, Carrier sabit → Ring çıkış (yönü ters)
+    ratio = -zr / zs;
+    ratioFormula = "i = −Zr/Zs";
+    outRpm = rpm / ratio;
+  } else if (currentMode === "sun_fixed") {
+    // Ring giriş, Sun sabit → Carrier çıkış
+    ratio = 1 + zs / zr;
+    ratioFormula = "i = 1 + Zs/Zr";
+    outRpm = rpm / ratio;
+  }
+
+  // Planet dönüş hızı (sun giriş, ring sabit)
+  const omegaSun = rpm;
+  const omegaCarrier = omegaSun / (1 + zr / zs);
+  const omegaPlanet = (omegaSun - omegaCarrier) * (-zs / zp) + omegaCarrier;
+
+  // Doğrulamalar
+  const errors = [];
+  // 1. Ring = sun + 2*planet
+  if (zr !== zs + 2 * zp) {
+    errors.push(`Geometri: Zr ≠ Zs + 2·Zp  (gerekli: ${zs + 2*zp})`);
+  }
+  // 2. Montaj koşulu (Zs + Zr) / N tam sayı olmalı
+  if ((zs + zr) % N !== 0) {
+    errors.push(`Montaj koşulu sağlanmıyor: (Zs+Zr)/N = ${((zs+zr)/N).toFixed(3)} tam sayı değil`);
+  }
+  // 3. Komşuluk koşulu — planetler birbirine değmesin
+  const carrierR = m * (zs + zp) / 2;
+  const neighborDist = 2 * carrierR * Math.sin(Math.PI / N);
+  const planetTipDia = m * (zp + 2);
+  if (neighborDist <= planetTipDia) {
+    errors.push(`Komşuluk koşulu: planetler çakışıyor (mesafe ${neighborDist.toFixed(2)} mm ≤ planet diş üstü Ø ${planetTipDia.toFixed(2)} mm)`);
+  }
+  // 4. Minimum diş sayısı kontrolü (alttan kesilme — 20° için ~17)
+  const minTeeth = alpha >= 20 ? 17 : 32;
+  if (zs < minTeeth) {
+    errors.push(`Uyarı: Zs < ${minTeeth}, ${alpha}° basınç açısında alttan kesilme (undercut) olabilir`);
+  }
+
+  return {
+    zs, zp, zr, N, m, alpha, rpm,
+    ds, dp, dr, das, dap, dar, dfs, dfp, dfr,
+    a, ratio, ratioFormula, outRpm,
+    omegaSun, omegaCarrier, omegaPlanet,
+    errors
+  };
+}
+
+function renderResults(r) {
+  const fmt = (v, u = "") => isFinite(v) ? `${v.toFixed(2)}${u}` : "—";
+  const items = [
+    ["Çevrim Oranı (i)", `${fmt(r.ratio)}  (${r.ratioFormula})`],
+    ["Çıkış Devri", fmt(r.outRpm, " d/dk")],
+    ["Eksenler Arası (a)", fmt(r.a, " mm")],
+    ["Güneş Taksimat Ø (ds)", fmt(r.ds, " mm")],
+    ["Planet Taksimat Ø (dp)", fmt(r.dp, " mm")],
+    ["Ring Taksimat Ø (dr)", fmt(r.dr, " mm")],
+    ["Güneş Diş Üstü Ø", fmt(r.das, " mm")],
+    ["Planet Diş Üstü Ø", fmt(r.dap, " mm")],
+    ["Ring Diş Dibi Ø", fmt(r.dfr, " mm")],
+    ["Taşıyıcı Devri", fmt(r.omegaCarrier, " d/dk")],
+    ["Planet Kendi Ekseni Devri", fmt(r.omegaPlanet, " d/dk")],
+    ["Toplam Diş Yükü Paylaşımı", `${r.N} planet`]
+  ];
+  $("results").innerHTML = items.map(([l, v]) =>
+    `<div class="result-item"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
+  ).join("");
+
+  const valEl = $("validation");
+  if (r.errors.length === 0) {
+    valEl.innerHTML = `<div class="validation ok">✓ Tüm kinematik ve montaj koşulları sağlanıyor.</div>`;
+  } else {
+    valEl.innerHTML = `<div class="validation err"><strong>Uyarılar:</strong><ul>${
+      r.errors.map(e => `<li>${e}</li>`).join("")
+    }</ul></div>`;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// SVG Çizim
+// ---------------------------------------------------------------------------
+const NS = "http://www.w3.org/2000/svg";
+let animState = { sunAngle: 0, carrierAngle: 0, planetAngle: 0, running: true, lastTs: 0 };
+
+function el(name, attrs = {}) {
+  const e = document.createElementNS(NS, name);
+  Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+  return e;
+}
+
+// Dişli profili — basitleştirilmiş trapez-dişli yaklaşımı (görsel amaçlı)
+// Her diş için 4 nokta: kök-başlangıç, tepe-başlangıç, tepe-sonu, kök-sonu
+function gearPath(teeth, pitchR, addendum, dedendum, internal = false) {
+  const Z = teeth;
+  const ang = (Math.PI * 2) / Z;
+  const rOut = internal ? pitchR + dedendum : pitchR + addendum;
+  const rIn  = internal ? pitchR + addendum  : pitchR - dedendum;
+  const toothW = 0.55;        // diş kök genişliği (açı oranı)
+  const tipW   = toothW * 0.6; // diş tepe genişliği (daha dar)
+  let d = "";
+  for (let i = 0; i < Z; i++) {
+    const base = i * ang;
+    const a1 = base - (toothW * ang) / 2; // kök başlangıç
+    const a2 = base - (tipW   * ang) / 2; // tepe başlangıç
+    const a3 = base + (tipW   * ang) / 2; // tepe sonu
+    const a4 = base + (toothW * ang) / 2; // kök sonu
+    const p1 = polar(rIn,  a1);
+    const p2 = polar(rOut, a2);
+    const p3 = polar(rOut, a3);
+    const p4 = polar(rIn,  a4);
+    d += (i === 0 ? "M" : "L") + ` ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} `;
+    d += `L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} `;
+    d += `L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)} `;
+    d += `L ${p4.x.toFixed(2)} ${p4.y.toFixed(2)} `;
+  }
+  d += "Z";
+  return d;
+}
+
+function polar(r, a) {
+  return { x: r * Math.cos(a), y: r * Math.sin(a) };
+}
+
+// Basit daire dişli (detay kapalıyken)
+function simpleGearPath(r) {
+  return `M ${r} 0 A ${r} ${r} 0 1 1 ${-r} 0 A ${r} ${r} 0 1 1 ${r} 0 Z`;
+}
+
+function draw(r) {
+  const svg = $("diagram");
+  svg.innerHTML = "";
+
+  // ViewBox'u Ring + biraz pay kadar ayarla
+  const maxR = (r.zr * r.m) / 2 + r.m * 3 + 20;
+  svg.setAttribute("viewBox", `-${maxR} -${maxR} ${maxR*2} ${maxR*2}`);
+
+  const detail = $("teethDetail").checked;
+  const m = r.m;
+
+  const sunR = r.ds / 2;
+  const planetR = r.dp / 2;
+  const ringR = r.dr / 2;
+  const carrierR = r.a; // sun ile planet merkezi arası
+
+  // RING (iç dişli) — dış halka + iç dişler
+  const ringGroup = el("g");
+  const ringOuter = el("circle", {
+    cx: 0, cy: 0, r: ringR + m * 4,
+    fill: "#1e1b4b",
+    stroke: "#a78bfa",
+    "stroke-width": 1.5
+  });
+  ringGroup.appendChild(ringOuter);
+  const ringInner = el("path", {
+    d: detail ? gearPath(r.zr, ringR, m, m * 1.25, true) : simpleGearPath(ringR),
+    fill: "#0a1020",
+    stroke: "#a78bfa",
+    "stroke-width": 1.2
+  });
+  ringGroup.appendChild(ringInner);
+  svg.appendChild(ringGroup);
+
+  // CARRIER (taşıyıcı) — planetleri birleştiren disk
+  const carrierGroup = el("g", { id: "carrierG" });
+  // Planet merkez noktaları arasını birleştir
+  const carrierPts = [];
+  for (let i = 0; i < r.N; i++) {
+    const a = (i / r.N) * Math.PI * 2;
+    carrierPts.push({ x: carrierR * Math.cos(a), y: carrierR * Math.sin(a) });
+  }
+  for (let i = 0; i < r.N; i++) {
+    const next = carrierPts[(i + 1) % r.N];
+    const p = carrierPts[i];
+    const arm = el("path", {
+      d: `M 0 0 L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`,
+      stroke: "#4ade80",
+      "stroke-width": 4,
+      "stroke-linecap": "round",
+      opacity: 0.55
+    });
+    carrierGroup.appendChild(arm);
+  }
+  // Carrier merkez göbeği
+  carrierGroup.appendChild(el("circle", { cx: 0, cy: 0, r: m * 2.5, fill: "#4ade80", opacity: 0.4 }));
+
+  // PLANETLER
+  const planetsGroup = el("g", { id: "planetsG" });
+  for (let i = 0; i < r.N; i++) {
+    const a = (i / r.N) * Math.PI * 2;
+    const cx = carrierR * Math.cos(a);
+    const cy = carrierR * Math.sin(a);
+    const pg = el("g", {
+      transform: `translate(${cx.toFixed(2)} ${cy.toFixed(2)})`,
+      "data-planet-idx": i
+    });
+    const inner = el("g", { class: "planet-rot" });
+    inner.appendChild(el("path", {
+      d: detail ? gearPath(r.zp, planetR, m, m * 1.25, false) : simpleGearPath(planetR),
+      fill: "#1e3a5f",
+      stroke: "#60a5fa",
+      "stroke-width": 1.2
+    }));
+    // İşaret noktası (dönüşü göstermek için)
+    inner.appendChild(el("circle", {
+      cx: planetR * 0.6, cy: 0, r: m * 0.6,
+      fill: "#fbbf24"
+    }));
+    pg.appendChild(inner);
+    planetsGroup.appendChild(pg);
+  }
+  carrierGroup.appendChild(planetsGroup);
+  svg.appendChild(carrierGroup);
+
+  // SUN (Güneş)
+  const sunGroup = el("g", { id: "sunG" });
+  sunGroup.appendChild(el("path", {
+    d: detail ? gearPath(r.zs, sunR, m, m * 1.25, false) : simpleGearPath(sunR),
+    fill: "#78350f",
+    stroke: "#fbbf24",
+    "stroke-width": 1.4
+  }));
+  // İşaret çentiği
+  sunGroup.appendChild(el("line", {
+    x1: 0, y1: 0, x2: sunR * 0.9, y2: 0,
+    stroke: "#fff", "stroke-width": 2
+  }));
+  svg.appendChild(sunGroup);
+
+  // Etiketler
+  const labels = el("g", { "font-family": "system-ui", "font-size": 11, fill: "#94a3b8" });
+  labels.appendChild(el("text", { x: 0, y: -ringR - m * 2 - 6, "text-anchor": "middle", fill: "#a78bfa" })).textContent = `Ring Z=${r.zr}`;
+  labels.appendChild(el("text", { x: 0, y: sunR + m * 3 + 12, "text-anchor": "middle", fill: "#fbbf24" })).textContent = `Sun Z=${r.zs}`;
+  svg.appendChild(labels);
+
+  return { sunR, planetR, ringR, carrierR };
+}
+
+// ---------------------------------------------------------------------------
+// Animasyon
+// ---------------------------------------------------------------------------
+let lastResult = null;
+function animate(ts) {
+  if (!lastResult) { requestAnimationFrame(animate); return; }
+  const dt = animState.lastTs ? (ts - animState.lastTs) / 1000 : 0;
+  animState.lastTs = ts;
+  if ($("anim").checked) {
+    const speedFactor = parseFloat($("speed").value) / 30; // 1.0 = normal
+    const sunOmega = 60 * speedFactor; // derece/sn
+    const r = lastResult;
+    const carrierOmega = sunOmega / r.ratio;
+    const planetOmega = (sunOmega - carrierOmega) * (-r.zs / r.zp) + carrierOmega;
+
+    animState.sunAngle += sunOmega * dt;
+    animState.carrierAngle += carrierOmega * dt;
+    animState.planetAngle += planetOmega * dt;
+
+    const sunG = $("sunG");
+    const carrierG = $("carrierG");
+    if (sunG) sunG.setAttribute("transform", `rotate(${animState.sunAngle})`);
+    if (carrierG) carrierG.setAttribute("transform", `rotate(${animState.carrierAngle})`);
+    // Planet kendi etrafında dönüş
+    document.querySelectorAll(".planet-rot").forEach(p => {
+      // Planet kendi yerel ekseninde dönmeli — carrier dönmüşken ekstra spin
+      p.setAttribute("transform", `rotate(${animState.planetAngle - animState.carrierAngle})`);
+    });
+  }
+  requestAnimationFrame(animate);
+}
+requestAnimationFrame(animate);
+
+// ---------------------------------------------------------------------------
+// Ana akış
+// ---------------------------------------------------------------------------
+function calculateAndDraw() {
+  syncRing();
+  const r = calculate();
+  renderResults(r);
+  if (r.errors.filter(e => !e.startsWith("Uyarı")).length === 0) {
+    lastResult = r;
+    draw(r);
+    animState.sunAngle = 0;
+    animState.carrierAngle = 0;
+    animState.planetAngle = 0;
+  } else {
+    // Yine de çiz, ama göster
+    lastResult = r;
+    draw(r);
+  }
+}
+
+$("calcBtn").addEventListener("click", calculateAndDraw);
+$("resetBtn").addEventListener("click", () => {
+  applyPreset(PRESETS[0]);
+});
+
+$("exportBtn").addEventListener("click", () => {
+  const svg = $("diagram");
+  const serializer = new XMLSerializer();
+  const src = serializer.serializeToString(svg);
+  const blob = new Blob([`<?xml version="1.0"?>\n` + src], { type: "image/svg+xml" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "planet-dis-li.svg";
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// Otomatik yeniden çiz — parametre değiştiğinde
+["zs","zp","zr","np","alpha","rpm","modulePreset","moduleCustom","teethDetail"].forEach(id => {
+  $(id).addEventListener("change", calculateAndDraw);
+});
+
+// Başlat
+renderPresets();
+calculateAndDraw();
+</script>
+</body>
+</html>
