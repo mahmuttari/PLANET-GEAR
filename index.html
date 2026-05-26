@@ -158,6 +158,49 @@
   }
   .btn.secondary:hover { background: #2d3b54; }
 
+  .auto-size-row {
+    display: flex;
+    gap: 5px;
+    flex-wrap: wrap;
+    margin: 4px 0 10px;
+  }
+  .btn-mini {
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    color: var(--accent-2);
+    padding: 5px 8px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .btn-mini:hover { background: #2d3b54; border-color: var(--accent); }
+  .micro-lock {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    cursor: pointer;
+    font-size: 9px;
+    padding: 0 2px;
+    opacity: 0.5;
+    transition: opacity 0.15s;
+  }
+  .micro-lock:hover, .micro-lock.locked { opacity: 1; color: var(--gold); }
+  .fix-btn {
+    background: var(--ok);
+    color: #08111f;
+    border: none;
+    padding: 4px 9px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    font-weight: 600;
+    margin-left: 6px;
+    transition: background 0.15s;
+  }
+  .fix-btn:hover { background: #86efac; }
   .toggle-row {
     display: flex;
     gap: 3px;
@@ -235,8 +278,9 @@
     border-radius: 7px;
     font-size: 12.5px;
   }
-  .validation.ok  { background: rgba(74, 222, 128, 0.12); border: 1px solid rgba(74, 222, 128, 0.4); color: var(--ok); }
-  .validation.err { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248, 113, 113, 0.4); color: var(--err); }
+  .validation.ok   { background: rgba(74, 222, 128, 0.12); border: 1px solid rgba(74, 222, 128, 0.4); color: var(--ok); }
+  .validation.warn { background: rgba(250, 204, 21, 0.10); border: 1px solid rgba(250, 204, 21, 0.4); color: var(--warn); }
+  .validation.err  { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248, 113, 113, 0.4); color: var(--err); }
   .validation ul { margin: 4px 0 0 18px; padding: 0; }
 
   .canvas-wrap {
@@ -329,17 +373,23 @@
       <div class="panel-body" id="basicBody">
         <div class="row three">
           <div class="field">
-            <label>Güneş Zs</label>
+            <label>Güneş Zs <button class="micro-lock" data-lock="zs" title="Bu değeri otomatik boyutlandırma sırasında sabit tut">🔒</button></label>
             <input type="number" id="zs" value="20" min="6" step="1">
           </div>
           <div class="field">
-            <label>Planet Zp</label>
+            <label>Planet Zp <button class="micro-lock" data-lock="zp" title="Sabit tut">🔒</button></label>
             <input type="number" id="zp" value="20" min="6" step="1">
           </div>
           <div class="field">
-            <label>Ring Zr</label>
+            <label>Ring Zr <button class="micro-lock" data-lock="zr" title="Sabit tut">🔒</button></label>
             <input type="number" id="zr" value="60" min="6" step="1">
           </div>
+        </div>
+        <div class="auto-size-row">
+          <button class="btn-mini" id="autoZp">Sun+Ring'den Zp</button>
+          <button class="btn-mini" id="autoZr">Sun+Zp'den Zr</button>
+          <button class="btn-mini" id="autoZs">Ring+Zp'den Zs</button>
+          <button class="btn-mini" id="autoN">N öner</button>
         </div>
 
         <div class="row three">
@@ -575,9 +625,10 @@ function inv(alpha) { return Math.tan(alpha) - alpha; }
 // =============================================================================
 //                          DİŞLİ PROFİLİ (involüt)
 // =============================================================================
-// Dış (external) ve iç (internal/ring) dişli için profil oluşturur.
-// Tek dişin sınırı: sağ kanat (kök→tepe) → tepe yayı → sol kanat (tepe→kök) → kök yayı
-// Çıktı: SVG `d` özelliği için path string
+// Bir dişin iki yanağı, taban çemberinin involütüdür ve diş eksenine
+// göre simetrik konumlanır. Diş ucundan kök yönüne giderken diş kalınlığı
+// daralır (eksene yaklaşır). Bu, harici dişli için "doğal involüt yansıması",
+// dahili dişli için doğrudan doğal involüt kullanımı ile sağlanır.
 function generateGearPath(opts) {
   const {
     z, m, alpha, x = 0,
@@ -587,141 +638,132 @@ function generateGearPath(opts) {
   } = opts;
 
   const aRad = alpha * DEG;
-  const r  = (m * z) / 2;                  // Pitch yarıçapı
+  const r  = (m * z) / 2;                   // Pitch yarıçapı
   const rb = r * Math.cos(aRad);            // Taban (base) yarıçapı
   let ra, rf;
   if (internal) {
-    // İç dişli: tepe daha küçük yarıçap, dip daha büyük
-    ra = r - (ha - x) * m;
-    rf = r + (hf + x) * m;
+    ra = r - (ha - x) * m;     // tepe (iç tarafa bakar — daha küçük yarıçap)
+    rf = r + (hf + x) * m;     // dip (dışta — daha büyük yarıçap)
   } else {
-    ra = r + (ha + x) * m;
-    rf = r - (hf - x) * m;
+    ra = r + (ha + x) * m;     // tepe (dışta)
+    rf = r - (hf - x) * m;     // dip (içte)
   }
   if (rf < 0.1) rf = 0.1;
 
   // Pitch çemberinde diş yarı kalınlık açısı
-  // s = m * (π/2 + 2x·tan α)   ;   ψ = s / (2r)
+  // s = m * (π/2 + 2·x·tan α)   ;   ψ = s / (2r)
   const sPitch = m * (Math.PI / 2 + 2 * x * Math.tan(aRad));
   const halfTooth = sPitch / (2 * r);
 
-  // İnvolüt parametre sınırları
-  // İnvolüt t=0'da rb'de başlar.
-  // r(t) = rb * sqrt(1 + t²)  →  t(r) = sqrt((r/rb)² - 1)
-  const tAtR  = (rad) => rad > rb ? Math.sqrt((rad / rb) ** 2 - 1) : 0;
-  const tStart = tAtR(Math.max(rb, internal ? Math.min(ra, rf) : Math.max(rb, rf)));
-  const tEnd   = tAtR(internal ? rf : ra);
+  // İnvolütün pitch çemberindeki polar açısı: inv(α) = tan α − α
+  const invAlpha = Math.tan(aRad) - aRad;
 
-  // İnvolütin pitch çemberindeki dönme miktarı: inv(α)
-  // Profil pitch'te diş ekseninin sağında halfTooth açısında bitecek şekilde hizalanır.
-  // Bir kanadın taban açısı: ψ_base = halfTooth - inv(α) ; bu açıda involüt t=0'da başlar
-  // (t artarken kanat saat yönü tersi büyür).
-  // Diş ekseni 0 derecede ise: sağ kanat üzerindeki nokta, açı = ψ_base - involutePolarAngle(t)
-  // Burada involutePolarAngle(t) = inv'in t parametresindeki polar açısı = (tan(α_t) − α_t)
-  // ama biz doğrudan involute() fonksiyonu ile Kartezyen üretip rotate'lediğimizden,
-  // sağ kanadı baz açıda generate edip, ekseni doğru noktaya çekmek için referans alıyoruz.
-
-  // Pitch çemberindeki involüt noktası: t = tan(α) → involüt(rb, tan(α))
-  // Bu nokta polar açısı: atan2(y, x). Pitch'te diş yan tarafının açısal pozisyonu = halfTooth.
-  // Yani sağ kanat noktalarını üretip, (halfTooth - pitchInvAngle) kadar döndürelim.
-  const pitchPt = involute(rb, Math.tan(aRad));
-  const pitchInvAngle = Math.atan2(pitchPt.y, pitchPt.x);
+  // İnvolüt parametre sınırları (t = sqrt((r/rb)² − 1))
+  const tAtR = (rad) => rad > rb ? Math.sqrt((rad / rb) ** 2 - 1) : 0;
+  let tInner, tOuter;
+  if (internal) {
+    // Dahili: yanağın radyal aralığı [ra, rf], ra<rf, ra ≥ rb genelde
+    tInner = tAtR(Math.max(rb, Math.min(ra, rf)));
+    tOuter = tAtR(Math.max(ra, rf));
+  } else {
+    // Harici: yanak [max(rb, rf), ra]
+    tInner = tAtR(Math.max(rb, Math.min(ra, rf)));
+    tOuter = tAtR(Math.max(ra, rf));
+  }
 
   const segs = Math.max(3, segments);
-  // Sağ kanat noktaları (kök → tepe). İnvolüt için t artarken yarıçap büyür.
-  // t'yi tStart..tEnd arasında örnekle.
-  const rightFlank = [];
+  // İnvolüt noktaları (kök tarafından tepe tarafına, t artarken yarıçap büyür)
+  const involutePts = [];
   for (let i = 0; i <= segs; i++) {
-    const t = tStart + (tEnd - tStart) * (i / segs);
-    const p = involute(rb, t);
-    rightFlank.push(p);
+    const t = tInner + (tOuter - tInner) * (i / segs);
+    involutePts.push(involute(rb, t));
   }
-  // İç dişlide yarıçap azaltılırken eğri ters yöne genişlemiyor; bu yüzden
-  // iç dişli için involüt yine dışa doğru üretilir, sadece tepe ve dip rolleri swap.
-  // Görsel doğruluk için iç dişlide kanadı dışa katlanmış (mirror) gösteriyoruz.
-  // Bu, tüketici-dişli (rack-conjugate) ile tutarlıdır.
 
-  // Sağ kanatı eksene hizala: kanat pitch radyusunu kestiğinde, açı = +halfTooth olsun.
-  // Şu an pitchPt'in polar açısı = pitchInvAngle ; istediğimiz = halfTooth.
-  const shift = halfTooth - pitchInvAngle;
-  // Kök ucunu eksende -halfTooth tarafına geçirmemek için aynı shift uygulanır.
-  // İç dişlide kanadı yönünü ters çeviriyoruz (eksen üzerinde y → -y), bu yan değişimini sağlar.
+  // KRİTİK HATA DÜZELTMESİ (önceki sürümde diş tepede genişliyordu):
+  // Harici dişli için ÜST yanak, doğal involütün y-yansıması olmalı
+  // (kanat tepeye doğru eksene yaklaşır, yani diş daralır).
+  // Dahili dişli için tam tersi — doğal involüt doğrudan kullanılır.
+  // shiftMag: yanağın pitch'te ±halfTooth'a oturması için gereken döndürme.
+  //   Harici (yansıtılmış involüt): φ_pitch = −invα → +halfTooth için +halfTooth+invα
+  //   Dahili (doğal involüt):       φ_pitch = +invα → +halfTooth için +halfTooth−invα
+  const shiftMag = halfTooth + (internal ? -invAlpha : invAlpha);
 
-  const orientRight = (p) => {
-    let q = internal ? { x: p.x, y: -p.y } : p;
-    return rotate(q, shift);
+  const orientUpper = (p) => {
+    const q = internal ? p : { x: p.x, y: -p.y }; // harici için yansıt
+    return rotate(q, shiftMag);
   };
-  const orientLeft = (p) => {
-    let q = internal ? { x: p.x, y: -p.y } : p;
-    q = { x: q.x, y: -q.y }; // sol kanat sağın aynası (y → -y)
-    return rotate(q, -shift); // ters yön
+  const orientLower = (p) => {
+    const q = internal ? { x: p.x, y: -p.y } : p; // alt yanak üstün aynası
+    return rotate(q, -shiftMag);
   };
 
-  // Diş üstü ve diş dibi yarıçapları
-  const tipRadius  = internal ? ra : ra; // mutlak yarıçap, internal'de ra<r
-  const rootRadius = internal ? rf : rf;
+  // Tepe ve dip yarıçapları
+  const tipRadius  = ra;
+  const rootRadius = rf;
+  const clampR = (p, R) => {
+    const m_ = Math.hypot(p.x, p.y);
+    if (m_ < 1e-6) return p;
+    return { x: (p.x * R) / m_, y: (p.y * R) / m_ };
+  };
 
   let d = "";
   const pitchAngle = TAU / z;
 
+  // İlk dişin üst-kök açısı (kapanış için saklanır)
+  const firstUpperRootAng = (() => {
+    const p = involutePts[0];
+    const localAng = Math.atan2(p.y, p.x);
+    return (internal ? localAng : -localAng) + shiftMag;
+  })();
+
   for (let i = 0; i < z; i++) {
     const center = i * pitchAngle;
 
-    // Sağ kanat noktaları, dişin merkez ekseninde
-    const rPts = rightFlank.map(p => rotate(orientRight(p), center));
-    const lPts = rightFlank.map(p => rotate(orientLeft(p), center));
-    // Tepeleri tipRadius'a kelepçele (numerik hata için):
-    const clamp = (p, R) => {
-      const m_ = Math.hypot(p.x, p.y);
-      if (m_ < 1e-6) return p;
-      return { x: p.x * R / m_, y: p.y * R / m_ };
-    };
-    // Kanat son nokta = tepe (ra) veya kök (rf), ortalanır
-    // (involüt parametrelendirmesi rf veya ra'yı tam yakalamayabilir).
-    const flankTip = clamp(rPts[rPts.length - 1], tipRadius);
-    const lFlankTip = clamp(lPts[lPts.length - 1], tipRadius);
-    rPts[rPts.length - 1] = flankTip;
-    lPts[lPts.length - 1] = lFlankTip;
+    // Üst yanak (kök → tepe)
+    const upper = involutePts.map(p => rotate(orientUpper(p), center));
+    const lower = involutePts.map(p => rotate(orientLower(p), center));
 
-    // Kanat başlangıcı (taban tarafı): rootRadius'a uzat (eğer rf<rb ise radyal çizgi ile)
-    // Basitlik için kök noktasını radyal olarak rootRadius'a yansıt:
-    const rRoot = (() => {
-      const ang = Math.atan2(rPts[0].y, rPts[0].x);
-      return { x: rootRadius * Math.cos(ang), y: rootRadius * Math.sin(ang) };
+    // Tepe noktalarını tam tip yarıçapına projekte et
+    upper[upper.length - 1] = clampR(upper[upper.length - 1], tipRadius);
+    lower[lower.length - 1] = clampR(lower[lower.length - 1], tipRadius);
+
+    // Kök noktalarını dip yarıçapına projekte et (rf<rb durumu için radyal hat)
+    const uRoot = (() => {
+      const a = Math.atan2(upper[0].y, upper[0].x);
+      return { x: rootRadius * Math.cos(a), y: rootRadius * Math.sin(a) };
     })();
     const lRoot = (() => {
-      const ang = Math.atan2(lPts[0].y, lPts[0].x);
-      return { x: rootRadius * Math.cos(ang), y: rootRadius * Math.sin(ang) };
+      const a = Math.atan2(lower[0].y, lower[0].x);
+      return { x: rootRadius * Math.cos(a), y: rootRadius * Math.sin(a) };
     })();
 
     if (i === 0) {
-      d += `M ${rRoot.x.toFixed(3)} ${rRoot.y.toFixed(3)} `;
+      d += `M ${uRoot.x.toFixed(3)} ${uRoot.y.toFixed(3)} `;
     } else {
-      // Önceki sol kök → bu sağ kök, kök çemberi boyunca yay
-      d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${rRoot.x.toFixed(3)} ${rRoot.y.toFixed(3)} `;
+      // Önceki dişin alt-kökünden bu dişin üst-köküne, dip çemberinde yay
+      d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${uRoot.x.toFixed(3)} ${uRoot.y.toFixed(3)} `;
     }
-    // Sağ kanat: kök → tepe
-    d += `L ${rPts[0].x.toFixed(3)} ${rPts[0].y.toFixed(3)} `;
-    for (let k = 1; k < rPts.length; k++) {
-      d += `L ${rPts[k].x.toFixed(3)} ${rPts[k].y.toFixed(3)} `;
+    // Üst yanak: kök tarafından tepeye
+    d += `L ${upper[0].x.toFixed(3)} ${upper[0].y.toFixed(3)} `;
+    for (let k = 1; k < upper.length; k++) {
+      d += `L ${upper[k].x.toFixed(3)} ${upper[k].y.toFixed(3)} `;
     }
-    // Tepe yayı: sağ tepe → sol tepe (yay tipRadius)
-    d += `A ${tipRadius.toFixed(3)} ${tipRadius.toFixed(3)} 0 0 ${internal ? 0 : 1} ${lPts[lPts.length-1].x.toFixed(3)} ${lPts[lPts.length-1].y.toFixed(3)} `;
-    // Sol kanat: tepe → kök
-    for (let k = lPts.length - 2; k >= 0; k--) {
-      d += `L ${lPts[k].x.toFixed(3)} ${lPts[k].y.toFixed(3)} `;
+    // Tepe yayı: üst tepeden alt tepeye, kısa yol (large-arc=0)
+    // Harici: tipRadius dışa konveks → sweep=0 (saat yönü math) — dişin DIŞINI dolaşır
+    // Dahili: tepe içeride, içbükey görünür → sweep=1
+    d += `A ${tipRadius.toFixed(3)} ${tipRadius.toFixed(3)} 0 0 ${internal ? 1 : 0} ${lower[lower.length-1].x.toFixed(3)} ${lower[lower.length-1].y.toFixed(3)} `;
+    // Alt yanak: tepeden köke
+    for (let k = lower.length - 2; k >= 0; k--) {
+      d += `L ${lower[k].x.toFixed(3)} ${lower[k].y.toFixed(3)} `;
     }
     d += `L ${lRoot.x.toFixed(3)} ${lRoot.y.toFixed(3)} `;
   }
-  // Son sol kökten ilk sağ köke kapanış yayı
-  d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${(() => {
-    // İlk dişin sağ kökü:
-    const center = 0;
-    const baseAng = Math.atan2(rightFlank[0].y, rightFlank[0].x);
-    const orient = internal ? -baseAng : baseAng;
-    const finalAng = orient + shift + center;
-    return `${(rootRadius * Math.cos(finalAng)).toFixed(3)} ${(rootRadius * Math.sin(finalAng)).toFixed(3)}`;
-  })()} `;
+  // Kapanış: son alt-kökten ilk üst-köke dip yayı
+  const firstUR = {
+    x: rootRadius * Math.cos(firstUpperRootAng),
+    y: rootRadius * Math.sin(firstUpperRootAng)
+  };
+  d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${firstUR.x.toFixed(3)} ${firstUR.y.toFixed(3)} `;
   d += "Z";
   return d;
 }
@@ -887,14 +929,78 @@ $("modulePreset").addEventListener("change", () => {
   calculateAndDraw();
 });
 
-// Zr otomatik
-function syncRing() {
-  const zs = parseInt($("zs").value) || 0;
-  const zp = parseInt($("zp").value) || 0;
+// Otomatik boyutlandırma butonları
+$("autoZp").addEventListener("click", () => {
+  const zs = parseInt($("zs").value);
+  const zr = parseInt($("zr").value);
+  const diff = zr - zs;
+  if (diff < 2) {
+    alert(`Zr (${zr}) − Zs (${zs}) = ${diff}, en az 12 olmalı.`);
+    return;
+  }
+  if (diff % 2 !== 0) {
+    const zpFloor = Math.floor(diff / 2);
+    const zpCeil  = zpFloor + 1;
+    const useCeil = confirm(
+      `Zr − Zs = ${diff} tek sayı. Zp tam çıkmıyor.\n\n` +
+      `Tam Zp için iki seçenek:\n` +
+      `  • Zp = ${zpFloor}, Zr = ${zs + 2*zpFloor}\n` +
+      `  • Zp = ${zpCeil},  Zr = ${zs + 2*zpCeil}\n\n` +
+      `Daha büyük olanı (Zp=${zpCeil}) seçmek için TAMAM, küçüğü için İPTAL.`
+    );
+    const zp = useCeil ? zpCeil : zpFloor;
+    $("zp").value = zp;
+    $("zr").value = zs + 2 * zp;
+  } else {
+    $("zp").value = diff / 2;
+  }
+  calculateAndDraw();
+});
+
+$("autoZr").addEventListener("click", () => {
+  const zs = parseInt($("zs").value);
+  const zp = parseInt($("zp").value);
   $("zr").value = zs + 2 * zp;
-}
-$("zs").addEventListener("input", syncRing);
-$("zp").addEventListener("input", syncRing);
+  calculateAndDraw();
+});
+
+$("autoZs").addEventListener("click", () => {
+  const zr = parseInt($("zr").value);
+  const zp = parseInt($("zp").value);
+  const zs = zr - 2 * zp;
+  if (zs < 6) {
+    alert(`Bu Zp ve Zr için Zs = ${zs}, çok küçük (min 6). Önce Zp veya Zr'yi değiştir.`);
+    return;
+  }
+  $("zs").value = zs;
+  calculateAndDraw();
+});
+
+$("autoN").addEventListener("click", () => {
+  const zs = parseInt($("zs").value);
+  const zr = parseInt($("zr").value);
+  const zp = parseInt($("zp").value);
+  const sum = zs + zr;
+  const m = getModule();
+  const carrierR = m * (zs + zp) / 2;
+  const planetTipDia = m * (zp + 2);
+  const valid = [];
+  for (let n = 2; n <= 8; n++) {
+    if (sum % n !== 0) continue;
+    const neighbor = 2 * carrierR * Math.sin(Math.PI / n);
+    if (neighbor > planetTipDia + 0.5 * m) valid.push({ n, neighbor });
+  }
+  if (valid.length === 0) {
+    alert(`(Zs + Zr) = ${sum} için 2..8 arasında geometrik olarak uygun N bulunamadı.\nDeneyiniz: Zp'yi azaltın veya Zs+Zr'yi farklı seçin.`);
+    return;
+  }
+  const list = valid.map(v => `  • N=${v.n} (planet aralığı ${v.neighbor.toFixed(1)} mm > tepe ${planetTipDia.toFixed(1)} mm)`).join("\n");
+  const bestN = valid[valid.length - 1].n; // en fazla planet (yük paylaşımı en iyi)
+  if (confirm(`Uygun N değerleri:\n${list}\n\nEn yüksek değer N=${bestN} seçilsin mi?`)) {
+    $("np").value = bestN;
+    calculateAndDraw();
+  }
+});
 
 // Tork/Güç senkronu
 function syncPower() {
@@ -1022,25 +1128,124 @@ function calculate() {
   const omegaPlanet = (omegaSun - omegaCarrier) * (-zs / zp) + omegaCarrier;
   const P_input = T_input * TAU * rpm / 60; // W
 
-  // ----- Doğrulamalar -----
+  // ----- Doğrulamalar (sayısal düzeltme önerileriyle) -----
   const errors = [];
-  if (zr !== zs + 2 * zp) errors.push(`Geometri: Zr ≠ Zs + 2·Zp (gerekli: ${zs + 2*zp})`);
-  if ((zs + zr) % N !== 0) errors.push(`Montaj koşulu sağlanmıyor: (Zs+Zr)/N = ${((zs+zr)/N).toFixed(3)}`);
 
+  // 1) Temel geometri: Zr = Zs + 2·Zp
+  if (zr !== zs + 2 * zp) {
+    const fixes = [];
+    const zrCorrect = zs + 2 * zp;
+    fixes.push({ label: `Zr → ${zrCorrect}`, target: "zr", value: zrCorrect });
+    if ((zr - zs) >= 12 && (zr - zs) % 2 === 0) {
+      fixes.push({ label: `Zp → ${(zr - zs) / 2}`, target: "zp", value: (zr - zs) / 2 });
+    } else if ((zr - zs) >= 13 && (zr - zs) % 2 !== 0) {
+      const zpFloor = Math.floor((zr - zs) / 2);
+      fixes.push({ label: `Zp → ${zpFloor} (Zr → ${zs + 2*zpFloor})`, multi: [
+        { target: "zp", value: zpFloor }, { target: "zr", value: zs + 2*zpFloor }
+      ] });
+    }
+    if ((zr - 2 * zp) >= 6) {
+      fixes.push({ label: `Zs → ${zr - 2 * zp}`, target: "zs", value: zr - 2 * zp });
+    }
+    errors.push({
+      severity: "err",
+      msg: `Geometri çelişkisi: Zr ≠ Zs + 2·Zp`,
+      detail: `Mevcut: ${zr} ≠ ${zs} + 2·${zp} = ${zs + 2*zp}  (fark: ${zr - (zs+2*zp)})`,
+      fixes
+    });
+  }
+
+  // 2) Montaj koşulu: (Zs + Zr) / N ∈ ℤ
+  if ((zs + zr) % N !== 0) {
+    const sum = zs + zr;
+    const fixes = [];
+    for (let n = 2; n <= 8; n++) {
+      if (sum % n === 0) fixes.push({ label: `N → ${n}`, target: "np", value: n });
+    }
+    const rem = sum % N;
+    const zsUp   = zs + (N - rem);
+    const zsDown = zs - rem;
+    const zrUp   = zr + (N - rem);
+    const zrDown = zr - rem;
+    if (zsDown >= 6) fixes.push({ label: `Zs → ${zsDown}`, target: "zs", value: zsDown });
+    fixes.push({ label: `Zs → ${zsUp}`,   target: "zs", value: zsUp });
+    if (zrDown >= 12) fixes.push({ label: `Zr → ${zrDown}`, target: "zr", value: zrDown });
+    fixes.push({ label: `Zr → ${zrUp}`,   target: "zr", value: zrUp });
+    errors.push({
+      severity: "err",
+      msg: `Montaj koşulu ihlal: (Zs + Zr) / N tam sayı değil`,
+      detail: `(${zs} + ${zr}) / ${N} = ${(sum/N).toFixed(3)}  →  N kalanı ${rem}`,
+      fixes
+    });
+  }
+
+  // 3) Komşuluk: planet diş tepeleri çakışmasın
   const carrierR = a;
   const neighborDist = 2 * carrierR * Math.sin(Math.PI / N);
-  if (neighborDist <= dap + 0.5 * m) {
-    errors.push(`Komşuluk koşulu ihlal: planet aralığı ${neighborDist.toFixed(2)} ≤ planet diş üstü Ø ${dap.toFixed(2)} mm`);
+  const minGap = 0.5 * m;
+  if (neighborDist <= dap + minGap) {
+    const fixes = [];
+    // N'i azalt
+    if (N > 2) fixes.push({ label: `N → ${N - 1}`, target: "np", value: N - 1 });
+    // Zp'yi azalt: yeni Zp gerek
+    // Şart: 2·a·sin(π/N) > m·(Zp+2) + minGap
+    // a = m·(Zs+Zp)/2  →  m·(Zs+Zp)·sin(π/N) > m·(Zp+2) + minGap
+    // (Zs+Zp)·sin(π/N) − Zp > 2 + minGap/m
+    // Zp·(sin(π/N) − 1) > 2 + minGap/m − Zs·sin(π/N)
+    // Zp < (Zs·sin(π/N) − 2 − minGap/m) / (1 − sin(π/N))
+    const s = Math.sin(Math.PI / N);
+    const zpMax = Math.floor((zs * s - 2 - minGap / m) / (1 - s));
+    if (zpMax >= 6 && zpMax < zp) {
+      const zrNew = zs + 2 * zpMax;
+      fixes.push({ label: `Zp → ${zpMax}, Zr → ${zrNew}`, multi: [
+        { target: "zp", value: zpMax }, { target: "zr", value: zrNew }
+      ]});
+    }
+    errors.push({
+      severity: "err",
+      msg: `Komşuluk ihlal: planetler birbirine değiyor`,
+      detail: `Planet merkezleri arası ${neighborDist.toFixed(2)} mm ≤ planet diş üstü Ø ${dap.toFixed(2)} mm`,
+      fixes
+    });
   }
-  // Undercut kontrolü: zmin = 2/sin²(α) ≈ 17 (20° için)
-  const zmin = 2 / (Math.sin(aRad) ** 2);
-  const xs_min = (zmin - zs) / zmin;
-  const xp_min = (zmin - zp) / zmin;
-  if (zs < zmin && xs < xs_min - 0.01) {
-    errors.push(`Güneş: undercut riski (gerekli x ≥ ${xs_min.toFixed(2)}, mevcut ${xs})`);
+
+  // 4) Eksenel paylaşım: tüm pitch çapları aynı modülü kullanmalı (otomatik)
+  // 5) Undercut: zmin = 2·ha*/sin²α
+  const zmin = 2 * ha / (Math.sin(aRad) ** 2);
+  if (zs < zmin) {
+    const x_min = (zmin - zs) / zmin;
+    if (xs < x_min - 0.01) {
+      errors.push({
+        severity: "warn",
+        msg: `Güneş alttan kesilme (undercut) riski`,
+        detail: `Z=${zs} < zmin=${zmin.toFixed(1)} (α=${alpha}°). Gerekli profil kayması x ≥ ${x_min.toFixed(2)}, mevcut ${xs}`,
+        fixes: [{ label: `xs → ${x_min.toFixed(2)}`, target: "xs", value: x_min.toFixed(2) }]
+      });
+    }
   }
-  if (zp < zmin && xp < xp_min - 0.01) {
-    errors.push(`Planet: undercut riski (gerekli x ≥ ${xp_min.toFixed(2)}, mevcut ${xp})`);
+  if (zp < zmin) {
+    const x_min = (zmin - zp) / zmin;
+    if (xp < x_min - 0.01) {
+      errors.push({
+        severity: "warn",
+        msg: `Planet alttan kesilme (undercut) riski`,
+        detail: `Z=${zp} < zmin=${zmin.toFixed(1)}. Gerekli x ≥ ${x_min.toFixed(2)}, mevcut ${xp}`,
+        fixes: [{ label: `xp → ${x_min.toFixed(2)}`, target: "xp", value: x_min.toFixed(2) }]
+      });
+    }
+  }
+
+  // 6) Profil kayması toplam dengesi (eşitlik gereksinimi: sun+planet eksenler arası ile uyumlu)
+  // Standart: xs + xp + xr_internal_meshing eşitliği — ring iç eşleşmesi için
+  // Basit kontrol: |xs + xp - xr| < 0.1 olmalı (kabaca dengeli)
+  const xBalance = xs + xp - xr; // ideal: |xBalance| küçük
+  if (Math.abs(xBalance) > 0.3 && (xs !== 0 || xp !== 0 || xr !== 0)) {
+    errors.push({
+      severity: "warn",
+      msg: `Profil kayması dengesizliği`,
+      detail: `xs + xp − xr = ${xBalance.toFixed(2)} (|değer| < 0.3 önerilir)`,
+      fixes: [{ label: `xr → ${(xs + xp).toFixed(2)}`, target: "xr", value: (xs + xp).toFixed(2) }]
+    });
   }
 
   // ----- Mukavemet (kritik temas: Güneş ↔ Planet) -----
@@ -1218,14 +1423,32 @@ function renderResults(r) {
     </div>`
   ).join("");
 
-  // ----- DOĞRULAMA -----
+  // ----- DOĞRULAMA + Düzeltme Önerileri -----
   const valEl = $("validation");
   if (r.errors.length === 0) {
     valEl.innerHTML = `<div class="validation ok">✓ Tüm kinematik ve montaj koşulları sağlanıyor.</div>`;
   } else {
-    valEl.innerHTML = `<div class="validation err"><strong>Uyarılar:</strong><ul>${
-      r.errors.map(e => `<li>${e}</li>`).join("")
-    }</ul></div>`;
+    const hasErr = r.errors.some(e => e.severity === "err");
+    const errHtml = r.errors.map((e, idx) => {
+      const fixButtons = (e.fixes || []).map((fx, j) => {
+        const id = `fix_${idx}_${j}`;
+        // multi fix: birden çok input set eder
+        if (fx.multi) {
+          const data = fx.multi.map(m => `data-set-${m.target}="${m.value}"`).join(" ");
+          return `<button class="fix-btn" ${data}>${fx.label}</button>`;
+        }
+        return `<button class="fix-btn" data-set-${fx.target}="${fx.value}">${fx.label}</button>`;
+      }).join(" ");
+      return `<li style="margin-bottom:8px;">
+        <strong>${e.msg}</strong>
+        <div style="font-size:11px; color:var(--muted); margin:2px 0 4px;">${e.detail || ""}</div>
+        ${fixButtons ? `<div>${fixButtons}</div>` : ""}
+      </li>`;
+    }).join("");
+    valEl.innerHTML = `<div class="validation ${hasErr ? "err" : "warn"}">
+      <strong>${hasErr ? "✗ Çelişkili / Geçersiz Parametreler" : "⚠ Uyarılar"}</strong>
+      <ul style="list-style:none; padding-left:0; margin-top:6px;">${errHtml}</ul>
+    </div>`;
   }
 }
 
@@ -1454,7 +1677,6 @@ requestAnimationFrame(animate);
 //                                 ANA AKIŞ
 // =============================================================================
 function calculateAndDraw() {
-  syncRing();
   syncPower();
   const r = calculate();
   renderResults(r);
@@ -1487,6 +1709,32 @@ const watchedInputs = [
 watchedInputs.forEach(id => {
   const e = $(id);
   if (e) e.addEventListener("change", calculateAndDraw);
+});
+
+// Düzeltme butonları (event delegation)
+$("validation").addEventListener("click", (e) => {
+  const btn = e.target.closest(".fix-btn");
+  if (!btn) return;
+  let changed = false;
+  for (const attr of Array.from(btn.attributes)) {
+    if (attr.name.startsWith("data-set-")) {
+      const target = attr.name.substring("data-set-".length);
+      const el = $(target);
+      if (el) {
+        el.value = attr.value;
+        changed = true;
+      }
+    }
+  }
+  if (changed) calculateAndDraw();
+});
+
+// Kilit butonları (görsel; kullanıcıya hangi parametreyi sabit tutmak istediğini hatırlatır)
+document.querySelectorAll(".micro-lock").forEach(b => {
+  b.addEventListener("click", (e) => {
+    e.preventDefault();
+    b.classList.toggle("locked");
+  });
 });
 
 // Başlat
