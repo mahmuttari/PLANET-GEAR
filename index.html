@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Planet Dişli Seti Hesaplayıcı ve Çizici</title>
+<title>Planet Dişli Hesaplayıcı · Profesyonel</title>
 <style>
   :root {
     --bg: #0f172a;
@@ -17,6 +17,10 @@
     --ok: #4ade80;
     --warn: #facc15;
     --err: #f87171;
+    --gold: #fbbf24;
+    --blue: #60a5fa;
+    --violet: #a78bfa;
+    --green: #4ade80;
   }
   * { box-sizing: border-box; }
   body {
@@ -27,125 +31,123 @@
     min-height: 100vh;
   }
   header {
-    padding: 18px 24px;
+    padding: 16px 24px;
     border-bottom: 1px solid var(--border);
-    background: rgba(15, 23, 42, 0.8);
-    backdrop-filter: blur(6px);
+    background: rgba(15, 23, 42, 0.85);
+    backdrop-filter: blur(8px);
     position: sticky;
     top: 0;
     z-index: 10;
   }
-  header h1 {
-    margin: 0;
-    font-size: 20px;
-    letter-spacing: 0.2px;
-  }
-  header p {
-    margin: 4px 0 0;
-    color: var(--muted);
-    font-size: 13px;
-  }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: 0.2px; }
+  header p  { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+
   .layout {
     display: grid;
-    grid-template-columns: 380px 1fr;
-    gap: 18px;
-    padding: 18px;
-    max-width: 1500px;
+    grid-template-columns: 420px 1fr;
+    gap: 16px;
+    padding: 16px;
+    max-width: 1700px;
     margin: 0 auto;
   }
-  @media (max-width: 980px) {
-    .layout { grid-template-columns: 1fr; }
-  }
+  @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+
   .panel {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px;
+    margin-bottom: 14px;
   }
   .panel h2 {
     margin: 0 0 12px;
-    font-size: 15px;
+    font-size: 14px;
     color: var(--accent);
     text-transform: uppercase;
     letter-spacing: 0.6px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
+  .panel h2 .badge {
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--accent);
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 10px;
+    text-transform: none;
+    letter-spacing: 0;
+    font-weight: 500;
+  }
+  .collapser {
+    cursor: pointer;
+    user-select: none;
+  }
+  .collapser .arrow {
+    transition: transform 0.2s;
+    color: var(--muted);
+  }
+  .panel.collapsed .arrow { transform: rotate(-90deg); }
+  .panel.collapsed .panel-body { display: none; }
+
   .row {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 10px;
-    margin-bottom: 10px;
+    gap: 9px;
+    margin-bottom: 9px;
   }
-  .field {
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .field label {
-    font-size: 12px;
-    color: var(--muted);
-  }
+  .row.three { grid-template-columns: 1fr 1fr 1fr; }
+  .field { display: flex; flex-direction: column; gap: 4px; }
+  .field label { font-size: 11px; color: var(--muted); }
+  .field label .unit { color: #64748b; }
   .field input, .field select {
     background: var(--panel-2);
     color: var(--text);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
-    font-size: 14px;
+    border-radius: 7px;
+    padding: 7px 9px;
+    font-size: 13px;
     font-family: inherit;
     outline: none;
     transition: border-color 0.15s;
   }
-  .field input:focus, .field select:focus {
-    border-color: var(--accent);
-  }
+  .field input:focus, .field select:focus { border-color: var(--accent); }
+  .field input:disabled { opacity: 0.5; }
   .field.full { grid-column: 1 / -1; }
+
   .preset-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
-    margin-bottom: 10px;
+    gap: 7px;
   }
   .preset-btn {
     background: var(--panel-2);
     border: 1px solid var(--border);
     color: var(--text);
-    padding: 8px 10px;
-    border-radius: 8px;
+    padding: 7px 9px;
+    border-radius: 7px;
     cursor: pointer;
     text-align: left;
-    font-size: 12px;
+    font-size: 11px;
     font-family: inherit;
     transition: all 0.15s;
   }
-  .preset-btn:hover {
-    border-color: var(--accent);
-    background: #2d3b54;
-  }
-  .preset-btn .ptitle {
-    font-weight: 600;
-    display: block;
-    color: var(--accent-2);
-  }
-  .preset-btn .pdesc {
-    color: var(--muted);
-    font-size: 11px;
-  }
-  .actions {
-    display: flex;
-    gap: 8px;
-    margin-top: 12px;
-  }
+  .preset-btn:hover { border-color: var(--accent); background: #2d3b54; }
+  .preset-btn .ptitle { font-weight: 600; display: block; color: var(--accent-2); font-size: 12px; }
+  .preset-btn .pdesc { color: var(--muted); font-size: 10px; }
+
+  .actions { display: flex; gap: 8px; margin-top: 10px; }
   .btn {
     flex: 1;
     background: var(--accent);
     color: #08111f;
     border: none;
-    padding: 10px 14px;
-    border-radius: 8px;
+    padding: 9px 13px;
+    border-radius: 7px;
     cursor: pointer;
     font-weight: 600;
     font-family: inherit;
-    font-size: 14px;
+    font-size: 13px;
     transition: background 0.15s;
   }
   .btn:hover { background: var(--accent-2); }
@@ -155,75 +157,115 @@
     border: 1px solid var(--border);
   }
   .btn.secondary:hover { background: #2d3b54; }
+
+  .toggle-row {
+    display: flex;
+    gap: 3px;
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 7px;
+    padding: 3px;
+  }
+  .toggle-row button {
+    flex: 1;
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 6px 7px;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 11px;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .toggle-row button.active {
+    background: var(--accent);
+    color: #08111f;
+    font-weight: 600;
+  }
+
+  /* Sonuçlar */
+  .tabs {
+    display: flex;
+    gap: 2px;
+    margin-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .tab {
+    background: transparent;
+    color: var(--muted);
+    border: none;
+    padding: 8px 14px;
+    cursor: pointer;
+    font-family: inherit;
+    font-size: 13px;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+  }
+  .tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+  .tab-content { display: none; }
+  .tab-content.active { display: block; }
+
   .results {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 8px;
+    gap: 7px;
     font-size: 13px;
   }
   .result-item {
     background: var(--panel-2);
     border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 8px 10px;
+    border-radius: 7px;
+    padding: 7px 9px;
   }
-  .result-item .lbl {
-    color: var(--muted);
-    font-size: 11px;
-    display: block;
-  }
-  .result-item .val {
-    color: var(--text);
-    font-weight: 600;
-    font-size: 14px;
-    margin-top: 2px;
-  }
+  .result-item .lbl { color: var(--muted); font-size: 10.5px; display: block; }
+  .result-item .val { color: var(--text); font-weight: 600; font-size: 14px; margin-top: 2px; }
+  .result-item .sub { color: var(--muted); font-size: 10px; margin-top: 2px; }
+  .result-item.ok    { border-color: rgba(74, 222, 128, 0.4); background: rgba(74, 222, 128, 0.07); }
+  .result-item.warn  { border-color: rgba(250, 204, 21, 0.45); background: rgba(250, 204, 21, 0.08); }
+  .result-item.err   { border-color: rgba(248, 113, 113, 0.5); background: rgba(248, 113, 113, 0.08); }
+  .result-item.full  { grid-column: 1 / -1; }
+
   .validation {
     margin-top: 10px;
     padding: 10px;
-    border-radius: 8px;
-    font-size: 13px;
+    border-radius: 7px;
+    font-size: 12.5px;
   }
-  .validation.ok {
-    background: rgba(74, 222, 128, 0.12);
-    border: 1px solid rgba(74, 222, 128, 0.4);
-    color: var(--ok);
-  }
-  .validation.err {
-    background: rgba(248, 113, 113, 0.12);
-    border: 1px solid rgba(248, 113, 113, 0.4);
-    color: var(--err);
-  }
-  .validation ul { margin: 4px 0 0 16px; padding: 0; }
+  .validation.ok  { background: rgba(74, 222, 128, 0.12); border: 1px solid rgba(74, 222, 128, 0.4); color: var(--ok); }
+  .validation.err { background: rgba(248, 113, 113, 0.12); border: 1px solid rgba(248, 113, 113, 0.4); color: var(--err); }
+  .validation ul { margin: 4px 0 0 18px; padding: 0; }
+
   .canvas-wrap {
     background: var(--panel);
     border: 1px solid var(--border);
     border-radius: 12px;
-    padding: 16px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
     min-height: 600px;
   }
   .canvas-tools {
     display: flex;
-    gap: 8px;
-    margin-bottom: 12px;
+    gap: 10px;
+    margin-bottom: 10px;
     flex-wrap: wrap;
     align-items: center;
+    font-size: 12px;
   }
   .canvas-tools label {
-    font-size: 12px;
     color: var(--muted);
     display: flex;
     align-items: center;
     gap: 6px;
   }
-  .canvas-tools input[type="range"] {
-    width: 120px;
-  }
+  .canvas-tools input[type="range"] { width: 110px; }
   svg { display: block; width: 100%; height: auto; background: #0a1020; border-radius: 8px; }
   .legend {
-    margin-top: 12px;
+    margin-top: 10px;
     display: flex;
     gap: 14px;
     flex-wrap: wrap;
@@ -241,233 +283,560 @@
   footer {
     text-align: center;
     color: var(--muted);
-    font-size: 12px;
-    padding: 16px;
+    font-size: 11px;
+    padding: 12px;
+    line-height: 1.6;
   }
   .section-divider {
     height: 1px;
     background: var(--border);
-    margin: 14px 0;
+    margin: 12px 0;
   }
-  .toggle-row {
-    display: flex;
-    gap: 4px;
-    background: var(--panel-2);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 4px;
-  }
-  .toggle-row button {
-    flex: 1;
-    background: transparent;
+  .help {
+    font-size: 11px;
     color: var(--muted);
-    border: none;
-    padding: 6px 8px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-    font-family: inherit;
-    transition: all 0.15s;
-  }
-  .toggle-row button.active {
-    background: var(--accent);
-    color: #08111f;
-    font-weight: 600;
+    margin-bottom: 10px;
+    line-height: 1.5;
+    padding: 8px 10px;
+    background: rgba(56, 189, 248, 0.05);
+    border-left: 2px solid var(--accent);
+    border-radius: 4px;
   }
 </style>
 </head>
 <body>
 
 <header>
-  <h1>Planet Dişli Seti Hesaplayıcı ve Çizici</h1>
-  <p>Hazır endüstri konfigürasyonları arasından seçin veya kendi değerlerinizi girerek hesaplayın ve görselleştirin.</p>
+  <h1>Planet Dişli Seti Hesaplayıcı · Profesyonel Sürüm</h1>
+  <p>Gerçek involut profil çizimi, profil kayması (rack-shift), mukavemet ve hassasiyet hesapları (Lewis · AGMA · Hertz)</p>
 </header>
 
 <div class="layout">
 
   <div>
-    <!-- Hazır Seçenekler -->
+
+    <!-- HAZIR KONFİGÜRASYONLAR -->
     <div class="panel">
-      <h2>Hazır Konfigürasyonlar</h2>
-      <div class="preset-grid" id="presetGrid"></div>
-    </div>
-
-    <!-- Parametre Girişleri -->
-    <div class="panel" style="margin-top: 14px;">
-      <h2>Parametreler</h2>
-
-      <div class="row">
-        <div class="field">
-          <label>Güneş Dişli Diş Sayısı (Zs)</label>
-          <input type="number" id="zs" value="20" min="6" step="1">
-        </div>
-        <div class="field">
-          <label>Planet Dişli Diş Sayısı (Zp)</label>
-          <input type="number" id="zp" value="20" min="6" step="1">
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label>Ring (İç Dişli) Zr <span style="color:var(--muted)">(otomatik)</span></label>
-          <input type="number" id="zr" value="60" min="6" step="1">
-        </div>
-        <div class="field">
-          <label>Planet Sayısı (N)</label>
-          <input type="number" id="np" value="3" min="2" max="8" step="1">
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label>Modül (m) [mm]</label>
-          <select id="modulePreset">
-            <option value="0.5">0.5</option>
-            <option value="0.75">0.75</option>
-            <option value="1">1</option>
-            <option value="1.25">1.25</option>
-            <option value="1.5">1.5</option>
-            <option value="2" selected>2</option>
-            <option value="2.5">2.5</option>
-            <option value="3">3</option>
-            <option value="4">4</option>
-            <option value="5">5</option>
-            <option value="6">6</option>
-            <option value="8">8</option>
-            <option value="10">10</option>
-            <option value="custom">Özel...</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Özel Modül (mm)</label>
-          <input type="number" id="moduleCustom" value="2" min="0.1" step="0.1" disabled>
-        </div>
-      </div>
-
-      <div class="row">
-        <div class="field">
-          <label>Basınç Açısı α (°)</label>
-          <select id="alpha">
-            <option value="14.5">14.5°</option>
-            <option value="20" selected>20° (Standart)</option>
-            <option value="25">25°</option>
-          </select>
-        </div>
-        <div class="field">
-          <label>Giriş Devri n [d/dk]</label>
-          <input type="number" id="rpm" value="1500" min="0" step="10">
-        </div>
-      </div>
-
-      <div class="section-divider"></div>
-
-      <div class="field full" style="margin-bottom: 10px;">
-        <label>Çalışma Modu (Sabit Eleman / Giriş → Çıkış)</label>
-        <div class="toggle-row" id="modeToggle">
-          <button data-mode="ring_fixed" class="active">Ring Sabit · Güneş→Taşıyıcı</button>
-          <button data-mode="carrier_fixed">Taşıyıcı Sabit · Güneş→Ring</button>
-          <button data-mode="sun_fixed">Güneş Sabit · Ring→Taşıyıcı</button>
-        </div>
-      </div>
-
-      <div class="actions">
-        <button class="btn" id="calcBtn">Hesapla & Çiz</button>
-        <button class="btn secondary" id="resetBtn">Sıfırla</button>
+      <h2><span class="collapser" data-target="presetBody">Hazır Konfigürasyonlar <span class="arrow">▼</span></span></h2>
+      <div class="panel-body" id="presetBody">
+        <div class="preset-grid" id="presetGrid"></div>
       </div>
     </div>
 
-    <!-- Sonuçlar -->
-    <div class="panel" style="margin-top: 14px;">
-      <h2>Hesap Sonuçları</h2>
-      <div class="results" id="results"></div>
-      <div id="validation"></div>
+    <!-- TEMEL PARAMETRELER -->
+    <div class="panel">
+      <h2><span class="collapser" data-target="basicBody">1 · Temel Geometri <span class="arrow">▼</span></span></h2>
+      <div class="panel-body" id="basicBody">
+        <div class="row three">
+          <div class="field">
+            <label>Güneş Zs</label>
+            <input type="number" id="zs" value="20" min="6" step="1">
+          </div>
+          <div class="field">
+            <label>Planet Zp</label>
+            <input type="number" id="zp" value="20" min="6" step="1">
+          </div>
+          <div class="field">
+            <label>Ring Zr</label>
+            <input type="number" id="zr" value="60" min="6" step="1">
+          </div>
+        </div>
+
+        <div class="row three">
+          <div class="field">
+            <label>Planet Sayısı N</label>
+            <input type="number" id="np" value="3" min="2" max="8" step="1">
+          </div>
+          <div class="field">
+            <label>Modül m <span class="unit">mm</span></label>
+            <select id="modulePreset">
+              <option value="0.5">0.5</option><option value="0.75">0.75</option>
+              <option value="1">1</option><option value="1.25">1.25</option>
+              <option value="1.5">1.5</option><option value="2" selected>2</option>
+              <option value="2.5">2.5</option><option value="3">3</option>
+              <option value="4">4</option><option value="5">5</option>
+              <option value="6">6</option><option value="8">8</option>
+              <option value="10">10</option>
+              <option value="custom">Özel...</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Özel m <span class="unit">mm</span></label>
+            <input type="number" id="moduleCustom" value="2" min="0.1" step="0.05" disabled>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Basınç Açısı α <span class="unit">°</span></label>
+            <select id="alpha">
+              <option value="14.5">14.5°</option>
+              <option value="17.5">17.5°</option>
+              <option value="20" selected>20° (Standart DIN/ISO)</option>
+              <option value="22.5">22.5°</option>
+              <option value="25">25°</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Helis Açısı β <span class="unit">°</span></label>
+            <input type="number" id="beta" value="0" min="0" max="45" step="1">
+          </div>
+        </div>
+
+        <div class="field full">
+          <label>Çalışma Modu</label>
+          <div class="toggle-row" id="modeToggle">
+            <button data-mode="ring_fixed" class="active">Ring↓ · S→C</button>
+            <button data-mode="carrier_fixed">C↓ · S→R</button>
+            <button data-mode="sun_fixed">S↓ · R→C</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFİL PARAMETRELERİ -->
+    <div class="panel">
+      <h2><span class="collapser" data-target="profileBody">2 · Diş Profili (DIN 867) <span class="arrow">▼</span></span></h2>
+      <div class="panel-body" id="profileBody">
+        <div class="help">
+          ha* = diş üstü kat. (std 1.0) · hf* = diş dibi kat. (std 1.25) · c* = boşluk (std 0.25)
+          · x = profil kayması (rack-shift, ±0.5 tipik). Kayma diş aşağı kesilmeyi (undercut) önler.
+        </div>
+        <div class="row three">
+          <div class="field"><label>ha*</label><input type="number" id="haCoef" value="1.0" min="0.5" max="1.5" step="0.05"></div>
+          <div class="field"><label>hf*</label><input type="number" id="hfCoef" value="1.25" min="1.0" max="1.5" step="0.05"></div>
+          <div class="field"><label>c* (boşluk)</label><input type="number" id="cCoef" value="0.25" min="0.1" max="0.4" step="0.05"></div>
+        </div>
+        <div class="row three">
+          <div class="field"><label>x · Güneş</label><input type="number" id="xs" value="0" min="-0.7" max="0.7" step="0.05"></div>
+          <div class="field"><label>x · Planet</label><input type="number" id="xp" value="0" min="-0.7" max="0.7" step="0.05"></div>
+          <div class="field"><label>x · Ring</label><input type="number" id="xr" value="0" min="-0.7" max="0.7" step="0.05"></div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Diş Yan Yuvarlatma ρf*</label>
+            <input type="number" id="rhoF" value="0.38" min="0.2" max="0.5" step="0.02">
+          </div>
+          <div class="field">
+            <label>Çizim Çözünürlüğü</label>
+            <select id="resolution">
+              <option value="6">Hızlı</option>
+              <option value="12" selected>Normal</option>
+              <option value="24">Yüksek</option>
+              <option value="48">Çok Yüksek</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MUKAVEMET -->
+    <div class="panel">
+      <h2><span class="collapser" data-target="strengthBody">3 · Mukavemet & Kuvvet <span class="arrow">▼</span></span></h2>
+      <div class="panel-body" id="strengthBody">
+        <div class="help">
+          Lewis (basit eğme), AGMA 2001 (eğme + dinamik faktörler) ve Hertz (yüzey/pitting) gerilimleri.
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Yüzey Genişliği b <span class="unit">mm</span></label>
+            <input type="number" id="faceWidth" value="20" min="1" step="1">
+          </div>
+          <div class="field">
+            <label>Giriş Devri n <span class="unit">d/dk</span></label>
+            <input type="number" id="rpm" value="1500" min="0" step="10">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Giriş Torku T <span class="unit">Nm</span></label>
+            <input type="number" id="torque" value="50" min="0" step="1">
+          </div>
+          <div class="field">
+            <label>Veya Güç P <span class="unit">kW</span></label>
+            <input type="number" id="power" value="7.85" min="0" step="0.1">
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label>Uygulama Faktörü Ka</label>
+            <select id="ka">
+              <option value="1.0">1.00 · Düzgün/Düzgün</option>
+              <option value="1.25" selected>1.25 · Düzgün/Orta Şok</option>
+              <option value="1.5">1.50 · Orta Şok</option>
+              <option value="1.75">1.75 · Orta/Ağır Şok</option>
+              <option value="2.25">2.25 · Ağır Şok</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>İmalat Kalite Grade (ISO 1328)</label>
+            <select id="quality">
+              <option value="5">Q5 (Hassas taşlanmış)</option>
+              <option value="7" selected>Q7 (İyi)</option>
+              <option value="9">Q9 (Orta)</option>
+              <option value="11">Q11 (Kaba)</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field full">
+            <label>Malzeme</label>
+            <select id="material"></select>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- AKSIYONLAR -->
+    <div class="actions">
+      <button class="btn" id="calcBtn">Hesapla & Çiz</button>
+      <button class="btn secondary" id="resetBtn">Varsayılana Dön</button>
     </div>
   </div>
 
-  <!-- Çizim Alanı -->
-  <div class="canvas-wrap">
-    <div class="canvas-tools">
-      <label>Animasyon
-        <input type="checkbox" id="anim" checked>
-      </label>
-      <label>Hız
-        <input type="range" id="speed" min="0" max="100" value="30">
-      </label>
-      <label>Dişli Detayı
-        <input type="checkbox" id="teethDetail" checked>
-      </label>
-      <button class="btn secondary" id="exportBtn" style="flex:0 0 auto;">SVG İndir</button>
+  <!-- ÇIKTILAR -->
+  <div>
+    <div class="canvas-wrap">
+      <div class="canvas-tools">
+        <label>Animasyon <input type="checkbox" id="anim" checked></label>
+        <label>Hız <input type="range" id="speed" min="0" max="100" value="25"></label>
+        <label>Diş Detayı <input type="checkbox" id="teethDetail" checked></label>
+        <label>Pitch Çemberleri <input type="checkbox" id="showPitch"></label>
+        <label>Base Çemberleri <input type="checkbox" id="showBase"></label>
+        <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
+        <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
+      </div>
+      <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
+      <div class="legend">
+        <span><span class="dot" style="background:#fbbf24"></span>Güneş (Sun)</span>
+        <span><span class="dot" style="background:#60a5fa"></span>Planet</span>
+        <span><span class="dot" style="background:#a78bfa"></span>Ring</span>
+        <span><span class="dot" style="background:#4ade80"></span>Taşıyıcı (Carrier)</span>
+        <span><span class="dot" style="background:#f87171"></span>Kuvvet (Ft)</span>
+      </div>
     </div>
-    <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
-    <div class="legend">
-      <span><span class="dot" style="background:#fbbf24"></span>Güneş Dişli (Sun)</span>
-      <span><span class="dot" style="background:#60a5fa"></span>Planet Dişliler</span>
-      <span><span class="dot" style="background:#a78bfa"></span>Ring (İç Dişli)</span>
-      <span><span class="dot" style="background:#4ade80"></span>Taşıyıcı (Carrier)</span>
+
+    <div class="panel" style="margin-top: 14px;">
+      <div class="tabs">
+        <button class="tab active" data-tab="kinematik">Kinematik</button>
+        <button class="tab" data-tab="geometri">Geometri</button>
+        <button class="tab" data-tab="mukavemet">Mukavemet</button>
+      </div>
+
+      <div class="tab-content active" id="tab-kinematik">
+        <div class="results" id="results-kinematik"></div>
+      </div>
+      <div class="tab-content" id="tab-geometri">
+        <div class="results" id="results-geometri"></div>
+      </div>
+      <div class="tab-content" id="tab-mukavemet">
+        <div class="results" id="results-mukavemet"></div>
+      </div>
+
+      <div id="validation"></div>
     </div>
   </div>
 </div>
 
 <footer>
-  Planet dişli kinematik formülleri: i = 1 + Zr/Zs (Ring sabit, Güneş giriş, Taşıyıcı çıkış). Montaj koşulu: (Zs + Zr) / N ∈ ℤ.
+  Formüller: çevrim oranı (Willis denklemi), Lewis Y-faktörü, AGMA 2001-D04 (Yj geometri faktörü, Kv dinamik faktör),
+  Hertz temas gerilimi (ISO 6336). Mukavemet sonuçları başlangıç tahminidir;
+  kritik uygulamalar için tam ISO/AGMA hesabı yapın.
 </footer>
 
 <script>
-// ---------------------------------------------------------------------------
-// Presetler — piyasada yaygın kullanılan planet dişli konfigürasyonları
-// ---------------------------------------------------------------------------
-const PRESETS = [
-  {
-    name: "Otomotiv Otomatik Şanzıman",
-    desc: "Zs=24, Zp=18, Zr=60, N=3, m=2",
-    values: { zs: 24, zp: 18, zr: 60, np: 3, m: 2 }
-  },
-  {
-    name: "Endüstriyel Redüktör 1:5",
-    desc: "Zs=18, Zp=27, Zr=72, N=3, m=3",
-    values: { zs: 18, zp: 27, zr: 72, np: 3, m: 3 }
-  },
-  {
-    name: "Robotik (Yüksek Hassasiyet)",
-    desc: "Zs=12, Zp=18, Zr=48, N=3, m=1",
-    values: { zs: 12, zp: 18, zr: 48, np: 3, m: 1 }
-  },
-  {
-    name: "Rüzgar Türbini 1. Kademe",
-    desc: "Zs=21, Zp=39, Zr=99, N=3, m=10",
-    values: { zs: 21, zp: 39, zr: 99, np: 3, m: 10 }
-  },
-  {
-    name: "Standart 1:4 Redüktör",
-    desc: "Zs=20, Zp=20, Zr=60, N=3, m=2",
-    values: { zs: 20, zp: 20, zr: 60, np: 3, m: 2 }
-  },
-  {
-    name: "Yüksek Tork (4 Planet)",
-    desc: "Zs=16, Zp=24, Zr=64, N=4, m=4",
-    values: { zs: 16, zp: 24, zr: 64, np: 4, m: 4 }
-  },
-  {
-    name: "Kompakt Servo Redüktör",
-    desc: "Zs=15, Zp=15, Zr=45, N=3, m=1",
-    values: { zs: 15, zp: 15, zr: 45, np: 3, m: 1 }
-  },
-  {
-    name: "Ağır Endüstri (5 Planet)",
-    desc: "Zs=20, Zp=30, Zr=80, N=5, m=6",
-    values: { zs: 20, zp: 30, zr: 80, np: 5, m: 6 }
+// =============================================================================
+//                                MATEMATİK
+// =============================================================================
+const TAU = Math.PI * 2;
+const DEG = Math.PI / 180;
+
+function polar(r, a) { return { x: r * Math.cos(a), y: r * Math.sin(a) }; }
+function rotate(p, a) {
+  const c = Math.cos(a), s = Math.sin(a);
+  return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
+}
+
+// İnvolüt eğri parametrik denklemi
+// Taban yarıçapı rb, parametre t (radyan)
+function involute(rb, t) {
+  return {
+    x: rb * (Math.cos(t) + t * Math.sin(t)),
+    y: rb * (Math.sin(t) - t * Math.cos(t))
+  };
+}
+// inv(α) = tan(α) - α
+function inv(alpha) { return Math.tan(alpha) - alpha; }
+
+// =============================================================================
+//                          DİŞLİ PROFİLİ (involüt)
+// =============================================================================
+// Dış (external) ve iç (internal/ring) dişli için profil oluşturur.
+// Tek dişin sınırı: sağ kanat (kök→tepe) → tepe yayı → sol kanat (tepe→kök) → kök yayı
+// Çıktı: SVG `d` özelliği için path string
+function generateGearPath(opts) {
+  const {
+    z, m, alpha, x = 0,
+    ha = 1.0, hf = 1.25,
+    internal = false,
+    segments = 12
+  } = opts;
+
+  const aRad = alpha * DEG;
+  const r  = (m * z) / 2;                  // Pitch yarıçapı
+  const rb = r * Math.cos(aRad);            // Taban (base) yarıçapı
+  let ra, rf;
+  if (internal) {
+    // İç dişli: tepe daha küçük yarıçap, dip daha büyük
+    ra = r - (ha - x) * m;
+    rf = r + (hf + x) * m;
+  } else {
+    ra = r + (ha + x) * m;
+    rf = r - (hf - x) * m;
   }
+  if (rf < 0.1) rf = 0.1;
+
+  // Pitch çemberinde diş yarı kalınlık açısı
+  // s = m * (π/2 + 2x·tan α)   ;   ψ = s / (2r)
+  const sPitch = m * (Math.PI / 2 + 2 * x * Math.tan(aRad));
+  const halfTooth = sPitch / (2 * r);
+
+  // İnvolüt parametre sınırları
+  // İnvolüt t=0'da rb'de başlar.
+  // r(t) = rb * sqrt(1 + t²)  →  t(r) = sqrt((r/rb)² - 1)
+  const tAtR  = (rad) => rad > rb ? Math.sqrt((rad / rb) ** 2 - 1) : 0;
+  const tStart = tAtR(Math.max(rb, internal ? Math.min(ra, rf) : Math.max(rb, rf)));
+  const tEnd   = tAtR(internal ? rf : ra);
+
+  // İnvolütin pitch çemberindeki dönme miktarı: inv(α)
+  // Profil pitch'te diş ekseninin sağında halfTooth açısında bitecek şekilde hizalanır.
+  // Bir kanadın taban açısı: ψ_base = halfTooth - inv(α) ; bu açıda involüt t=0'da başlar
+  // (t artarken kanat saat yönü tersi büyür).
+  // Diş ekseni 0 derecede ise: sağ kanat üzerindeki nokta, açı = ψ_base - involutePolarAngle(t)
+  // Burada involutePolarAngle(t) = inv'in t parametresindeki polar açısı = (tan(α_t) − α_t)
+  // ama biz doğrudan involute() fonksiyonu ile Kartezyen üretip rotate'lediğimizden,
+  // sağ kanadı baz açıda generate edip, ekseni doğru noktaya çekmek için referans alıyoruz.
+
+  // Pitch çemberindeki involüt noktası: t = tan(α) → involüt(rb, tan(α))
+  // Bu nokta polar açısı: atan2(y, x). Pitch'te diş yan tarafının açısal pozisyonu = halfTooth.
+  // Yani sağ kanat noktalarını üretip, (halfTooth - pitchInvAngle) kadar döndürelim.
+  const pitchPt = involute(rb, Math.tan(aRad));
+  const pitchInvAngle = Math.atan2(pitchPt.y, pitchPt.x);
+
+  const segs = Math.max(3, segments);
+  // Sağ kanat noktaları (kök → tepe). İnvolüt için t artarken yarıçap büyür.
+  // t'yi tStart..tEnd arasında örnekle.
+  const rightFlank = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = tStart + (tEnd - tStart) * (i / segs);
+    const p = involute(rb, t);
+    rightFlank.push(p);
+  }
+  // İç dişlide yarıçap azaltılırken eğri ters yöne genişlemiyor; bu yüzden
+  // iç dişli için involüt yine dışa doğru üretilir, sadece tepe ve dip rolleri swap.
+  // Görsel doğruluk için iç dişlide kanadı dışa katlanmış (mirror) gösteriyoruz.
+  // Bu, tüketici-dişli (rack-conjugate) ile tutarlıdır.
+
+  // Sağ kanatı eksene hizala: kanat pitch radyusunu kestiğinde, açı = +halfTooth olsun.
+  // Şu an pitchPt'in polar açısı = pitchInvAngle ; istediğimiz = halfTooth.
+  const shift = halfTooth - pitchInvAngle;
+  // Kök ucunu eksende -halfTooth tarafına geçirmemek için aynı shift uygulanır.
+  // İç dişlide kanadı yönünü ters çeviriyoruz (eksen üzerinde y → -y), bu yan değişimini sağlar.
+
+  const orientRight = (p) => {
+    let q = internal ? { x: p.x, y: -p.y } : p;
+    return rotate(q, shift);
+  };
+  const orientLeft = (p) => {
+    let q = internal ? { x: p.x, y: -p.y } : p;
+    q = { x: q.x, y: -q.y }; // sol kanat sağın aynası (y → -y)
+    return rotate(q, -shift); // ters yön
+  };
+
+  // Diş üstü ve diş dibi yarıçapları
+  const tipRadius  = internal ? ra : ra; // mutlak yarıçap, internal'de ra<r
+  const rootRadius = internal ? rf : rf;
+
+  let d = "";
+  const pitchAngle = TAU / z;
+
+  for (let i = 0; i < z; i++) {
+    const center = i * pitchAngle;
+
+    // Sağ kanat noktaları, dişin merkez ekseninde
+    const rPts = rightFlank.map(p => rotate(orientRight(p), center));
+    const lPts = rightFlank.map(p => rotate(orientLeft(p), center));
+    // Tepeleri tipRadius'a kelepçele (numerik hata için):
+    const clamp = (p, R) => {
+      const m_ = Math.hypot(p.x, p.y);
+      if (m_ < 1e-6) return p;
+      return { x: p.x * R / m_, y: p.y * R / m_ };
+    };
+    // Kanat son nokta = tepe (ra) veya kök (rf), ortalanır
+    // (involüt parametrelendirmesi rf veya ra'yı tam yakalamayabilir).
+    const flankTip = clamp(rPts[rPts.length - 1], tipRadius);
+    const lFlankTip = clamp(lPts[lPts.length - 1], tipRadius);
+    rPts[rPts.length - 1] = flankTip;
+    lPts[lPts.length - 1] = lFlankTip;
+
+    // Kanat başlangıcı (taban tarafı): rootRadius'a uzat (eğer rf<rb ise radyal çizgi ile)
+    // Basitlik için kök noktasını radyal olarak rootRadius'a yansıt:
+    const rRoot = (() => {
+      const ang = Math.atan2(rPts[0].y, rPts[0].x);
+      return { x: rootRadius * Math.cos(ang), y: rootRadius * Math.sin(ang) };
+    })();
+    const lRoot = (() => {
+      const ang = Math.atan2(lPts[0].y, lPts[0].x);
+      return { x: rootRadius * Math.cos(ang), y: rootRadius * Math.sin(ang) };
+    })();
+
+    if (i === 0) {
+      d += `M ${rRoot.x.toFixed(3)} ${rRoot.y.toFixed(3)} `;
+    } else {
+      // Önceki sol kök → bu sağ kök, kök çemberi boyunca yay
+      d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${rRoot.x.toFixed(3)} ${rRoot.y.toFixed(3)} `;
+    }
+    // Sağ kanat: kök → tepe
+    d += `L ${rPts[0].x.toFixed(3)} ${rPts[0].y.toFixed(3)} `;
+    for (let k = 1; k < rPts.length; k++) {
+      d += `L ${rPts[k].x.toFixed(3)} ${rPts[k].y.toFixed(3)} `;
+    }
+    // Tepe yayı: sağ tepe → sol tepe (yay tipRadius)
+    d += `A ${tipRadius.toFixed(3)} ${tipRadius.toFixed(3)} 0 0 ${internal ? 0 : 1} ${lPts[lPts.length-1].x.toFixed(3)} ${lPts[lPts.length-1].y.toFixed(3)} `;
+    // Sol kanat: tepe → kök
+    for (let k = lPts.length - 2; k >= 0; k--) {
+      d += `L ${lPts[k].x.toFixed(3)} ${lPts[k].y.toFixed(3)} `;
+    }
+    d += `L ${lRoot.x.toFixed(3)} ${lRoot.y.toFixed(3)} `;
+  }
+  // Son sol kökten ilk sağ köke kapanış yayı
+  d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${(() => {
+    // İlk dişin sağ kökü:
+    const center = 0;
+    const baseAng = Math.atan2(rightFlank[0].y, rightFlank[0].x);
+    const orient = internal ? -baseAng : baseAng;
+    const finalAng = orient + shift + center;
+    return `${(rootRadius * Math.cos(finalAng)).toFixed(3)} ${(rootRadius * Math.sin(finalAng)).toFixed(3)}`;
+  })()} `;
+  d += "Z";
+  return d;
+}
+
+// =============================================================================
+//                         MUKAVEMET YARDIMCI HESAPLAR
+// =============================================================================
+
+// Lewis form faktörü Y (20°, full depth, x=0) — yaklaşık tablo
+const LEWIS_Y_20 = {
+  12: 0.245, 13: 0.261, 14: 0.277, 15: 0.290, 16: 0.296, 17: 0.303,
+  18: 0.309, 19: 0.314, 20: 0.322, 21: 0.328, 22: 0.331, 24: 0.337,
+  26: 0.346, 28: 0.353, 30: 0.359, 34: 0.371, 38: 0.384, 43: 0.397,
+  50: 0.409, 60: 0.422, 75: 0.435, 100: 0.447, 150: 0.460, 300: 0.472
+};
+function lewisY(z) {
+  const keys = Object.keys(LEWIS_Y_20).map(Number).sort((a, b) => a - b);
+  if (z <= keys[0]) return LEWIS_Y_20[keys[0]];
+  if (z >= keys[keys.length - 1]) return LEWIS_Y_20[keys[keys.length - 1]];
+  for (let i = 0; i < keys.length - 1; i++) {
+    if (z >= keys[i] && z <= keys[i + 1]) {
+      const t = (z - keys[i]) / (keys[i + 1] - keys[i]);
+      return LEWIS_Y_20[keys[i]] + t * (LEWIS_Y_20[keys[i + 1]] - LEWIS_Y_20[keys[i]]);
+    }
+  }
+  return 0.32;
+}
+
+// AGMA geometri faktörü Yj (yaklaşık, 20°, harici-harici eşleşme)
+function agmaYj(zPinion, zGear) {
+  // Çok basitleştirilmiş yaklaşım: Yj ≈ Y/Kf, burada Kf yorulma yığılma faktörü ≈ 1.5
+  // Daha doğrusu standart eğrilerden okunur. Burada Y * 0.85 olarak yaklaşıyoruz.
+  return lewisY(zPinion) * 0.85;
+}
+
+// Hertzian (yüzey) gerilimi için elastik faktör Ze [√MPa]
+function elasticityFactorZe(E1, E2, nu1, nu2) {
+  const inv1 = (1 - nu1 * nu1) / E1;
+  const inv2 = (1 - nu2 * nu2) / E2;
+  return Math.sqrt(1 / (Math.PI * (inv1 + inv2)));
+}
+
+// Zone factor Zh (20° için ≈ 2.495, x=0 standart)
+function zoneFactorZh(alpha, x1, x2, z1, z2) {
+  // ISO 6336 yaklaşımı: 20°, x=0 → 2.495
+  // (x1+x2)/(z1+z2) etkisi küçük; burada lineer düzeltme yapıyoruz.
+  const base = 2.495;
+  const corr = -3.5 * ((x1 + x2) / (z1 + z2));
+  return Math.max(1.5, base + corr);
+}
+
+// Dinamik faktör Kv (AGMA 2001, Q kalite gradeına göre)
+function dynamicKv(velocity_mps, qualityGrade) {
+  // velocity m/s. Q düştükçe (kaliteli) Kv 1'e yaklaşır.
+  // Yaklaşım: Kv = ((A + sqrt(200*v)) / A)^B
+  const Qv = 12 - qualityGrade; // AGMA Qv ≈ 12 - ISO Q
+  const B = 0.25 * Math.pow(12 - Qv, 0.667);
+  const A = 50 + 56 * (1 - B);
+  return Math.pow((A + Math.sqrt(200 * velocity_mps)) / A, B);
+}
+
+// =============================================================================
+//                          MALZEME VERİTABANI
+// =============================================================================
+const MATERIALS = [
+  { id: "C45_N",  name: "C45 — Normalleştirilmiş",        sFlim: 200, sHlim: 510, E: 210000, nu: 0.3 },
+  { id: "C45_T",  name: "C45 — Islah Edilmiş",            sFlim: 290, sHlim: 620, E: 210000, nu: 0.3 },
+  { id: "42CrMo4_T", name: "42CrMo4 — Islah",              sFlim: 420, sHlim: 780, E: 210000, nu: 0.3 },
+  { id: "34CrMo4_T", name: "34CrMo4 — Islah",              sFlim: 380, sHlim: 720, E: 210000, nu: 0.3 },
+  { id: "16MnCr5_C", name: "16MnCr5 — Sementasyon (Cf 60HRC)", sFlim: 500, sHlim: 1500, E: 210000, nu: 0.3 },
+  { id: "20MnCr5_C", name: "20MnCr5 — Sementasyon (Cf 60HRC)", sFlim: 525, sHlim: 1500, E: 210000, nu: 0.3 },
+  { id: "18CrNiMo7_C", name: "18CrNiMo7-6 — Sementasyon",  sFlim: 525, sHlim: 1500, E: 210000, nu: 0.3 },
+  { id: "31CrMoV9_N", name: "31CrMoV9 — Gaz Nitrür",       sFlim: 425, sHlim: 1250, E: 210000, nu: 0.3 },
+  { id: "GG25",   name: "GG25 — Lamel Grafit Dökme Demir", sFlim: 110, sHlim: 350, E: 105000, nu: 0.26 },
+  { id: "GGG70",  name: "GGG70 — Küresel Grafit Dökme Demir", sFlim: 320, sHlim: 580, E: 175000, nu: 0.28 },
+  { id: "PA66",   name: "PA66 — Polyamid 66",              sFlim: 40,  sHlim: 80,  E: 3000,   nu: 0.4 },
+  { id: "POM",    name: "POM — Polioksimetilen",           sFlim: 50,  sHlim: 90,  E: 3100,   nu: 0.4 },
 ];
 
-// ---------------------------------------------------------------------------
-// UI Setup
-// ---------------------------------------------------------------------------
+function getMat() {
+  const id = document.getElementById("material").value;
+  return MATERIALS.find(m => m.id === id) || MATERIALS[1];
+}
+
+// =============================================================================
+//                                  PRESETLER
+// =============================================================================
+const PRESETS = [
+  { name: "Otomotiv Otomatik Şanzıman", desc: "Zs=24, Zp=18, Zr=60, N=3, m=2",
+    values: { zs: 24, zp: 18, zr: 60, np: 3, m: 2, b: 25, T: 80 } },
+  { name: "Endüstriyel Redüktör 1:5", desc: "Zs=18, Zp=27, Zr=72, N=3, m=3",
+    values: { zs: 18, zp: 27, zr: 72, np: 3, m: 3, b: 30, T: 120 } },
+  { name: "Robotik (Yüksek Hassasiyet)", desc: "Zs=12, Zp=18, Zr=48, N=3, m=1",
+    values: { zs: 12, zp: 18, zr: 48, np: 3, m: 1, b: 12, T: 15 } },
+  { name: "Rüzgar Türbini 1. Kademe", desc: "Zs=21, Zp=39, Zr=99, N=3, m=10",
+    values: { zs: 21, zp: 39, zr: 99, np: 3, m: 10, b: 320, T: 35000 } },
+  { name: "Standart 1:4 Redüktör", desc: "Zs=20, Zp=20, Zr=60, N=3, m=2",
+    values: { zs: 20, zp: 20, zr: 60, np: 3, m: 2, b: 20, T: 50 } },
+  { name: "Yüksek Tork (4 Planet)", desc: "Zs=16, Zp=24, Zr=64, N=4, m=4",
+    values: { zs: 16, zp: 24, zr: 64, np: 4, m: 4, b: 40, T: 400 } },
+  { name: "Kompakt Servo Redüktör", desc: "Zs=15, Zp=15, Zr=45, N=3, m=1",
+    values: { zs: 15, zp: 15, zr: 45, np: 3, m: 1, b: 10, T: 8 } },
+  { name: "Ağır Endüstri (5 Planet)", desc: "Zs=20, Zp=30, Zr=80, N=5, m=6",
+    values: { zs: 20, zp: 30, zr: 80, np: 5, m: 6, b: 80, T: 1500 } },
+];
+
+// =============================================================================
+//                                   UI
+// =============================================================================
 const $ = (id) => document.getElementById(id);
 
 function renderPresets() {
   const grid = $("presetGrid");
   grid.innerHTML = "";
-  PRESETS.forEach((p, i) => {
+  PRESETS.forEach((p) => {
     const btn = document.createElement("button");
     btn.className = "preset-btn";
     btn.innerHTML = `<span class="ptitle">${p.name}</span><span class="pdesc">${p.desc}</span>`;
@@ -481,6 +850,8 @@ function applyPreset(p) {
   $("zp").value = p.values.zp;
   $("zr").value = p.values.zr;
   $("np").value = p.values.np;
+  if (p.values.b) $("faceWidth").value = p.values.b;
+  if (p.values.T) $("torque").value = p.values.T;
   const mSel = $("modulePreset");
   const hasOpt = Array.from(mSel.options).some(o => parseFloat(o.value) === p.values.m);
   if (hasOpt) {
@@ -492,7 +863,20 @@ function applyPreset(p) {
     $("moduleCustom").disabled = false;
     $("moduleCustom").value = p.values.m;
   }
+  syncPower();
   calculateAndDraw();
+}
+
+function renderMaterials() {
+  const sel = $("material");
+  sel.innerHTML = "";
+  MATERIALS.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.id;
+    opt.textContent = `${m.name}  ·  σF=${m.sFlim} MPa, σH=${m.sHlim} MPa`;
+    sel.appendChild(opt);
+  });
+  sel.value = "42CrMo4_T";
 }
 
 // Modül seçimi
@@ -500,16 +884,34 @@ $("modulePreset").addEventListener("change", () => {
   const isCustom = $("modulePreset").value === "custom";
   $("moduleCustom").disabled = !isCustom;
   if (!isCustom) $("moduleCustom").value = $("modulePreset").value;
+  calculateAndDraw();
 });
 
-// Zr otomatik güncellensin
+// Zr otomatik
 function syncRing() {
   const zs = parseInt($("zs").value) || 0;
   const zp = parseInt($("zp").value) || 0;
   $("zr").value = zs + 2 * zp;
 }
-$("zs").addEventListener("input", () => { syncRing(); });
-$("zp").addEventListener("input", () => { syncRing(); });
+$("zs").addEventListener("input", syncRing);
+$("zp").addEventListener("input", syncRing);
+
+// Tork/Güç senkronu
+function syncPower() {
+  const T = parseFloat($("torque").value) || 0;
+  const n = parseFloat($("rpm").value) || 0;
+  const P = T * 2 * Math.PI * n / 60 / 1000; // kW
+  $("power").value = P.toFixed(2);
+}
+function syncTorque() {
+  const P = parseFloat($("power").value) || 0;
+  const n = parseFloat($("rpm").value) || 0;
+  const T = (P * 1000 * 60) / (2 * Math.PI * Math.max(n, 0.01));
+  $("torque").value = T.toFixed(2);
+}
+$("torque").addEventListener("input", syncPower);
+$("power").addEventListener("input", syncTorque);
+$("rpm").addEventListener("input", syncPower);
 
 // Mod toggle
 let currentMode = "ring_fixed";
@@ -522,9 +924,26 @@ $("modeToggle").addEventListener("click", (e) => {
   }
 });
 
-// ---------------------------------------------------------------------------
-// Hesaplama
-// ---------------------------------------------------------------------------
+// Tab toggle
+document.querySelectorAll(".tab").forEach(t => {
+  t.addEventListener("click", () => {
+    document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+    document.querySelectorAll(".tab-content").forEach(x => x.classList.remove("active"));
+    t.classList.add("active");
+    $(`tab-${t.dataset.tab}`).classList.add("active");
+  });
+});
+
+// Panel collapse
+document.querySelectorAll(".collapser").forEach(c => {
+  c.addEventListener("click", () => {
+    c.closest(".panel").classList.toggle("collapsed");
+  });
+});
+
+// =============================================================================
+//                                 HESAPLA
+// =============================================================================
 function getModule() {
   return $("modulePreset").value === "custom"
     ? parseFloat($("moduleCustom").value) || 1
@@ -538,102 +957,268 @@ function calculate() {
   const N  = parseInt($("np").value);
   const m  = getModule();
   const alpha = parseFloat($("alpha").value);
+  const beta  = parseFloat($("beta").value);
   const rpm = parseFloat($("rpm").value) || 0;
+  const T_input = parseFloat($("torque").value) || 0; // Nm (giriş şaftında)
 
-  // Çap hesapları (taksimat / pitch çapları)
-  const ds = m * zs;
-  const dp = m * zp;
-  const dr = m * zr;
+  const ha = parseFloat($("haCoef").value);
+  const hf = parseFloat($("hfCoef").value);
+  const xs = parseFloat($("xs").value);
+  const xp = parseFloat($("xp").value);
+  const xr = parseFloat($("xr").value);
 
-  // Diş üstü çapları
-  const das = m * (zs + 2);
-  const dap = m * (zp + 2);
-  const dar = m * (zr - 2); // iç dişli için
+  const b  = parseFloat($("faceWidth").value);
+  const Ka = parseFloat($("ka").value);
+  const Q  = parseInt($("quality").value);
+  const mat = getMat();
+  const mat2 = mat; // şu an aynı malzeme varsayımı
 
-  // Diş dibi
-  const dfs = m * (zs - 2.5);
-  const dfp = m * (zp - 2.5);
-  const dfr = m * (zr + 2.5);
+  const aRad = alpha * DEG;
+  const bRad = beta  * DEG;
 
-  // Eksenler arası mesafe
-  const a = m * (zs + zp) / 2;
+  // Normal modülden alın modüle (helis için)
+  const mt = m / Math.cos(bRad);
 
-  // Çevrim oranı (modu bağlı)
-  let ratio = 0, ratioFormula = "", outRpm = 0;
+  // Çaplar (alın düzleminde)
+  const ds = mt * zs;
+  const dp = mt * zp;
+  const dr = mt * zr;
+
+  const das = ds + 2 * (ha + xs) * m;
+  const dap = dp + 2 * (ha + xp) * m;
+  const dar = dr - 2 * (ha - xr) * m;
+
+  const dfs = ds - 2 * (hf - xs) * m;
+  const dfp = dp - 2 * (hf - xp) * m;
+  const dfr = dr + 2 * (hf + xr) * m;
+
+  const dbs = ds * Math.cos(aRad);
+  const dbp = dp * Math.cos(aRad);
+  const dbr = dr * Math.cos(aRad);
+
+  // Eksenler arası
+  const a = mt * (zs + zp) / 2;
+
+  // ----- Çevrim Oranı -----
+  let ratio = 0, ratioFormula = "", outRpm = 0, T_out = 0;
   if (currentMode === "ring_fixed") {
-    // Sun giriş, Ring sabit → Carrier çıkış
     ratio = 1 + zr / zs;
     ratioFormula = "i = 1 + Zr/Zs";
     outRpm = rpm / ratio;
+    T_out = T_input * ratio;
   } else if (currentMode === "carrier_fixed") {
-    // Sun giriş, Carrier sabit → Ring çıkış (yönü ters)
     ratio = -zr / zs;
     ratioFormula = "i = −Zr/Zs";
     outRpm = rpm / ratio;
+    T_out = T_input * Math.abs(ratio);
   } else if (currentMode === "sun_fixed") {
-    // Ring giriş, Sun sabit → Carrier çıkış
     ratio = 1 + zs / zr;
     ratioFormula = "i = 1 + Zs/Zr";
     outRpm = rpm / ratio;
+    T_out = T_input * ratio;
   }
-
-  // Planet dönüş hızı (sun giriş, ring sabit)
   const omegaSun = rpm;
   const omegaCarrier = omegaSun / (1 + zr / zs);
   const omegaPlanet = (omegaSun - omegaCarrier) * (-zs / zp) + omegaCarrier;
+  const P_input = T_input * TAU * rpm / 60; // W
 
-  // Doğrulamalar
+  // ----- Doğrulamalar -----
   const errors = [];
-  // 1. Ring = sun + 2*planet
-  if (zr !== zs + 2 * zp) {
-    errors.push(`Geometri: Zr ≠ Zs + 2·Zp  (gerekli: ${zs + 2*zp})`);
-  }
-  // 2. Montaj koşulu (Zs + Zr) / N tam sayı olmalı
-  if ((zs + zr) % N !== 0) {
-    errors.push(`Montaj koşulu sağlanmıyor: (Zs+Zr)/N = ${((zs+zr)/N).toFixed(3)} tam sayı değil`);
-  }
-  // 3. Komşuluk koşulu — planetler birbirine değmesin
-  const carrierR = m * (zs + zp) / 2;
+  if (zr !== zs + 2 * zp) errors.push(`Geometri: Zr ≠ Zs + 2·Zp (gerekli: ${zs + 2*zp})`);
+  if ((zs + zr) % N !== 0) errors.push(`Montaj koşulu sağlanmıyor: (Zs+Zr)/N = ${((zs+zr)/N).toFixed(3)}`);
+
+  const carrierR = a;
   const neighborDist = 2 * carrierR * Math.sin(Math.PI / N);
-  const planetTipDia = m * (zp + 2);
-  if (neighborDist <= planetTipDia) {
-    errors.push(`Komşuluk koşulu: planetler çakışıyor (mesafe ${neighborDist.toFixed(2)} mm ≤ planet diş üstü Ø ${planetTipDia.toFixed(2)} mm)`);
+  if (neighborDist <= dap + 0.5 * m) {
+    errors.push(`Komşuluk koşulu ihlal: planet aralığı ${neighborDist.toFixed(2)} ≤ planet diş üstü Ø ${dap.toFixed(2)} mm`);
   }
-  // 4. Minimum diş sayısı kontrolü (alttan kesilme — 20° için ~17)
-  const minTeeth = alpha >= 20 ? 17 : 32;
-  if (zs < minTeeth) {
-    errors.push(`Uyarı: Zs < ${minTeeth}, ${alpha}° basınç açısında alttan kesilme (undercut) olabilir`);
+  // Undercut kontrolü: zmin = 2/sin²(α) ≈ 17 (20° için)
+  const zmin = 2 / (Math.sin(aRad) ** 2);
+  const xs_min = (zmin - zs) / zmin;
+  const xp_min = (zmin - zp) / zmin;
+  if (zs < zmin && xs < xs_min - 0.01) {
+    errors.push(`Güneş: undercut riski (gerekli x ≥ ${xs_min.toFixed(2)}, mevcut ${xs})`);
   }
+  if (zp < zmin && xp < xp_min - 0.01) {
+    errors.push(`Planet: undercut riski (gerekli x ≥ ${xp_min.toFixed(2)}, mevcut ${xp})`);
+  }
+
+  // ----- Mukavemet (kritik temas: Güneş ↔ Planet) -----
+  // Güneş şaftından gelen tork N planet arasında paylaşılır (ideal):
+  // Her planetin güneşle temasındaki teğet kuvvet:
+  const FtPerPlanet = (T_input * 1000) / (ds / 2) / N; // T_input Nm → Nmm, d mm → N
+  // Çevre hızı (pitch hızı)
+  const v_pitch = (Math.PI * ds * rpm) / 60000; // m/s
+
+  // Dinamik faktör
+  const Kv = dynamicKv(v_pitch, Q);
+  // Mesh load distribution Km/Kh ≈ 1.25 (orta-iyi), basitleştirilmiş
+  const Km = 1.25;
+  // Boyut faktörü Ks ≈ 1.0 küçük dişliler için
+  const Ks = 1.0;
+  // KB rim factor ≈ 1.0 (ring dışında)
+  const KB = 1.0;
+
+  // ----- Lewis basit eğme gerilimi -----
+  const Yl = lewisY(zs);
+  const sigmaB_Lewis = FtPerPlanet / (b * m * Yl); // MPa (N/mm²)
+
+  // ----- AGMA eğme gerilimi -----
+  // σ_F = Ft / (b * mt) * Ka*Kv*Ks * Km*KB / Yj
+  const Yj = agmaYj(zs, zp);
+  const sigmaB_AGMA = (FtPerPlanet / (b * mt)) * Ka * Kv * Ks * (Km * KB) / Yj;
+
+  // ----- Hertzian temas gerilimi (Güneş ↔ Planet) -----
+  // σ_H = Zh * Ze * sqrt( Ft/(b*d_p) * (u+1)/u * Ka*Kv*Km )
+  const Ze = elasticityFactorZe(mat.E, mat2.E, mat.nu, mat2.nu);
+  const Zh = zoneFactorZh(alpha, xs, xp, zs, zp);
+  const u_sp = zp / zs; // 'gear ratio' between mating pair (sun=pinion)
+  const sigmaH_SP = Zh * Ze * Math.sqrt(
+    Math.abs(FtPerPlanet / (b * ds) * (u_sp + 1) / u_sp * Ka * Kv * Km)
+  );
+
+  // ----- Planet ↔ Ring teması (iç temas) -----
+  // u negatif (iç temas), Zh ring x'i ile düzeltilir
+  const u_pr = zr / zp;
+  const Zh_pr = zoneFactorZh(alpha, xp, xr, zp, zr);
+  const sigmaH_PR = Zh_pr * Ze * Math.sqrt(
+    Math.abs(FtPerPlanet / (b * dp) * (u_pr - 1) / u_pr * Ka * Kv * Km)
+  );
+  // İç teması daha düşük gerilim verir (eğrilik benzer), bu standart bir gerçektir.
+
+  // ----- Güvenlik faktörleri -----
+  const SF_bend = mat.sFlim / sigmaB_AGMA;
+  const SF_contact = mat.sHlim / sigmaH_SP;
+
+  // ----- Önerilen güçler (SF=1.5 için) -----
+  // Eğme limitli iletilebilir Ft:
+  const Ft_allow_bend = (mat.sFlim / 1.5) * (b * mt) / (Ka * Kv * Ks * Km * KB / Yj);
+  // Temas limitli:
+  const Ft_allow_cont = ((mat.sHlim / 1.5) / (Zh * Ze)) ** 2 * (b * ds) * u_sp / (u_sp + 1) / (Ka * Kv * Km);
+  const Ft_allow = Math.min(Ft_allow_bend, Ft_allow_cont);
+  const T_allow = Ft_allow * (ds / 2) * N / 1000; // Nm (toplam, sun şaftında)
+  const P_allow = T_allow * TAU * rpm / 60 / 1000; // kW
 
   return {
-    zs, zp, zr, N, m, alpha, rpm,
-    ds, dp, dr, das, dap, dar, dfs, dfp, dfr,
-    a, ratio, ratioFormula, outRpm,
-    omegaSun, omegaCarrier, omegaPlanet,
+    // input
+    zs, zp, zr, N, m, mt, alpha, beta, rpm, T_input, P_input,
+    ha, hf, xs, xp, xr, b, Ka, Q,
+    mat,
+    // geometri
+    ds, dp, dr, das, dap, dar, dfs, dfp, dfr, dbs, dbp, dbr, a,
+    // kinematik
+    ratio, ratioFormula, outRpm, T_out, omegaSun, omegaCarrier, omegaPlanet,
+    // mukavemet
+    FtPerPlanet, v_pitch, Kv, Km, Ks, KB, Yl, Yj, Ze, Zh,
+    sigmaB_Lewis, sigmaB_AGMA, sigmaH_SP, sigmaH_PR,
+    SF_bend, SF_contact, T_allow, P_allow,
+    // doğrulama
     errors
   };
 }
 
+// =============================================================================
+//                                SONUÇLAR
+// =============================================================================
+function fmt(v, u = "", d = 2) {
+  if (!isFinite(v)) return "—";
+  if (Math.abs(v) >= 10000) return v.toExponential(2) + u;
+  return v.toFixed(d) + u;
+}
+
+function statusClass(value, warnT, errT, lowerIsBetter = false) {
+  if (lowerIsBetter) {
+    if (value < warnT) return "ok";
+    if (value < errT)  return "warn";
+    return "err";
+  } else {
+    if (value > warnT) return "ok";
+    if (value > errT)  return "warn";
+    return "err";
+  }
+}
+
 function renderResults(r) {
-  const fmt = (v, u = "") => isFinite(v) ? `${v.toFixed(2)}${u}` : "—";
-  const items = [
-    ["Çevrim Oranı (i)", `${fmt(r.ratio)}  (${r.ratioFormula})`],
-    ["Çıkış Devri", fmt(r.outRpm, " d/dk")],
-    ["Eksenler Arası (a)", fmt(r.a, " mm")],
-    ["Güneş Taksimat Ø (ds)", fmt(r.ds, " mm")],
-    ["Planet Taksimat Ø (dp)", fmt(r.dp, " mm")],
-    ["Ring Taksimat Ø (dr)", fmt(r.dr, " mm")],
-    ["Güneş Diş Üstü Ø", fmt(r.das, " mm")],
-    ["Planet Diş Üstü Ø", fmt(r.dap, " mm")],
-    ["Ring Diş Dibi Ø", fmt(r.dfr, " mm")],
-    ["Taşıyıcı Devri", fmt(r.omegaCarrier, " d/dk")],
-    ["Planet Kendi Ekseni Devri", fmt(r.omegaPlanet, " d/dk")],
-    ["Toplam Diş Yükü Paylaşımı", `${r.N} planet`]
+  // ----- KİNEMATİK -----
+  const kin = [
+    ["Çevrim Oranı (i)", `${fmt(r.ratio)}`, r.ratioFormula],
+    ["Giriş Devri n₁",    fmt(r.rpm, " d/dk")],
+    ["Çıkış Devri n₂",    fmt(r.outRpm, " d/dk")],
+    ["Çıkış Torku T₂",    fmt(r.T_out, " Nm")],
+    ["Giriş Gücü",        fmt(r.P_input / 1000, " kW")],
+    ["Pitch Çevresel Hız", fmt(r.v_pitch, " m/s")],
+    ["Taşıyıcı Devri",    fmt(r.omegaCarrier, " d/dk")],
+    ["Planet Kendi Ekseni", fmt(r.omegaPlanet, " d/dk")],
   ];
-  $("results").innerHTML = items.map(([l, v]) =>
-    `<div class="result-item"><span class="lbl">${l}</span><span class="val">${v}</span></div>`
+  $("results-kinematik").innerHTML = kin.map(item =>
+    `<div class="result-item">
+      <span class="lbl">${item[0]}</span>
+      <span class="val">${item[1]}</span>
+      ${item[2] ? `<span class="sub">${item[2]}</span>` : ""}
+    </div>`
   ).join("");
 
+  // ----- GEOMETRİ -----
+  const geo = [
+    ["Eksenler Arası a",       fmt(r.a, " mm")],
+    ["Modül (normal/alın) m / mt", `${fmt(r.m)} / ${fmt(r.mt)} mm`],
+    ["", ""], // spacer
+    ["Güneş — Pitch Ø",        fmt(r.ds, " mm")],
+    ["Güneş — Base Ø",         fmt(r.dbs, " mm")],
+    ["Güneş — Tip Ø",          fmt(r.das, " mm")],
+    ["Güneş — Root Ø",         fmt(r.dfs, " mm")],
+    ["Planet — Pitch Ø",       fmt(r.dp, " mm")],
+    ["Planet — Tip Ø",         fmt(r.dap, " mm")],
+    ["Planet — Root Ø",        fmt(r.dfp, " mm")],
+    ["Ring — Pitch Ø",         fmt(r.dr, " mm")],
+    ["Ring — Tip Ø (iç)",      fmt(r.dar, " mm")],
+    ["Ring — Root Ø (dış)",    fmt(r.dfr, " mm")],
+    ["Pitch Diş Adımı (p)",    fmt(Math.PI * r.m, " mm")],
+    ["Base Diş Adımı (pb)",    fmt(Math.PI * r.m * Math.cos(r.alpha * DEG), " mm")],
+  ];
+  $("results-geometri").innerHTML = geo.filter(x => x[0] !== "").map(item =>
+    `<div class="result-item"><span class="lbl">${item[0]}</span><span class="val">${item[1]}</span></div>`
+  ).join("");
+
+  // ----- MUKAVEMET -----
+  const sfClass = statusClass(r.SF_bend, 1.5, 1.0);
+  const shClass = statusClass(r.SF_contact, 1.3, 1.0);
+  const str = [
+    { l: "Planet Başına Teğet Kuvvet Ft", v: fmt(r.FtPerPlanet, " N"),
+      s: `Toplam: ${fmt(r.FtPerPlanet * r.N, " N")} (N=${r.N} planet)` },
+    { l: "Pitch Çevresel Hız v", v: fmt(r.v_pitch, " m/s") },
+    { l: "Dinamik Faktör Kv",   v: fmt(r.Kv) },
+    { l: "Yük Dağılım Km",      v: fmt(r.Km) },
+    { l: "Lewis Y (z=Zs)",      v: fmt(r.Yl, "", 3) },
+    { l: "AGMA Yj",             v: fmt(r.Yj, "", 3) },
+    { l: "Zh (zone)",           v: fmt(r.Zh, "", 3) },
+    { l: "Ze (elastik) [√MPa]", v: fmt(r.Ze, "", 1) },
+    { l: "Lewis Eğme σb", v: fmt(r.sigmaB_Lewis, " MPa") },
+    { l: "AGMA Eğme σF",  v: fmt(r.sigmaB_AGMA, " MPa"),
+      s: `Limit: ${r.mat.sFlim} MPa` },
+    { l: "Hertz Sun-Planet σH", v: fmt(r.sigmaH_SP, " MPa"),
+      s: `Limit: ${r.mat.sHlim} MPa` },
+    { l: "Hertz Planet-Ring σH", v: fmt(r.sigmaH_PR, " MPa") },
+    { l: "Eğme Güvenlik SF",     v: fmt(r.SF_bend),    cls: sfClass,
+      s: r.SF_bend < 1.0 ? "✗ Tehlikeli (< 1.0)"
+        : r.SF_bend < 1.5 ? "⚠ Marjinal (< 1.5 önerilen)"
+        : "✓ Güvenli" },
+    { l: "Temas Güvenlik SH",    v: fmt(r.SF_contact), cls: shClass,
+      s: r.SF_contact < 1.0 ? "✗ Pitting riski"
+        : r.SF_contact < 1.3 ? "⚠ Marjinal"
+        : "✓ Güvenli" },
+    { l: "İletilebilir Tork (SF=1.5)", v: fmt(r.T_allow, " Nm"), cls: "full" },
+    { l: "İletilebilir Güç (SF=1.5)",  v: fmt(r.P_allow, " kW"), cls: "full" },
+  ];
+  $("results-mukavemet").innerHTML = str.map(item =>
+    `<div class="result-item ${item.cls || ""}">
+      <span class="lbl">${item.l}</span>
+      <span class="val">${item.v}</span>
+      ${item.s ? `<span class="sub">${item.s}</span>` : ""}
+    </div>`
+  ).join("");
+
+  // ----- DOĞRULAMA -----
   const valEl = $("validation");
   if (r.errors.length === 0) {
     valEl.innerHTML = `<div class="validation ok">✓ Tüm kinematik ve montaj koşulları sağlanıyor.</div>`;
@@ -644,52 +1229,19 @@ function renderResults(r) {
   }
 }
 
-// ---------------------------------------------------------------------------
-// SVG Çizim
-// ---------------------------------------------------------------------------
+// =============================================================================
+//                                  ÇİZİM
+// =============================================================================
 const NS = "http://www.w3.org/2000/svg";
-let animState = { sunAngle: 0, carrierAngle: 0, planetAngle: 0, running: true, lastTs: 0 };
+let animState = { sunAngle: 0, carrierAngle: 0, planetSpin: 0, lastTs: 0 };
 
-function el(name, attrs = {}) {
+function el(name, attrs = {}, text = null) {
   const e = document.createElementNS(NS, name);
   Object.entries(attrs).forEach(([k, v]) => e.setAttribute(k, v));
+  if (text != null) e.textContent = text;
   return e;
 }
 
-// Dişli profili — basitleştirilmiş trapez-dişli yaklaşımı (görsel amaçlı)
-// Her diş için 4 nokta: kök-başlangıç, tepe-başlangıç, tepe-sonu, kök-sonu
-function gearPath(teeth, pitchR, addendum, dedendum, internal = false) {
-  const Z = teeth;
-  const ang = (Math.PI * 2) / Z;
-  const rOut = internal ? pitchR + dedendum : pitchR + addendum;
-  const rIn  = internal ? pitchR + addendum  : pitchR - dedendum;
-  const toothW = 0.55;        // diş kök genişliği (açı oranı)
-  const tipW   = toothW * 0.6; // diş tepe genişliği (daha dar)
-  let d = "";
-  for (let i = 0; i < Z; i++) {
-    const base = i * ang;
-    const a1 = base - (toothW * ang) / 2; // kök başlangıç
-    const a2 = base - (tipW   * ang) / 2; // tepe başlangıç
-    const a3 = base + (tipW   * ang) / 2; // tepe sonu
-    const a4 = base + (toothW * ang) / 2; // kök sonu
-    const p1 = polar(rIn,  a1);
-    const p2 = polar(rOut, a2);
-    const p3 = polar(rOut, a3);
-    const p4 = polar(rIn,  a4);
-    d += (i === 0 ? "M" : "L") + ` ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} `;
-    d += `L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)} `;
-    d += `L ${p3.x.toFixed(2)} ${p3.y.toFixed(2)} `;
-    d += `L ${p4.x.toFixed(2)} ${p4.y.toFixed(2)} `;
-  }
-  d += "Z";
-  return d;
-}
-
-function polar(r, a) {
-  return { x: r * Math.cos(a), y: r * Math.sin(a) };
-}
-
-// Basit daire dişli (detay kapalıyken)
 function simpleGearPath(r) {
   return `M ${r} 0 A ${r} ${r} 0 1 1 ${-r} 0 A ${r} ${r} 0 1 1 ${r} 0 Z`;
 }
@@ -698,188 +1250,247 @@ function draw(r) {
   const svg = $("diagram");
   svg.innerHTML = "";
 
-  // ViewBox'u Ring + biraz pay kadar ayarla
-  const maxR = (r.zr * r.m) / 2 + r.m * 3 + 20;
-  svg.setAttribute("viewBox", `-${maxR} -${maxR} ${maxR*2} ${maxR*2}`);
+  const maxR = (r.dfr / 2) + r.m * 5 + 30;
+  svg.setAttribute("viewBox", `${-maxR} ${-maxR} ${maxR*2} ${maxR*2}`);
 
   const detail = $("teethDetail").checked;
+  const showPitch = $("showPitch").checked;
+  const showBase  = $("showBase").checked;
+  const showForces = $("showForces").checked;
+  const segs = parseInt($("resolution").value);
+  const alpha = r.alpha;
   const m = r.m;
 
-  const sunR = r.ds / 2;
-  const planetR = r.dp / 2;
-  const ringR = r.dr / 2;
-  const carrierR = r.a; // sun ile planet merkezi arası
-
-  // RING (iç dişli) — dış halka + iç dişler
-  const ringGroup = el("g");
-  const ringOuter = el("circle", {
-    cx: 0, cy: 0, r: ringR + m * 4,
-    fill: "#1e1b4b",
-    stroke: "#a78bfa",
-    "stroke-width": 1.5
-  });
-  ringGroup.appendChild(ringOuter);
-  const ringInner = el("path", {
-    d: detail ? gearPath(r.zr, ringR, m, m * 1.25, true) : simpleGearPath(ringR),
+  // --- RING (en dıştaki çember + iç dişler) ---
+  const ringR_pitch = r.dr / 2;
+  const ringG = el("g", { id: "ringG" });
+  // Ring dış çemberi (gövde)
+  ringG.appendChild(el("circle", {
+    cx: 0, cy: 0, r: (r.dfr / 2) + r.m * 3,
+    fill: "#1e1b4b", stroke: "#a78bfa", "stroke-width": 1.5
+  }));
+  // Ring iç profili (dişler)
+  const ringPath = detail
+    ? generateGearPath({ z: r.zr, m: r.m, alpha, x: r.xr, ha: r.ha, hf: r.hf, internal: true, segments: segs })
+    : simpleGearPath(ringR_pitch);
+  ringG.appendChild(el("path", {
+    d: ringPath,
     fill: "#0a1020",
-    stroke: "#a78bfa",
-    "stroke-width": 1.2
-  });
-  ringGroup.appendChild(ringInner);
-  svg.appendChild(ringGroup);
-
-  // CARRIER (taşıyıcı) — planetleri birleştiren disk
-  const carrierGroup = el("g", { id: "carrierG" });
-  // Planet merkez noktaları arasını birleştir
-  const carrierPts = [];
-  for (let i = 0; i < r.N; i++) {
-    const a = (i / r.N) * Math.PI * 2;
-    carrierPts.push({ x: carrierR * Math.cos(a), y: carrierR * Math.sin(a) });
+    stroke: "#a78bfa", "stroke-width": 1.1
+  }));
+  if (showPitch) {
+    ringG.appendChild(el("circle", { cx: 0, cy: 0, r: ringR_pitch,
+      fill: "none", stroke: "#a78bfa", "stroke-dasharray": "3 3", "stroke-width": 0.5, opacity: 0.5 }));
   }
+  if (showBase) {
+    ringG.appendChild(el("circle", { cx: 0, cy: 0, r: r.dbr / 2,
+      fill: "none", stroke: "#a78bfa", "stroke-dasharray": "1 2", "stroke-width": 0.5, opacity: 0.4 }));
+  }
+  svg.appendChild(ringG);
+
+  // --- CARRIER + PLANETLER ---
+  const carrierG = el("g", { id: "carrierG" });
+  const carrierR = r.a;
+  // Carrier kolları
   for (let i = 0; i < r.N; i++) {
-    const next = carrierPts[(i + 1) % r.N];
-    const p = carrierPts[i];
-    const arm = el("path", {
+    const a = (i / r.N) * TAU;
+    const p = polar(carrierR, a);
+    carrierG.appendChild(el("path", {
       d: `M 0 0 L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`,
-      stroke: "#4ade80",
-      "stroke-width": 4,
-      "stroke-linecap": "round",
-      opacity: 0.55
-    });
-    carrierGroup.appendChild(arm);
+      stroke: "#4ade80", "stroke-width": Math.max(3, r.m * 0.8),
+      "stroke-linecap": "round", opacity: 0.45
+    }));
+    // Planet eksen pimi
+    carrierG.appendChild(el("circle", {
+      cx: p.x, cy: p.y, r: r.m * 0.6, fill: "#4ade80", opacity: 0.7
+    }));
   }
-  // Carrier merkez göbeği
-  carrierGroup.appendChild(el("circle", { cx: 0, cy: 0, r: m * 2.5, fill: "#4ade80", opacity: 0.4 }));
+  carrierG.appendChild(el("circle", { cx: 0, cy: 0, r: r.m * 2.5, fill: "#4ade80", opacity: 0.35 }));
 
-  // PLANETLER
-  const planetsGroup = el("g", { id: "planetsG" });
+  // Planet dişliler — carrierG içine yerleştir, her birinin kendi rotation grubu var
+  const planetPath = detail
+    ? generateGearPath({ z: r.zp, m: r.m, alpha, x: r.xp, ha: r.ha, hf: r.hf, internal: false, segments: segs })
+    : simpleGearPath(r.dp / 2);
   for (let i = 0; i < r.N; i++) {
-    const a = (i / r.N) * Math.PI * 2;
-    const cx = carrierR * Math.cos(a);
-    const cy = carrierR * Math.sin(a);
+    const a = (i / r.N) * TAU;
+    const p = polar(carrierR, a);
     const pg = el("g", {
-      transform: `translate(${cx.toFixed(2)} ${cy.toFixed(2)})`,
-      "data-planet-idx": i
+      transform: `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`,
+      "data-planet": i
     });
-    const inner = el("g", { class: "planet-rot" });
-    inner.appendChild(el("path", {
-      d: detail ? gearPath(r.zp, planetR, m, m * 1.25, false) : simpleGearPath(planetR),
-      fill: "#1e3a5f",
-      stroke: "#60a5fa",
-      "stroke-width": 1.2
+    const rot = el("g", { class: "planet-rot" });
+    rot.appendChild(el("path", {
+      d: planetPath,
+      fill: "#1e3a5f", stroke: "#60a5fa", "stroke-width": 1.1
     }));
-    // İşaret noktası (dönüşü göstermek için)
-    inner.appendChild(el("circle", {
-      cx: planetR * 0.6, cy: 0, r: m * 0.6,
-      fill: "#fbbf24"
+    // Yön belirleme noktası
+    rot.appendChild(el("circle", {
+      cx: (r.dp / 2) * 0.6, cy: 0, r: r.m * 0.45, fill: "#fbbf24"
     }));
-    pg.appendChild(inner);
-    planetsGroup.appendChild(pg);
+    if (showPitch) {
+      rot.appendChild(el("circle", { cx: 0, cy: 0, r: r.dp / 2,
+        fill: "none", stroke: "#60a5fa", "stroke-dasharray": "2 2", "stroke-width": 0.4, opacity: 0.5 }));
+    }
+    if (showBase) {
+      rot.appendChild(el("circle", { cx: 0, cy: 0, r: r.dbp / 2,
+        fill: "none", stroke: "#60a5fa", "stroke-dasharray": "1 2", "stroke-width": 0.4, opacity: 0.4 }));
+    }
+    pg.appendChild(rot);
+    carrierG.appendChild(pg);
   }
-  carrierGroup.appendChild(planetsGroup);
-  svg.appendChild(carrierGroup);
+  svg.appendChild(carrierG);
 
-  // SUN (Güneş)
-  const sunGroup = el("g", { id: "sunG" });
-  sunGroup.appendChild(el("path", {
-    d: detail ? gearPath(r.zs, sunR, m, m * 1.25, false) : simpleGearPath(sunR),
-    fill: "#78350f",
-    stroke: "#fbbf24",
-    "stroke-width": 1.4
+  // --- SUN (güneş) ---
+  const sunG = el("g", { id: "sunG" });
+  const sunPath = detail
+    ? generateGearPath({ z: r.zs, m: r.m, alpha, x: r.xs, ha: r.ha, hf: r.hf, internal: false, segments: segs })
+    : simpleGearPath(r.ds / 2);
+  sunG.appendChild(el("path", {
+    d: sunPath,
+    fill: "#78350f", stroke: "#fbbf24", "stroke-width": 1.4
   }));
-  // İşaret çentiği
-  sunGroup.appendChild(el("line", {
-    x1: 0, y1: 0, x2: sunR * 0.9, y2: 0,
-    stroke: "#fff", "stroke-width": 2
+  // Şaft göstergesi
+  sunG.appendChild(el("circle", { cx: 0, cy: 0, r: r.m * 1.2, fill: "#0a1020", stroke: "#fbbf24" }));
+  sunG.appendChild(el("line", {
+    x1: 0, y1: 0, x2: (r.ds/2) * 0.9, y2: 0,
+    stroke: "#fff", "stroke-width": 2, opacity: 0.7
   }));
-  svg.appendChild(sunGroup);
+  if (showPitch) {
+    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: r.ds / 2,
+      fill: "none", stroke: "#fbbf24", "stroke-dasharray": "2 2", "stroke-width": 0.5, opacity: 0.5 }));
+  }
+  if (showBase) {
+    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: r.dbs / 2,
+      fill: "none", stroke: "#fbbf24", "stroke-dasharray": "1 2", "stroke-width": 0.4, opacity: 0.4 }));
+  }
+  svg.appendChild(sunG);
 
-  // Etiketler
-  const labels = el("g", { "font-family": "system-ui", "font-size": 11, fill: "#94a3b8" });
-  labels.appendChild(el("text", { x: 0, y: -ringR - m * 2 - 6, "text-anchor": "middle", fill: "#a78bfa" })).textContent = `Ring Z=${r.zr}`;
-  labels.appendChild(el("text", { x: 0, y: sunR + m * 3 + 12, "text-anchor": "middle", fill: "#fbbf24" })).textContent = `Sun Z=${r.zs}`;
+  // --- KUVVET OKLARI ---
+  if (showForces) {
+    const fG = el("g", { id: "forcesG" });
+    const sunR = r.ds / 2;
+    const forceScale = Math.min(30, Math.max(8, Math.log10(Math.abs(r.FtPerPlanet) + 1) * 7));
+    for (let i = 0; i < r.N; i++) {
+      const ang = (i / r.N) * TAU;
+      const pt = polar(carrierR, ang);
+      // Sun→Planet temas noktası: sun yarıçapında, planet merkezine doğru
+      const contactPt = polar(sunR, ang);
+      // Kuvvet vektörü: basınç açısı kadar teğete göre eğik
+      const tangent = ang + Math.PI / 2;
+      const force = tangent + alpha * DEG;
+      const dx = Math.cos(force) * forceScale;
+      const dy = Math.sin(force) * forceScale;
+      fG.appendChild(el("line", {
+        x1: contactPt.x, y1: contactPt.y,
+        x2: contactPt.x + dx, y2: contactPt.y + dy,
+        stroke: "#f87171", "stroke-width": 1.5,
+        "marker-end": "url(#arrow)"
+      }));
+    }
+    // Ok markerı
+    const defs = el("defs");
+    const marker = el("marker", {
+      id: "arrow", viewBox: "0 0 10 10", refX: 8, refY: 5,
+      markerWidth: 6, markerHeight: 6, orient: "auto-start-reverse"
+    });
+    marker.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 Z", fill: "#f87171" }));
+    defs.appendChild(marker);
+    svg.appendChild(defs);
+    svg.appendChild(fG);
+  }
+
+  // --- ETİKETLER ---
+  const labels = el("g", { "font-family": "system-ui", "font-size": 12, fill: "#94a3b8" });
+  labels.appendChild(el("text", {
+    x: 0, y: -(r.dfr / 2) - r.m * 3 - 5, "text-anchor": "middle", fill: "#a78bfa"
+  }, `Ring  Z=${r.zr}  Ø${r.dr.toFixed(1)}`));
+  labels.appendChild(el("text", {
+    x: 0, y: r.das/2 + r.m * 2.5, "text-anchor": "middle", fill: "#fbbf24"
+  }, `Sun  Z=${r.zs}  Ø${r.ds.toFixed(1)}`));
+  // İlk planet için etiket
+  const p0 = polar(carrierR, -Math.PI / 2);
+  labels.appendChild(el("text", {
+    x: p0.x, y: p0.y - r.dap/2 - r.m * 1.5, "text-anchor": "middle", fill: "#60a5fa"
+  }, `Planet Z=${r.zp}`));
   svg.appendChild(labels);
-
-  return { sunR, planetR, ringR, carrierR };
 }
 
-// ---------------------------------------------------------------------------
-// Animasyon
-// ---------------------------------------------------------------------------
+// =============================================================================
+//                                ANIMASYON
+// =============================================================================
 let lastResult = null;
 function animate(ts) {
   if (!lastResult) { requestAnimationFrame(animate); return; }
   const dt = animState.lastTs ? (ts - animState.lastTs) / 1000 : 0;
   animState.lastTs = ts;
   if ($("anim").checked) {
-    const speedFactor = parseFloat($("speed").value) / 30; // 1.0 = normal
-    const sunOmega = 60 * speedFactor; // derece/sn
+    const speedFactor = parseFloat($("speed").value) / 30;
+    const sunOmega = 50 * speedFactor; // deg/sn
     const r = lastResult;
     const carrierOmega = sunOmega / r.ratio;
-    const planetOmega = (sunOmega - carrierOmega) * (-r.zs / r.zp) + carrierOmega;
+    const planetOmegaWorld = (sunOmega - carrierOmega) * (-r.zs / r.zp) + carrierOmega;
 
     animState.sunAngle += sunOmega * dt;
     animState.carrierAngle += carrierOmega * dt;
-    animState.planetAngle += planetOmega * dt;
+    animState.planetSpin = planetOmegaWorld - carrierOmega; // göreceli
 
     const sunG = $("sunG");
     const carrierG = $("carrierG");
     if (sunG) sunG.setAttribute("transform", `rotate(${animState.sunAngle})`);
     if (carrierG) carrierG.setAttribute("transform", `rotate(${animState.carrierAngle})`);
-    // Planet kendi etrafında dönüş
     document.querySelectorAll(".planet-rot").forEach(p => {
-      // Planet kendi yerel ekseninde dönmeli — carrier dönmüşken ekstra spin
-      p.setAttribute("transform", `rotate(${animState.planetAngle - animState.carrierAngle})`);
+      // Planet kendi yerel ekseninde dönmeli
+      // (Planet'in dünya açısı = carrier dönüşü + kendi dönüşü; biz carrier'ı çevirdiğimizden
+      // sadece göreceli dönüş kalır)
+      const planetAng = (animState.planetSpin / sunOmega) * animState.sunAngle;
+      p.setAttribute("transform", `rotate(${planetAng})`);
     });
   }
   requestAnimationFrame(animate);
 }
 requestAnimationFrame(animate);
 
-// ---------------------------------------------------------------------------
-// Ana akış
-// ---------------------------------------------------------------------------
+// =============================================================================
+//                                 ANA AKIŞ
+// =============================================================================
 function calculateAndDraw() {
   syncRing();
+  syncPower();
   const r = calculate();
   renderResults(r);
-  if (r.errors.filter(e => !e.startsWith("Uyarı")).length === 0) {
-    lastResult = r;
-    draw(r);
-    animState.sunAngle = 0;
-    animState.carrierAngle = 0;
-    animState.planetAngle = 0;
-  } else {
-    // Yine de çiz, ama göster
-    lastResult = r;
-    draw(r);
-  }
+  lastResult = r;
+  draw(r);
+  animState.sunAngle = 0;
+  animState.carrierAngle = 0;
 }
 
 $("calcBtn").addEventListener("click", calculateAndDraw);
-$("resetBtn").addEventListener("click", () => {
-  applyPreset(PRESETS[0]);
-});
+$("resetBtn").addEventListener("click", () => applyPreset(PRESETS[0]));
 
 $("exportBtn").addEventListener("click", () => {
   const svg = $("diagram");
-  const serializer = new XMLSerializer();
-  const src = serializer.serializeToString(svg);
+  const src = new XMLSerializer().serializeToString(svg);
   const blob = new Blob([`<?xml version="1.0"?>\n` + src], { type: "image/svg+xml" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url;
-  a.download = "planet-dis-li.svg";
-  a.click();
+  a.href = url; a.download = "planet-dis-li.svg"; a.click();
   URL.revokeObjectURL(url);
 });
 
-// Otomatik yeniden çiz — parametre değiştiğinde
-["zs","zp","zr","np","alpha","rpm","modulePreset","moduleCustom","teethDetail"].forEach(id => {
-  $(id).addEventListener("change", calculateAndDraw);
+// Tüm parametre değişimlerinde otomatik yeniden çiz
+const watchedInputs = [
+  "zs","zp","zr","np","alpha","beta","rpm","torque","power",
+  "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showForces",
+  "haCoef","hfCoef","cCoef","xs","xp","xr","rhoF","resolution",
+  "faceWidth","ka","quality","material"
+];
+watchedInputs.forEach(id => {
+  const e = $(id);
+  if (e) e.addEventListener("change", calculateAndDraw);
 });
 
 // Başlat
+renderMaterials();
 renderPresets();
 calculateAndDraw();
 </script>
