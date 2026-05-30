@@ -652,6 +652,11 @@ function rotate(p, a) {
   const c = Math.cos(a), s = Math.sin(a);
   return { x: p.x * c - p.y * s, y: p.x * s + p.y * c };
 }
+// Bir noktayı orjinden geçen ışın boyunca verilen yarıçapa projeksiyona getirir
+function projectToRadius(p, R) {
+  const n = Math.hypot(p.x, p.y);
+  return n < 1e-6 ? p : { x: (p.x * R) / n, y: (p.y * R) / n };
+}
 
 // İnvolüt eğri parametrik denklemi
 // Taban yarıçapı rb, parametre t (radyan)
@@ -679,40 +684,28 @@ function generateGearPath(opts) {
     segments = 12
   } = opts;
 
+  // Harici (sign=+1) ve dahili (sign=−1) dişlide tüm yön/işaret farkları tek
+  // bir parametreyle ifade edilir. ha/hf, ra/rf rolleri ve invAlpha yönü buna
+  // bağlı olarak çevrilir.
+  const sign = internal ? -1 : 1;
   const aRad = alpha * DEG;
   const r  = (m * z) / 2;                   // Pitch yarıçapı
   const rb = r * Math.cos(aRad);            // Taban (base) yarıçapı
-  let ra, rf;
-  if (internal) {
-    ra = r - (ha - x) * m;     // tepe (iç tarafa bakar — daha küçük yarıçap)
-    rf = r + (hf + x) * m;     // dip (dışta — daha büyük yarıçap)
-  } else {
-    ra = r + (ha + x) * m;     // tepe (dışta)
-    rf = r - (hf - x) * m;     // dip (içte)
-  }
+  let ra = r + sign * (ha + sign * x) * m;  // harici: r+ha·m, dahili: r−(ha−x)·m
+  let rf = r - sign * (hf - sign * x) * m;  // harici: r−hf·m, dahili: r+(hf+x)·m
   if (rf < 0.1) rf = 0.1;
 
   // Pitch çemberinde diş yarı kalınlık açısı
-  // s = m * (π/2 + 2·x·tan α)   ;   ψ = s / (2r)
-  const sPitch = m * (Math.PI / 2 + 2 * x * Math.tan(aRad));
-  const halfTooth = sPitch / (2 * r);
-
+  // s = m · (π/2 + 2·x·tan α)   ;   ψ = s / (2r)
+  const halfTooth = (Math.PI / 2 + 2 * x * Math.tan(aRad)) / z;
   // İnvolütün pitch çemberindeki polar açısı: inv(α) = tan α − α
   const invAlpha = Math.tan(aRad) - aRad;
 
-  // İnvolüt parametre sınırları (t = sqrt((r/rb)² − 1))
+  // İnvolüt parametre sınırı (t = sqrt((r/rb)² − 1)). Kök ve tepe yarıçapları,
+  // dahilide rf > ra, haricide rf < ra olduğundan max/min ile sırası bulunur.
   const tAtR = (rad) => rad > rb ? Math.sqrt((rad / rb) ** 2 - 1) : 0;
-  // tRoot = kök tarafındaki parametre, tTip = tepe tarafındaki
-  // Harici: kök iç tarafta (küçük r, küçük t), tepe dışta (büyük r, büyük t)
-  // Dahili: kök dışta (büyük r, büyük t), tepe içte (küçük r, küçük t)
-  let tRoot, tTip;
-  if (internal) {
-    tRoot = tAtR(rf);
-    tTip  = tAtR(Math.max(rb, ra));
-  } else {
-    tRoot = tAtR(Math.max(rb, rf));
-    tTip  = tAtR(ra);
-  }
+  const tRoot = tAtR(internal ? rf : Math.max(rb, rf));
+  const tTip  = tAtR(internal ? Math.max(rb, ra) : ra);
 
   const segs = Math.max(3, segments);
   // İnvolüt noktaları her zaman KÖK → TEPE sırasında (her iki dişli tipi için)
@@ -722,42 +715,25 @@ function generateGearPath(opts) {
     involutePts.push(involute(rb, t));
   }
 
-  // KRİTİK HATA DÜZELTMESİ (önceki sürümde diş tepede genişliyordu):
-  // Harici dişli için ÜST yanak, doğal involütün y-yansıması olmalı
-  // (kanat tepeye doğru eksene yaklaşır, yani diş daralır).
-  // Dahili dişli için tam tersi — doğal involüt doğrudan kullanılır.
-  // shiftMag: yanağın pitch'te ±halfTooth'a oturması için gereken döndürme.
-  //   Harici (yansıtılmış involüt): φ_pitch = −invα → +halfTooth için +halfTooth+invα
-  //   Dahili (doğal involüt):       φ_pitch = +invα → +halfTooth için +halfTooth−invα
-  const shiftMag = halfTooth + (internal ? -invAlpha : invAlpha);
-
-  const orientUpper = (p) => {
-    const q = internal ? p : { x: p.x, y: -p.y }; // harici için yansıt
-    return rotate(q, shiftMag);
-  };
-  const orientLower = (p) => {
-    const q = internal ? { x: p.x, y: -p.y } : p; // alt yanak üstün aynası
-    return rotate(q, -shiftMag);
-  };
+  // Üst yanak: harici için doğal involütün y-yansıması (kanat tepeye doğru
+  // eksene yaklaşır → diş daralır). Dahili için doğal involüt doğrudan
+  // kullanılır. shiftMag: yanağı pitch'te +halfTooth'a oturtmak için
+  // gereken döndürme; sign yönü çevirir.
+  const shiftMag = halfTooth + sign * invAlpha;
+  const mirrorY = (p) => ({ x: p.x, y: -p.y });
+  const orientUpper = (p) => rotate(internal ? p : mirrorY(p), shiftMag);
+  const orientLower = (p) => rotate(internal ? mirrorY(p) : p, -shiftMag);
 
   // Tepe ve dip yarıçapları
   const tipRadius  = ra;
   const rootRadius = rf;
-  const clampR = (p, R) => {
-    const m_ = Math.hypot(p.x, p.y);
-    if (m_ < 1e-6) return p;
-    return { x: (p.x * R) / m_, y: (p.y * R) / m_ };
-  };
 
   let d = "";
   const pitchAngle = TAU / z;
 
   // İlk dişin üst-kök açısı (kapanış için saklanır)
-  const firstUpperRootAng = (() => {
-    const p = involutePts[0];
-    const localAng = Math.atan2(p.y, p.x);
-    return (internal ? localAng : -localAng) + shiftMag;
-  })();
+  const firstUpper0 = orientUpper(involutePts[0]);
+  const firstUpperRootAng = Math.atan2(firstUpper0.y, firstUpper0.x);
 
   for (let i = 0; i < z; i++) {
     const center = i * pitchAngle;
@@ -767,18 +743,12 @@ function generateGearPath(opts) {
     const lower = involutePts.map(p => rotate(orientLower(p), center));
 
     // Tepe noktalarını tam tip yarıçapına projekte et
-    upper[upper.length - 1] = clampR(upper[upper.length - 1], tipRadius);
-    lower[lower.length - 1] = clampR(lower[lower.length - 1], tipRadius);
+    upper[upper.length - 1] = projectToRadius(upper[upper.length - 1], tipRadius);
+    lower[lower.length - 1] = projectToRadius(lower[lower.length - 1], tipRadius);
 
     // Kök noktalarını dip yarıçapına projekte et (rf<rb durumu için radyal hat)
-    const uRoot = (() => {
-      const a = Math.atan2(upper[0].y, upper[0].x);
-      return { x: rootRadius * Math.cos(a), y: rootRadius * Math.sin(a) };
-    })();
-    const lRoot = (() => {
-      const a = Math.atan2(lower[0].y, lower[0].x);
-      return { x: rootRadius * Math.cos(a), y: rootRadius * Math.sin(a) };
-    })();
+    const uRoot = projectToRadius(upper[0], rootRadius);
+    const lRoot = projectToRadius(lower[0], rootRadius);
 
     if (i === 0) {
       d += `M ${uRoot.x.toFixed(3)} ${uRoot.y.toFixed(3)} `;
@@ -801,10 +771,7 @@ function generateGearPath(opts) {
     d += `L ${lRoot.x.toFixed(3)} ${lRoot.y.toFixed(3)} `;
   }
   // Kapanış: son alt-kökten ilk üst-köke dip yayı
-  const firstUR = {
-    x: rootRadius * Math.cos(firstUpperRootAng),
-    y: rootRadius * Math.sin(firstUpperRootAng)
-  };
+  const firstUR = polar(rootRadius, firstUpperRootAng);
   d += `A ${rootRadius.toFixed(3)} ${rootRadius.toFixed(3)} 0 0 1 ${firstUR.x.toFixed(3)} ${firstUR.y.toFixed(3)} `;
   d += "Z";
   return d;
@@ -1216,24 +1183,15 @@ function calculate() {
   // Eksenler arası
   const a = mt * (zs + zp) / 2;
 
-  // ----- Çevrim Oranı -----
-  let ratio = 0, ratioFormula = "", outRpm = 0, T_out = 0;
-  if (currentMode === "ring_fixed") {
-    ratio = 1 + zr / zs;
-    ratioFormula = "i = 1 + Zr/Zs";
-    outRpm = rpm / ratio;
-    T_out = T_input * ratio;
-  } else if (currentMode === "carrier_fixed") {
-    ratio = -zr / zs;
-    ratioFormula = "i = −Zr/Zs";
-    outRpm = rpm / ratio;
-    T_out = T_input * Math.abs(ratio);
-  } else if (currentMode === "sun_fixed") {
-    ratio = 1 + zs / zr;
-    ratioFormula = "i = 1 + Zs/Zr";
-    outRpm = rpm / ratio;
-    T_out = T_input * ratio;
-  }
+  // ----- Çevrim Oranı (Willis denkleminden mod-bağlı) -----
+  const MODE_RATIO = {
+    ring_fixed:    { ratio: 1 + zr / zs, formula: "i = 1 + Zr/Zs" },
+    carrier_fixed: { ratio: -zr / zs,    formula: "i = −Zr/Zs"    },
+    sun_fixed:     { ratio: 1 + zs / zr, formula: "i = 1 + Zs/Zr" },
+  };
+  const { ratio, formula: ratioFormula } = MODE_RATIO[currentMode];
+  const outRpm = rpm / ratio;
+  const T_out  = T_input * Math.abs(ratio);
   const omegaSun = rpm;
   const omegaCarrier = omegaSun / (1 + zr / zs);
   const omegaPlanet = (omegaSun - omegaCarrier) * (-zs / zp) + omegaCarrier;
@@ -1697,6 +1655,46 @@ function simpleGearPath(r) {
   return `M ${r} 0 A ${r} ${r} 0 1 1 ${-r} 0 A ${r} ${r} 0 1 1 ${r} 0 Z`;
 }
 
+// Dişli renkleri tek noktada tutulur (CSS değişkenleriyle eşleşir)
+const COLORS = {
+  sun: "#fbbf24", sunBody: "#78350f",
+  planet: "#60a5fa", planetBody: "#1e3a5f",
+  ring: "#a78bfa", ringBody: "#1e1b4b",
+  carrier: "#4ade80",
+  force: "#f87171",
+  cavityFill: "#0a1020",
+};
+
+// Bir dişlinin pitch ve base referans çemberlerini ekler (showPitch/showBase'e
+// göre koşullu). Aynı kalıp sun/planet/ring için 3 kez tekrarlanıyordu.
+function appendRefCircles(group, { r_pitch, r_base, color, m, showPitch, showBase, swThin, swDash }) {
+  if (showPitch) {
+    group.appendChild(el("circle", {
+      cx: 0, cy: 0, r: r_pitch, fill: "none", stroke: color,
+      "stroke-dasharray": `${m * 1.5} ${m * 1.5}`,
+      "stroke-width": swThin, opacity: 0.55,
+    }));
+  }
+  if (showBase) {
+    group.appendChild(el("circle", {
+      cx: 0, cy: 0, r: r_base, fill: "none", stroke: color,
+      "stroke-dasharray": `${m * 0.5} ${m * 1}`,
+      "stroke-width": swDash, opacity: 0.45,
+    }));
+  }
+}
+
+// Planet i'nin statik mesh fazı. Assembly koşulu sağlandığında tüm planetler
+// için aynı değeri, sağlanmadığında uygun yaklaşımı verir.
+// ψ_i = (θ_i + 180° − 180°/Zp)  mod  (360°/Zp), [-toothPitch/2, +toothPitch/2]
+function planetPhase(i, N, Zp) {
+  const toothPitch = 360 / Zp;
+  let phase = (i / N) * 360 + 180 - 180 / Zp;
+  phase = ((phase % toothPitch) + toothPitch) % toothPitch;
+  if (phase > toothPitch / 2) phase -= toothPitch;
+  return phase;
+}
+
 function draw(r) {
   const svg = $("diagram");
   svg.innerHTML = "";
@@ -1720,124 +1718,79 @@ function draw(r) {
   const swDash  = Math.max(0.03, m * 0.04);
   const swArrow = Math.max(0.10, m * 0.14);
 
+  // Ring dış disk halkasının pitch'in dışına olan radyal payı; etiket konumlamada
+  // da kullanılıyor, bu yüzden tek değişkene bağladık.
+  const ringDiscPad = m * 3;
+  const refOpts = { m, showPitch, showBase, swThin, swDash };
+  // Tek noktada path üretimi: r.ha/r.hf burada katsayıdır (yükseklik değil).
+  const gearPathFor = (z, x, pitchR, internal) => detail
+    ? generateGearPath({ z, m, alpha, x, ha: r.ha, hf: r.hf, internal, segments: segs })
+    : simpleGearPath(pitchR);
+
   // --- RING (en dıştaki çember + iç dişler) ---
-  const ringR_pitch = r.dr / 2;
   const ringG = el("g", { id: "ringG" });
-  // Ring dış çemberi (gövde)
   ringG.appendChild(el("circle", {
-    cx: 0, cy: 0, r: (r.dfr / 2) + r.m * 3,
-    fill: "#1e1b4b", stroke: "#a78bfa", "stroke-width": sw
+    cx: 0, cy: 0, r: (r.dfr / 2) + ringDiscPad,
+    fill: COLORS.ringBody, stroke: COLORS.ring, "stroke-width": sw
   }));
-  // Ring iç profili (dişler)
-  const ringPath = detail
-    ? generateGearPath({ z: r.zr, m: r.m, alpha, x: r.xr, ha: r.ha, hf: r.hf, internal: true, segments: segs })
-    : simpleGearPath(ringR_pitch);
   ringG.appendChild(el("path", {
-    d: ringPath,
-    fill: "#0a1020",
-    stroke: "#a78bfa", "stroke-width": sw
+    d: gearPathFor(r.zr, r.xr, r.dr / 2, true),
+    fill: COLORS.cavityFill, stroke: COLORS.ring, "stroke-width": sw
   }));
-  if (showPitch) {
-    ringG.appendChild(el("circle", { cx: 0, cy: 0, r: ringR_pitch,
-      fill: "none", stroke: "#a78bfa", "stroke-dasharray": `${m*1.5} ${m*1.5}`, "stroke-width": swThin, opacity: 0.55 }));
-  }
-  if (showBase) {
-    ringG.appendChild(el("circle", { cx: 0, cy: 0, r: r.dbr / 2,
-      fill: "none", stroke: "#a78bfa", "stroke-dasharray": `${m*0.5} ${m*1}`, "stroke-width": swDash, opacity: 0.45 }));
-  }
+  appendRefCircles(ringG, { ...refOpts, r_pitch: r.dr / 2, r_base: r.dbr / 2, color: COLORS.ring });
   svg.appendChild(ringG);
 
   // --- CARRIER + PLANETLER ---
   const carrierG = el("g", { id: "carrierG" });
   const carrierR = r.a;
-  // Carrier kolları
-  for (let i = 0; i < r.N; i++) {
-    const a = (i / r.N) * TAU;
-    const p = polar(carrierR, a);
+  const planetPositions = Array.from({ length: r.N }, (_, i) => polar(carrierR, (i / r.N) * TAU));
+  // Carrier kolları + pim göstergeleri
+  for (const p of planetPositions) {
     carrierG.appendChild(el("path", {
       d: `M 0 0 L ${p.x.toFixed(2)} ${p.y.toFixed(2)}`,
-      stroke: "#4ade80", "stroke-width": Math.max(1.2, r.m * 0.6),
+      stroke: COLORS.carrier, "stroke-width": Math.max(1.2, m * 0.6),
       "stroke-linecap": "round", opacity: 0.45
     }));
-    // Planet eksen pimi
-    carrierG.appendChild(el("circle", {
-      cx: p.x, cy: p.y, r: r.m * 0.55, fill: "#4ade80", opacity: 0.7
-    }));
+    carrierG.appendChild(el("circle", { cx: p.x, cy: p.y, r: m * 0.55, fill: COLORS.carrier, opacity: 0.7 }));
   }
-  carrierG.appendChild(el("circle", { cx: 0, cy: 0, r: r.m * 2.2, fill: "#4ade80", opacity: 0.30 }));
+  carrierG.appendChild(el("circle", { cx: 0, cy: 0, r: m * 2.2, fill: COLORS.carrier, opacity: 0.30 }));
 
-  // Planet dişliler — carrierG içine yerleştir, her birinin kendi rotation grubu var
-  // Statik mesh fazı: planet'in gap'i, sun teeth'in temas yönünde olacak şekilde döndürülür
-  // ψ_i = (θ_i + 180° − 180°/Zp)  mod  (360°/Zp)
-  // Bu, hem sun (iç temas) hem ring (dış temas) için aynı anda meshe izin verir
-  // (assembly koşulu (Zs+Zr)/N ∈ ℤ sağlandığında tüm planetler aynı ψ ile hizalanır)
-  const planetPath = detail
-    ? generateGearPath({ z: r.zp, m: r.m, alpha, x: r.xp, ha: r.ha, hf: r.hf, internal: false, segments: segs })
-    : simpleGearPath(r.dp / 2);
-  const toothPitchP = 360 / r.zp;
-  for (let i = 0; i < r.N; i++) {
-    const a_rad = (i / r.N) * TAU;
-    const a_deg = (i / r.N) * 360;
-    const p = polar(carrierR, a_rad);
-    // Statik faz (derece). [-toothPitch/2, +toothPitch/2] aralığına indir.
-    let phase = a_deg + 180 - 180 / r.zp;
-    phase = ((phase % toothPitchP) + toothPitchP) % toothPitchP;
-    if (phase > toothPitchP / 2) phase -= toothPitchP;
-
+  // Planet dişliler. Her birine statik mesh fazı (planetPhase) uygulanır;
+  // assembly koşulu sağlanırsa tüm planetler için aynı, sağlanmazsa farklı.
+  // Aynı zamanda animasyon cache'ini doldurur (60fps döngüsünde DOM sorgusu olmasın).
+  const planetPath = gearPathFor(r.zp, r.xp, r.dp / 2, false);
+  animCache.planets = [];
+  planetPositions.forEach((p, i) => {
+    const phase = planetPhase(i, r.N, r.zp);
     const pg = el("g", {
       transform: `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`,
-      "data-planet": i
+      "data-planet": i,
     });
-    const rot = el("g", {
-      class: "planet-rot",
-      "data-phase": phase.toFixed(4),
-      transform: `rotate(${phase.toFixed(3)})`
-    });
-    rot.appendChild(el("path", {
-      d: planetPath,
-      fill: "#1e3a5f", stroke: "#60a5fa", "stroke-width": sw
-    }));
-    // Yön belirleme noktası — gap konumunda (görsel onay için)
-    rot.appendChild(el("circle", {
-      cx: (r.dp / 2) * 0.6, cy: 0, r: r.m * 0.4, fill: "#fbbf24"
-    }));
-    if (showPitch) {
-      rot.appendChild(el("circle", { cx: 0, cy: 0, r: r.dp / 2,
-        fill: "none", stroke: "#60a5fa", "stroke-dasharray": `${m*1.5} ${m*1.5}`, "stroke-width": swThin, opacity: 0.55 }));
-    }
-    if (showBase) {
-      rot.appendChild(el("circle", { cx: 0, cy: 0, r: r.dbp / 2,
-        fill: "none", stroke: "#60a5fa", "stroke-dasharray": `${m*0.5} ${m*1}`, "stroke-width": swDash, opacity: 0.45 }));
-    }
+    const rot = el("g", { class: "planet-rot", transform: `rotate(${phase.toFixed(3)})` });
+    rot.appendChild(el("path", { d: planetPath, fill: COLORS.planetBody, stroke: COLORS.planet, "stroke-width": sw }));
+    rot.appendChild(el("circle", { cx: (r.dp / 2) * 0.6, cy: 0, r: m * 0.4, fill: COLORS.sun }));
+    appendRefCircles(rot, { ...refOpts, r_pitch: r.dp / 2, r_base: r.dbp / 2, color: COLORS.planet });
     pg.appendChild(rot);
     carrierG.appendChild(pg);
-  }
+    animCache.planets.push({ node: rot, phase });
+  });
   svg.appendChild(carrierG);
+  animCache.carrierG = carrierG;
 
   // --- SUN (güneş) ---
   const sunG = el("g", { id: "sunG" });
-  const sunPath = detail
-    ? generateGearPath({ z: r.zs, m: r.m, alpha, x: r.xs, ha: r.ha, hf: r.hf, internal: false, segments: segs })
-    : simpleGearPath(r.ds / 2);
   sunG.appendChild(el("path", {
-    d: sunPath,
-    fill: "#78350f", stroke: "#fbbf24", "stroke-width": sw
+    d: gearPathFor(r.zs, r.xs, r.ds / 2, false),
+    fill: COLORS.sunBody, stroke: COLORS.sun, "stroke-width": sw
   }));
-  // Şaft göstergesi
-  sunG.appendChild(el("circle", { cx: 0, cy: 0, r: r.m * 1.0, fill: "#0a1020", stroke: "#fbbf24", "stroke-width": sw }));
+  sunG.appendChild(el("circle", { cx: 0, cy: 0, r: m * 1.0, fill: COLORS.cavityFill, stroke: COLORS.sun, "stroke-width": sw }));
   sunG.appendChild(el("line", {
-    x1: 0, y1: 0, x2: (r.ds/2) * 0.85, y2: 0,
+    x1: 0, y1: 0, x2: (r.ds / 2) * 0.85, y2: 0,
     stroke: "#fff", "stroke-width": Math.max(0.8, m * 0.25), opacity: 0.7
   }));
-  if (showPitch) {
-    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: r.ds / 2,
-      fill: "none", stroke: "#fbbf24", "stroke-dasharray": `${m*1.5} ${m*1.5}`, "stroke-width": swThin, opacity: 0.55 }));
-  }
-  if (showBase) {
-    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: r.dbs / 2,
-      fill: "none", stroke: "#fbbf24", "stroke-dasharray": `${m*0.5} ${m*1}`, "stroke-width": swDash, opacity: 0.45 }));
-  }
+  appendRefCircles(sunG, { ...refOpts, r_pitch: r.ds / 2, r_base: r.dbs / 2, color: COLORS.sun });
   svg.appendChild(sunG);
+  animCache.sunG = sunG;
 
   // --- KUVVET OKLARI ---
   if (showForces) {
@@ -1846,28 +1799,23 @@ function draw(r) {
     const forceScale = Math.min(30, Math.max(8, Math.log10(Math.abs(r.FtPerPlanet) + 1) * 7));
     for (let i = 0; i < r.N; i++) {
       const ang = (i / r.N) * TAU;
-      const pt = polar(carrierR, ang);
-      // Sun→Planet temas noktası: sun yarıçapında, planet merkezine doğru
       const contactPt = polar(sunR, ang);
-      // Kuvvet vektörü: basınç açısı kadar teğete göre eğik
-      const tangent = ang + Math.PI / 2;
-      const force = tangent + alpha * DEG;
-      const dx = Math.cos(force) * forceScale;
-      const dy = Math.sin(force) * forceScale;
+      // Kuvvet vektörü teğete göre basınç açısı kadar eğik
+      const force = ang + Math.PI / 2 + alpha * DEG;
       fG.appendChild(el("line", {
         x1: contactPt.x, y1: contactPt.y,
-        x2: contactPt.x + dx, y2: contactPt.y + dy,
-        stroke: "#f87171", "stroke-width": swArrow,
+        x2: contactPt.x + Math.cos(force) * forceScale,
+        y2: contactPt.y + Math.sin(force) * forceScale,
+        stroke: COLORS.force, "stroke-width": swArrow,
         "marker-end": "url(#arrow)"
       }));
     }
-    // Ok markerı
     const defs = el("defs");
     const marker = el("marker", {
       id: "arrow", viewBox: "0 0 10 10", refX: 8, refY: 5,
       markerWidth: 6, markerHeight: 6, orient: "auto-start-reverse"
     });
-    marker.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 Z", fill: "#f87171" }));
+    marker.appendChild(el("path", { d: "M 0 0 L 10 5 L 0 10 Z", fill: COLORS.force }));
     defs.appendChild(marker);
     svg.appendChild(defs);
     svg.appendChild(fG);
@@ -1876,25 +1824,19 @@ function draw(r) {
   // --- ETİKETLER ---
   const fontSize = Math.max(6, maxR * 0.04);
   const labels = el("g", { "font-family": "system-ui", "font-size": fontSize, fill: "#94a3b8" });
-  labels.appendChild(el("text", {
-    x: 0, y: -(r.dfr / 2) - r.m * 3 - fontSize * 0.4, "text-anchor": "middle", fill: "#a78bfa"
-  }, `Ring  Z=${r.zr}  Ø${r.dr.toFixed(1)}  m=${r.m}`));
-  labels.appendChild(el("text", {
-    x: 0, y: -(r.dfr / 2) - r.m * 3 + fontSize * 0.7, "text-anchor": "middle", fill: "#a78bfa",
-    "font-size": fontSize * 0.7
-  }, `da=${r.dar.toFixed(1)}  df=${r.dfr.toFixed(1)}`));
-  labels.appendChild(el("text", {
-    x: 0, y: (r.dfr / 2) + r.m * 3 + fontSize, "text-anchor": "middle", fill: "#fbbf24"
-  }, `Sun  Z=${r.zs}  Ø${r.ds.toFixed(1)}  m=${r.m}`));
-  labels.appendChild(el("text", {
-    x: 0, y: (r.dfr / 2) + r.m * 3 + fontSize * 2, "text-anchor": "middle", fill: "#fbbf24",
-    "font-size": fontSize * 0.7
-  }, `da=${r.das.toFixed(1)}  df=${r.dfs.toFixed(1)}`));
-  // İlk planet için etiket
+  const addLabel = (text, x, y, color, fs = fontSize) => {
+    labels.appendChild(el("text",
+      { x, y, "text-anchor": "middle", fill: color, "font-size": fs }, text));
+  };
+  const ringLabelY = -(r.dfr / 2) - ringDiscPad;
+  const sunLabelY  =  (r.dfr / 2) + ringDiscPad;
+  addLabel(`Ring  Z=${r.zr}  Ø${r.dr.toFixed(1)}  m=${m}`, 0, ringLabelY - fontSize * 0.4, COLORS.ring);
+  addLabel(`da=${r.dar.toFixed(1)}  df=${r.dfr.toFixed(1)}`, 0, ringLabelY + fontSize * 0.7, COLORS.ring, fontSize * 0.7);
+  addLabel(`Sun  Z=${r.zs}  Ø${r.ds.toFixed(1)}  m=${m}`, 0, sunLabelY + fontSize, COLORS.sun);
+  addLabel(`da=${r.das.toFixed(1)}  df=${r.dfs.toFixed(1)}`, 0, sunLabelY + fontSize * 2, COLORS.sun, fontSize * 0.7);
+  // Aşağıdaki planete etiket
   const p0 = polar(carrierR, -Math.PI / 2);
-  labels.appendChild(el("text", {
-    x: p0.x, y: p0.y - r.dap/2 - fontSize * 0.5, "text-anchor": "middle", fill: "#60a5fa"
-  }, `Planet Z=${r.zp}  Ø${r.dp.toFixed(1)}`));
+  addLabel(`Planet Z=${r.zp}  Ø${r.dp.toFixed(1)}`, p0.x, p0.y - r.dap / 2 - fontSize * 0.5, COLORS.planet);
   svg.appendChild(labels);
 }
 
@@ -1902,6 +1844,9 @@ function draw(r) {
 //                                ANIMASYON
 // =============================================================================
 let lastResult = null;
+// draw() içinde doldurulur — animasyonun her frame'de DOM sorgusu yapmaması için
+let animCache = { sunG: null, carrierG: null, planets: [] };
+
 function animate(ts) {
   if (!lastResult) { requestAnimationFrame(animate); return; }
   const dt = animState.lastTs ? (ts - animState.lastTs) / 1000 : 0;
@@ -1915,25 +1860,21 @@ function animate(ts) {
     // Carrier sabit       →  ω_r = −ω_s · Zs/Zr      ; ratio = −Zr/Zs
     // Sun sabit (ω_s=0)   →  ω_c = ω_r · Zr/(Zs+Zr) ; (giriş ring)
     const carrierOmega = sunOmega / r.ratio;
-    // Planet dünya açısal hızı: ω_p = ω_c · (1 − R/r_p) = −ω_c · Zs/Zp + ω_c
-    //                               = (ω_s − ω_c) · (−Zs/Zp) + ω_c
+    // Planet dünya açısal hızı: ω_p = (ω_s − ω_c) · (−Zs/Zp) + ω_c
     const planetOmegaWorld = (sunOmega - carrierOmega) * (-r.zs / r.zp) + carrierOmega;
-    // Carrier frame'inde planet rotasyonu (görsel olarak uygulanan kısım)
     const planetSpinRel = planetOmegaWorld - carrierOmega;
 
     animState.sunAngle     += sunOmega     * dt;
     animState.carrierAngle += carrierOmega * dt;
     animState.planetSpin   += planetSpinRel * dt;
 
-    const sunG = $("sunG");
-    const carrierG = $("carrierG");
-    if (sunG)     sunG.setAttribute("transform", `rotate(${animState.sunAngle.toFixed(3)})`);
-    if (carrierG) carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
-    // Her planet'in kendi statik fazı + dinamik dönüş (carrier-relative)
-    document.querySelectorAll(".planet-rot").forEach(p => {
-      const phase = parseFloat(p.getAttribute("data-phase") || "0");
-      p.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
-    });
+    if (animCache.sunG)     animCache.sunG.setAttribute("transform", `rotate(${animState.sunAngle.toFixed(3)})`);
+    if (animCache.carrierG) animCache.carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
+    // Statik faz draw()'da data-phase'e yazılmıştı; her frame'de tekrar
+    // parse etmemek için draw() bunları animCache.planets içine de yerleştirir.
+    for (const { node, phase } of animCache.planets) {
+      node.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
+    }
   }
   requestAnimationFrame(animate);
 }
