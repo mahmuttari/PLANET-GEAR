@@ -599,6 +599,7 @@
         <label>Diş Detayı <input type="checkbox" id="teethDetail" checked></label>
         <label>Pitch Çemberleri <input type="checkbox" id="showPitch"></label>
         <label>Base Çemberleri <input type="checkbox" id="showBase"></label>
+        <label>Pitch Temas Noktaları <input type="checkbox" id="showPitchMarks"></label>
         <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
       </div>
@@ -668,6 +669,50 @@ function involute(rb, t) {
 }
 // inv(α) = tan(α) - α
 function inv(alpha) { return Math.tan(alpha) - alpha; }
+
+// inv(α_w) = v denklemini Newton ile çözer (analitik tersi yok).
+// Profil kayması altında çalışma basınç açısı için kullanılır.
+function invInverse(v) {
+  if (v <= 0) return 0;
+  // İlk yaklaşım: küçük v için inv(α) ≈ α³/3
+  let a = Math.cbrt(3 * v);
+  for (let i = 0; i < 10; i++) {
+    const t = Math.tan(a);
+    const f  = t - a - v;     // tan(α) − α − v
+    const fp = t * t;          // d/dα = sec²(α) − 1 = tan²(α)
+    if (Math.abs(fp) < 1e-12) break;
+    const da = f / fp;
+    a -= da;
+    if (Math.abs(da) < 1e-9) break;
+  }
+  return a;
+}
+
+// İki dişlinin profil kayması altındaki çalışma eksen mesafesi (ISO 21771).
+// internal=true ise eşleşme harici-dahili (planet-ring), aksi halde harici-harici.
+function workingCenterDistance(z1, z2, m, alphaDeg, x1, x2, internal = false) {
+  const aRad = alphaDeg * DEG;
+  const zSum = internal ? Math.abs(z2 - z1) : z1 + z2;
+  const xSum = internal ? (x2 - x1) : (x1 + x2);
+  const aStd = m * zSum / 2;
+  if (Math.abs(xSum) < 1e-9 || zSum === 0) return aStd;
+  const invAlphaW = inv(aRad) + 2 * xSum * Math.tan(aRad) / zSum;
+  const alphaW = invInverse(invAlphaW);
+  return aStd * Math.cos(aRad) / Math.cos(alphaW);
+}
+
+// Mod-bağlı açısal hızlar — Willis denklemiyle (animasyon için).
+// Her mod giriş şaftını farklı seçer; "input ω" giriş şaftına uygulanır,
+// diğerleri buradan türetilir. (Geleneksel: ring_fixed → sun input;
+// carrier_fixed → sun input; sun_fixed → ring input.)
+function omegasFromMode(mode, omegaIn, zs, zr) {
+  switch (mode) {
+    case "ring_fixed":    return { sun: omegaIn, ring: 0,                       carrier: omegaIn * zs / (zs + zr) };
+    case "carrier_fixed": return { sun: omegaIn, ring: -omegaIn * zs / zr,      carrier: 0 };
+    case "sun_fixed":     return { sun: 0,       ring: omegaIn,                 carrier: omegaIn * zr / (zs + zr) };
+    default:              return { sun: omegaIn, ring: 0,                       carrier: omegaIn * zs / (zs + zr) };
+  }
+}
 
 // =============================================================================
 //                          DİŞLİ PROFİLİ (involüt)
@@ -1180,8 +1225,11 @@ function calculate() {
   const dbp = dp * Math.cos(aRad);
   const dbr = dr * Math.cos(aRad);
 
-  // Eksenler arası
-  const a = mt * (zs + zp) / 2;
+  // Eksenler arası — standart (x=0) ve profil kayması altında çalışma
+  // ISO 21771: a_w = a · cos(α) / cos(α_w),  inv(α_w) = inv(α) + 2(x1+x2)·tanα / (z1+z2)
+  const aStd  = mt * (zs + zp) / 2;
+  const a     = workingCenterDistance(zs, zp, mt, alpha, xs, xp, false);
+  const aw_pr = workingCenterDistance(zp, zr, mt, alpha, xp, xr, true);  // planet-ring
 
   // ----- Çevrim Oranı (Willis denkleminden mod-bağlı) -----
   const MODE_RATIO = {
@@ -1304,16 +1352,35 @@ function calculate() {
     }
   }
 
-  // 6) Profil kayması toplam dengesi (eşitlik gereksinimi: sun+planet eksenler arası ile uyumlu)
-  // Standart: xs + xp + xr_internal_meshing eşitliği — ring iç eşleşmesi için
-  // Basit kontrol: |xs + xp - xr| < 0.1 olmalı (kabaca dengeli)
-  const xBalance = xs + xp - xr; // ideal: |xBalance| küçük
-  if (Math.abs(xBalance) > 0.3 && (xs !== 0 || xp !== 0 || xr !== 0)) {
+  // 6) Profil kayması tutarlılığı — sun-planet ile planet-ring çalışma eksen
+  //    mesafeleri eşit olmalı (her ikisi de aynı planet merkezini görüyor)
+  const axisMismatch = Math.abs(a - aw_pr);
+  if (axisMismatch > 0.01 * m && (xs !== 0 || xp !== 0 || xr !== 0)) {
+    // xr çözümü: xr = xp + (xs+xp) için yaklaşık (küçük kaymalar)
+    const xrSuggest = (xs + 2 * xp).toFixed(2); // ilk yaklaşım — kullanıcı ince ayar yapar
     errors.push({
       severity: "warn",
-      msg: `Profil kayması dengesizliği`,
-      detail: `xs + xp − xr = ${xBalance.toFixed(2)} (|değer| < 0.3 önerilir)`,
-      fixes: [{ label: `xr → ${(xs + xp).toFixed(2)}`, target: "xr", value: (xs + xp).toFixed(2) }]
+      msg: `Profil kayması: sun-planet & planet-ring eksen mesafeleri uyuşmuyor`,
+      detail: `aₛₚ = ${a.toFixed(3)} mm,  aₚᵣ = ${aw_pr.toFixed(3)} mm  (fark ${axisMismatch.toFixed(3)} mm)`,
+      fixes: [{ label: `xr → ${xrSuggest}`, target: "xr", value: xrSuggest }]
+    });
+  }
+
+  // 7) Planet diş sayısı tek — statik çizimde sun-side gap ile ring-side gap
+  //    aynı anda hizalanmıyor (geometri: 180° = Zp/2·diş adımı; Zp tek → yarım adım kayık)
+  if (zp % 2 !== 0) {
+    errors.push({
+      severity: "warn",
+      msg: `Planet diş sayısı tek (Zp=${zp}) — statik çizimde ring tarafında diş-üstüne-diş görünebilir`,
+      detail: `Gerçek dişlilerde sorun değil (sürekli yuvarlanma kompanze eder), ama tek bir anlık görüntüde sun mesh düzgün, ring mesh half-pitch kayık görünür. Önerilen: Zp=${zp+1} veya Zp=${zp-1}`,
+      fixes: [
+        { label: `Zp → ${zp + 1} (Zr → ${zs + 2*(zp+1)})`, multi: [
+          { target: "zp", value: zp + 1 }, { target: "zr", value: zs + 2*(zp+1) }
+        ]},
+        { label: `Zp → ${zp - 1} (Zr → ${zs + 2*(zp-1)})`, multi: [
+          { target: "zp", value: zp - 1 }, { target: "zr", value: zs + 2*(zp-1) }
+        ]}
+      ]
     });
   }
 
@@ -1642,7 +1709,7 @@ function renderResults(r) {
 // =============================================================================
 const NS = "http://www.w3.org/2000/svg";
 // planetSpin: carrier referans çerçevesinde planet'in birikimli açısı (derece, SVG +CW)
-let animState = { sunAngle: 0, carrierAngle: 0, planetSpin: 0, lastTs: 0 };
+let animState = { sunAngle: 0, ringAngle: 0, carrierAngle: 0, planetSpin: 0, lastTs: 0 };
 
 function el(name, attrs = {}, text = null) {
   const e = document.createElementNS(NS, name);
@@ -1739,6 +1806,7 @@ function draw(r) {
   }));
   appendRefCircles(ringG, { ...refOpts, r_pitch: r.dr / 2, r_base: r.dbr / 2, color: COLORS.ring });
   svg.appendChild(ringG);
+  animCache.ringG = ringG;
 
   // --- CARRIER + PLANETLER ---
   const carrierG = el("g", { id: "carrierG" });
@@ -1792,6 +1860,23 @@ function draw(r) {
   svg.appendChild(sunG);
   animCache.sunG = sunG;
 
+  // --- PITCH TEMAS NOKTALARI (her sun-planet ve planet-ring meshi için) ---
+  if ($("showPitchMarks").checked) {
+    const ringR_pitch = r.dr / 2;
+    const sunR = r.ds / 2;
+    const ringR = ringR_pitch;
+    const dotR = Math.max(0.3, m * 0.25);
+    const pG = el("g", { id: "pitchMarks" });
+    for (let i = 0; i < r.N; i++) {
+      const ang = (i / r.N) * TAU;
+      const ptSP = polar(sunR, ang);                  // sun-planet pitch tangent
+      const ptPR = polar(ringR, ang);                 // planet-ring pitch tangent
+      pG.appendChild(el("circle", { cx: ptSP.x, cy: ptSP.y, r: dotR, fill: "#22d3ee", opacity: 0.9 }));
+      pG.appendChild(el("circle", { cx: ptPR.x, cy: ptPR.y, r: dotR, fill: "#22d3ee", opacity: 0.9 }));
+    }
+    svg.appendChild(pG);
+  }
+
   // --- KUVVET OKLARI ---
   if (showForces) {
     const fG = el("g", { id: "forcesG" });
@@ -1838,6 +1923,33 @@ function draw(r) {
   const p0 = polar(carrierR, -Math.PI / 2);
   addLabel(`Planet Z=${r.zp}  Ø${r.dp.toFixed(1)}`, p0.x, p0.y - r.dap / 2 - fontSize * 0.5, COLORS.planet);
   svg.appendChild(labels);
+
+  // --- GEÇERSİZ ASSEMBLY OVERLAY ---
+  // (Zs+Zr)/N tam sayı değilse veya geometri çelişiyorsa: çizim doğru fiziksel
+  // bir sistemi temsil etmiyor — kullanıcıya açık bir banner ve çapraz halka göster.
+  const fatalErrs = (r.errors || []).filter(e => e.severity === "err");
+  if (fatalErrs.length > 0) {
+    const banner = el("g", { id: "errBanner" });
+    const bh = fontSize * 3.5;
+    banner.appendChild(el("rect", {
+      x: -maxR, y: -maxR, width: maxR * 2, height: bh,
+      fill: "#7f1d1d", opacity: 0.92
+    }));
+    banner.appendChild(el("text", {
+      x: 0, y: -maxR + fontSize * 1.4, "text-anchor": "middle",
+      fill: "#fee2e2", "font-size": fontSize * 1.1, "font-weight": "bold"
+    }, `⚠ GEÇERSİZ KONFİGÜRASYON`));
+    banner.appendChild(el("text", {
+      x: 0, y: -maxR + fontSize * 2.6, "text-anchor": "middle",
+      fill: "#fecaca", "font-size": fontSize * 0.75
+    }, `${fatalErrs[0].msg} — çizim yalnız referans, fiziksel olarak çalışmaz`));
+    // Hafif kırmızı tüllü kaplama
+    banner.appendChild(el("circle", {
+      cx: 0, cy: 0, r: (r.dfr / 2) + ringDiscPad,
+      fill: "#dc2626", opacity: 0.07
+    }));
+    svg.appendChild(banner);
+  }
 }
 
 // =============================================================================
@@ -1845,7 +1957,7 @@ function draw(r) {
 // =============================================================================
 let lastResult = null;
 // draw() içinde doldurulur — animasyonun her frame'de DOM sorgusu yapmaması için
-let animCache = { sunG: null, carrierG: null, planets: [] };
+let animCache = { sunG: null, ringG: null, carrierG: null, planets: [] };
 
 function animate(ts) {
   if (!lastResult) { requestAnimationFrame(animate); return; }
@@ -1853,25 +1965,23 @@ function animate(ts) {
   animState.lastTs = ts;
   if ($("anim").checked) {
     const speedFactor = parseFloat($("speed").value) / 30;
-    const sunOmega = 50 * speedFactor; // deg/sn (SVG +rotate = saat yönü)
+    const omegaIn = 50 * speedFactor; // giriş şaftı açısal hızı (deg/sn)
     const r = lastResult;
-    // Willis denklemi: (ω_s − ω_c)/(ω_r − ω_c) = −Zr/Zs
-    // Ring sabit (ω_r=0)  →  ω_c = ω_s · Zs/(Zs+Zr) ; ratio = 1+Zr/Zs
-    // Carrier sabit       →  ω_r = −ω_s · Zs/Zr      ; ratio = −Zr/Zs
-    // Sun sabit (ω_s=0)   →  ω_c = ω_r · Zr/(Zs+Zr) ; (giriş ring)
-    const carrierOmega = sunOmega / r.ratio;
-    // Planet dünya açısal hızı: ω_p = (ω_s − ω_c) · (−Zs/Zp) + ω_c
-    const planetOmegaWorld = (sunOmega - carrierOmega) * (-r.zs / r.zp) + carrierOmega;
-    const planetSpinRel = planetOmegaWorld - carrierOmega;
+    // Modlara göre üç şaftın da hızı (sun/ring/carrier). Geleneksel:
+    //   ring_fixed: sun input    carrier_fixed: sun input   sun_fixed: ring input
+    const w = omegasFromMode(currentMode, omegaIn, r.zs, r.zr);
+    // Planet dünya açısal hızı (Willis): ω_p = (ω_s − ω_c)·(−Zs/Zp) + ω_c
+    const planetOmegaWorld = (w.sun - w.carrier) * (-r.zs / r.zp) + w.carrier;
+    const planetSpinRel    = planetOmegaWorld - w.carrier;
 
-    animState.sunAngle     += sunOmega     * dt;
-    animState.carrierAngle += carrierOmega * dt;
+    animState.sunAngle     += w.sun     * dt;
+    animState.ringAngle    += w.ring    * dt;
+    animState.carrierAngle += w.carrier * dt;
     animState.planetSpin   += planetSpinRel * dt;
 
-    if (animCache.sunG)     animCache.sunG.setAttribute("transform", `rotate(${animState.sunAngle.toFixed(3)})`);
+    if (animCache.sunG)     animCache.sunG.setAttribute("transform",     `rotate(${animState.sunAngle.toFixed(3)})`);
+    if (animCache.ringG)    animCache.ringG.setAttribute("transform",    `rotate(${animState.ringAngle.toFixed(3)})`);
     if (animCache.carrierG) animCache.carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
-    // Statik faz draw()'da data-phase'e yazılmıştı; her frame'de tekrar
-    // parse etmemek için draw() bunları animCache.planets içine de yerleştirir.
     for (const { node, phase } of animCache.planets) {
       node.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
     }
@@ -1891,6 +2001,7 @@ function calculateAndDraw() {
   draw(r);
   // Animasyon birikimlerini sıfırla (statik faz draw() içinde uygulanıyor)
   animState.sunAngle = 0;
+  animState.ringAngle = 0;
   animState.carrierAngle = 0;
   animState.planetSpin = 0;
 }
@@ -1911,7 +2022,7 @@ $("exportBtn").addEventListener("click", () => {
 // Tüm parametre değişimlerinde otomatik yeniden çiz
 const watchedInputs = [
   "zs","zp","zr","np","alpha","beta","rpm","torque","power",
-  "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showForces",
+  "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showPitchMarks","showForces",
   "haCoef","hfCoef","cCoef","xs","xp","xr","rhoF","resolution",
   "faceWidth","ka","quality","material"
 ];
