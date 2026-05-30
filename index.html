@@ -1683,6 +1683,7 @@ function renderResults(r) {
 //                                  ÇİZİM
 // =============================================================================
 const NS = "http://www.w3.org/2000/svg";
+// planetSpin: carrier referans çerçevesinde planet'in birikimli açısı (derece, SVG +CW)
 let animState = { sunAngle: 0, carrierAngle: 0, planetSpin: 0, lastTs: 0 };
 
 function el(name, attrs = {}, text = null) {
@@ -1766,22 +1767,37 @@ function draw(r) {
   carrierG.appendChild(el("circle", { cx: 0, cy: 0, r: r.m * 2.2, fill: "#4ade80", opacity: 0.30 }));
 
   // Planet dişliler — carrierG içine yerleştir, her birinin kendi rotation grubu var
+  // Statik mesh fazı: planet'in gap'i, sun teeth'in temas yönünde olacak şekilde döndürülür
+  // ψ_i = (θ_i + 180° − 180°/Zp)  mod  (360°/Zp)
+  // Bu, hem sun (iç temas) hem ring (dış temas) için aynı anda meshe izin verir
+  // (assembly koşulu (Zs+Zr)/N ∈ ℤ sağlandığında tüm planetler aynı ψ ile hizalanır)
   const planetPath = detail
     ? generateGearPath({ z: r.zp, m: r.m, alpha, x: r.xp, ha: r.ha, hf: r.hf, internal: false, segments: segs })
     : simpleGearPath(r.dp / 2);
+  const toothPitchP = 360 / r.zp;
   for (let i = 0; i < r.N; i++) {
-    const a = (i / r.N) * TAU;
-    const p = polar(carrierR, a);
+    const a_rad = (i / r.N) * TAU;
+    const a_deg = (i / r.N) * 360;
+    const p = polar(carrierR, a_rad);
+    // Statik faz (derece). [-toothPitch/2, +toothPitch/2] aralığına indir.
+    let phase = a_deg + 180 - 180 / r.zp;
+    phase = ((phase % toothPitchP) + toothPitchP) % toothPitchP;
+    if (phase > toothPitchP / 2) phase -= toothPitchP;
+
     const pg = el("g", {
       transform: `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`,
       "data-planet": i
     });
-    const rot = el("g", { class: "planet-rot" });
+    const rot = el("g", {
+      class: "planet-rot",
+      "data-phase": phase.toFixed(4),
+      transform: `rotate(${phase.toFixed(3)})`
+    });
     rot.appendChild(el("path", {
       d: planetPath,
       fill: "#1e3a5f", stroke: "#60a5fa", "stroke-width": sw
     }));
-    // Yön belirleme noktası
+    // Yön belirleme noktası — gap konumunda (görsel onay için)
     rot.appendChild(el("circle", {
       cx: (r.dp / 2) * 0.6, cy: 0, r: r.m * 0.4, fill: "#fbbf24"
     }));
@@ -1892,25 +1908,31 @@ function animate(ts) {
   animState.lastTs = ts;
   if ($("anim").checked) {
     const speedFactor = parseFloat($("speed").value) / 30;
-    const sunOmega = 50 * speedFactor; // deg/sn
+    const sunOmega = 50 * speedFactor; // deg/sn (SVG +rotate = saat yönü)
     const r = lastResult;
+    // Willis denklemi: (ω_s − ω_c)/(ω_r − ω_c) = −Zr/Zs
+    // Ring sabit (ω_r=0)  →  ω_c = ω_s · Zs/(Zs+Zr) ; ratio = 1+Zr/Zs
+    // Carrier sabit       →  ω_r = −ω_s · Zs/Zr      ; ratio = −Zr/Zs
+    // Sun sabit (ω_s=0)   →  ω_c = ω_r · Zr/(Zs+Zr) ; (giriş ring)
     const carrierOmega = sunOmega / r.ratio;
+    // Planet dünya açısal hızı: ω_p = ω_c · (1 − R/r_p) = −ω_c · Zs/Zp + ω_c
+    //                               = (ω_s − ω_c) · (−Zs/Zp) + ω_c
     const planetOmegaWorld = (sunOmega - carrierOmega) * (-r.zs / r.zp) + carrierOmega;
+    // Carrier frame'inde planet rotasyonu (görsel olarak uygulanan kısım)
+    const planetSpinRel = planetOmegaWorld - carrierOmega;
 
-    animState.sunAngle += sunOmega * dt;
+    animState.sunAngle     += sunOmega     * dt;
     animState.carrierAngle += carrierOmega * dt;
-    animState.planetSpin = planetOmegaWorld - carrierOmega; // göreceli
+    animState.planetSpin   += planetSpinRel * dt;
 
     const sunG = $("sunG");
     const carrierG = $("carrierG");
-    if (sunG) sunG.setAttribute("transform", `rotate(${animState.sunAngle})`);
-    if (carrierG) carrierG.setAttribute("transform", `rotate(${animState.carrierAngle})`);
+    if (sunG)     sunG.setAttribute("transform", `rotate(${animState.sunAngle.toFixed(3)})`);
+    if (carrierG) carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
+    // Her planet'in kendi statik fazı + dinamik dönüş (carrier-relative)
     document.querySelectorAll(".planet-rot").forEach(p => {
-      // Planet kendi yerel ekseninde dönmeli
-      // (Planet'in dünya açısı = carrier dönüşü + kendi dönüşü; biz carrier'ı çevirdiğimizden
-      // sadece göreceli dönüş kalır)
-      const planetAng = (animState.planetSpin / sunOmega) * animState.sunAngle;
-      p.setAttribute("transform", `rotate(${planetAng})`);
+      const phase = parseFloat(p.getAttribute("data-phase") || "0");
+      p.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
     });
   }
   requestAnimationFrame(animate);
@@ -1926,8 +1948,10 @@ function calculateAndDraw() {
   renderResults(r);
   lastResult = r;
   draw(r);
+  // Animasyon birikimlerini sıfırla (statik faz draw() içinde uygulanıyor)
   animState.sunAngle = 0;
   animState.carrierAngle = 0;
+  animState.planetSpin = 0;
 }
 
 $("calcBtn").addEventListener("click", calculateAndDraw);
