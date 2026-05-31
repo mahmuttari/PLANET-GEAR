@@ -794,73 +794,107 @@ function omegasFromMode(mode, omegaIn, zs, zr) {
 
 // Verili Zs/Zp/Zr/N/m için optimal profil kaymalarını (x_s, x_p, x_r) hesaplar.
 // Amaç: diş sayıları DEĞİŞTİRİLMEDEN geometrik uyum sağlanması.
-//   1) Undercut riski olan dişlilere (Z < zmin) gerekli x_min uygulanır
-//   2) Sun-planet ve planet-ring çalışma eksen mesafelerinin EŞİT olması için
-//      x_r türetilir (ISO 21771: cos(α_w_pr) = cos(α_w_sp)·(Zr-Zp)/(Zs+Zp))
-//   3) Tepedeki diş kalınlığı (sa) çok küçükse uyarı döndürülür
-// Profil kayması ÇÖZEMEDİĞİ durumlar: (Zs+Zr)/N tam sayı değil (montaj — pür
-// topolojik), Zp tek (statik görsel simetri). Bu durumlar ayrıca işaretlenir.
+//
+// SEBEP ZİNCİRİ — neden tüm dişlilerde x değişmeli:
+//   1) Eğer Zs veya Zp < zmin (=2·ha*/sin²α ≈17 @20°) → o dişlide undercut
+//      riski; profil kayması x ≥ (zmin−z)/zmin gerek.
+//   2) Sun-planet meshindeki TOPLAM x_sp = x_s + x_p, çalışma basınç açısı
+//      α_w_sp'yi belirler:  inv(α_w_sp) = inv(α) + 2·tan(α)·(x_sp)/(z_s+z_p)
+//   3) α_w_sp ≠ α değişince çalışma eksen mesafesi değişir:
+//      a_w_sp = m·(z_s+z_p)·cos α / (2·cos α_w_sp)
+//   4) AMA aynı planet, ring ile de meshlenir: a_w_pr = a_w_sp olmalı
+//      (planet merkezi her iki taraftan da aynı yerde) → bu da x_r'yi bağlar:
+//      x_r = x_p + (inv(α_w_pr)−inv α)·(z_r−z_p) / (2·tan α)
+//   Sonuç: tek dişliye x koymak yetmez — zincirleme olarak diğerlerini de
+//   tetikler. Bu fonksiyon tümünü ISO 21771 ile EŞZAMANLI çözer.
+//
+// DAĞITIM (Niemann): x_s + x_p toplamı, küçük dişli daha çok pozitif x alır
+// (sliding eşitlenir, tepe kalınlığı dengelenir). x_s/x_p ≈ z_p/z_s · x_p/x_s.
 function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf }) {
   const aRad  = alpha * DEG;
   const tanA  = Math.tan(aRad);
   const invA  = inv(aRad);
   const zmin  = 2 * ha / (Math.sin(aRad) ** 2);
 
-  // Adım 1: Undercut'a karşı taban
-  const xs = Math.max(0, zs < zmin ? (zmin - zs) / zmin : 0);
-  const xp = Math.max(0, zp < zmin ? (zmin - zp) / zmin : 0);
+  // Adım 1: Undercut için per-dişli minimumlar
+  const xs_min = zs < zmin ? (zmin - zs) / zmin : 0;
+  const xp_min = zp < zmin ? (zmin - zp) / zmin : 0;
 
-  // Adım 2: x_r — sun-planet ve planet-ring eksenler arasını eşitle
-  // α_w_sp: sun-planet (harici) çalışma basınç açısı
+  // Adım 2: x_s + x_p toplamı + Niemann dağılımı
+  // Toplam, hem undercut'ı sağlamalı hem de simetrik dağılım için baseline
+  // bırakmalı. Eğer hiç undercut yoksa toplam = 0 (temiz tasarım).
+  // Niemann (DIN 3992 ek B): küçük dişli daha pozitif → x_s = sum·z_p/(z_s+z_p)
+  //                                                    x_p = sum·z_s/(z_s+z_p)
+  // Bu undercut'sız da uygulansa, x'in tepe kalınlığını eşitleme etkisi olur.
+  const xsp_undercut = xs_min + xp_min;
+  // Toplam: undercut için gerekli min'in 2 katı (her iki dişliye de bonus) veya 0
+  const x_sp_sum = xsp_undercut > 0 ? Math.max(xsp_undercut * 1.3, 0.15) : 0;
+  let xs = x_sp_sum * zp / (zs + zp);
+  let xp = x_sp_sum * zs / (zs + zp);
+  // Her gear için minimumun altına düşmesin
+  if (xs < xs_min) {
+    const deficit = xs_min - xs;
+    xs = xs_min;
+    xp += deficit * 0.5; // küçük bir telafi
+  }
+  if (xp < xp_min) {
+    const deficit = xp_min - xp;
+    xp = xp_min;
+    xs += deficit * 0.5;
+  }
+
+  // Adım 3: x_r — sun-planet ve planet-ring eksenler arası eşitliği
+  // a_w_sp = a_w_pr koşulundan: cos(α_w_pr) = cos(α_w_sp) · (z_r-z_p)/(z_s+z_p)
   const invAwSP = invA + 2 * tanA * (xs + xp) / (zs + zp);
   const awSP    = invInverse(invAwSP);
-  // Cos ilişkisi: cos(αw_pr) = cos(αw_sp) · (Zr-Zp) / (Zs+Zp)
-  // (Bu, a_w_sp = a_w_pr koşulundan gelir)
   const cosAwPR = Math.cos(awSP) * (zr - zp) / (zs + zp);
   let xr = 0;
   let note = null;
+  let awPR_deg = null;
   if (cosAwPR <= 0 || cosAwPR >= 1) {
     note = `Aşırı geometri sapması (cos α_w_pr = ${cosAwPR.toFixed(3)}). ` +
            `Zr ≠ Zs+2·Zp farkı profil kayması ile kapatılamayacak kadar büyük.`;
   } else {
     const awPR    = Math.acos(cosAwPR);
+    awPR_deg      = awPR / DEG;
     const invAwPR = inv(awPR);
     xr = xp + (invAwPR - invA) * (zr - zp) / (2 * tanA);
   }
 
-  // Adım 3: sa (tepe diş kalınlığı) sağlığı
-  // sa < 0.25·m sivrilme riski. Profil kayması arttıkça sa düşer (harici dişli).
-  // Eğer xs/xp çok yüksekse, kullanıcı uyarılır (otomatik düşürme yapmıyoruz,
-  // çünkü undercut limitini ihlal edecek).
+  // Adım 4: sa (tepe diş kalınlığı) sağlık kontrolü
   const warns = [];
   const checkSa = (label, z, x, internal) => {
-    const r = m * z / 2;
+    const r  = m * z / 2;
     const ra = internal ? r - (ha - x) * m : r + (ha + x) * m;
     const rb = r * Math.cos(aRad);
     const cosAa = Math.min(1, rb / ra);
     const aa = Math.acos(cosAa);
     const invAa = inv(aa);
     const s = m * (Math.PI / 2 + 2 * x * tanA);
-    const sa = internal ? (m * z) * (s / (m * z) - invA + invAa)
-                        : (m * z) * (s / (m * z) + invA - invAa) * (ra / (m * z / 2));
-    // Yukarıdaki formül için da ile çarpılmalı. Düzeltme:
     const da = 2 * ra;
-    const saReal = internal ? da * (s / (m * z) - invA + invAa)
-                            : da * (s / (m * z) + invA - invAa);
-    if (saReal < 0.25 * m) warns.push(`${label} sa = ${saReal.toFixed(2)} mm (<0.25·m=${(0.25*m).toFixed(2)})`);
+    const sa = internal ? da * (s / (m * z) - invA + invAa)
+                        : da * (s / (m * z) + invA - invAa);
+    if (sa < 0.25 * m) warns.push(`${label} sa = ${sa.toFixed(2)} mm < 0.25·m`);
   };
   checkSa("Güneş",   zs, xs, false);
   checkSa("Planet",  zp, xp, false);
   checkSa("Ring",    zr, xr, true);
 
+  // Hangi x neden hesaplandığını da döndürelim — UI bunu kullanıcıya açıklasın
+  const reasons = {
+    xs: xs_min > 0 ? `undercut (Zs=${zs}<${zmin.toFixed(1)})` :
+        xs !== 0   ? "Niemann dağılım" : "gerekli değil",
+    xp: xp_min > 0 ? `undercut (Zp=${zp}<${zmin.toFixed(1)})` :
+        xp !== 0   ? "Niemann dağılım (sliding eşitliği)" : "gerekli değil",
+    xr: xr !== 0   ? "a_sp = a_pr eksen eşitliği (ISO 21771)" : "gerekli değil",
+  };
+
   return {
-    xs: Math.round(xs * 100) / 100,
-    xp: Math.round(xp * 100) / 100,
-    xr: Math.round(xr * 100) / 100,
-    note, warns,
-    // diagnostics
-    invAwSP, awSP_deg: awSP / DEG,
-    awPR_deg: (cosAwPR > 0 && cosAwPR < 1) ? Math.acos(cosAwPR) / DEG : null,
+    xs: Math.round(xs * 1000) / 1000,
+    xp: Math.round(xp * 1000) / 1000,
+    xr: Math.round(xr * 1000) / 1000,
+    note, warns, reasons,
+    awSP_deg: awSP / DEG, awPR_deg,
   };
 }
 
@@ -1416,13 +1450,23 @@ $("autoX").addEventListener("click", () => {
   $("xs").value = result.xs;
   $("xp").value = result.xp;
   $("xr").value = result.xr;
-  const parts = [
-    `<span style="color:var(--ok)">✓ Uygulandı</span> xs=${result.xs}, xp=${result.xp}, xr=${result.xr}`,
-    result.awSP_deg && result.awPR_deg ? ` · α_w(SP)=${result.awSP_deg.toFixed(2)}° ≈ α_w(PR)=${result.awPR_deg.toFixed(2)}°` : "",
-  ];
-  if (result.note) parts.push(`<br><span style="color:var(--err)">⚠ ${result.note}</span>`);
-  if (result.warns.length) parts.push(`<br><span style="color:var(--warn)">⚠ ${result.warns.join(", ")}</span>`);
-  $("autoXOut").innerHTML = parts.join("");
+
+  const fmtX = (label, val, reason) =>
+    `<span style="color:var(--gold)">${label} = ${val.toFixed(3)}</span>
+     <span style="color:var(--muted); font-size:10px;"> (${reason})</span>`;
+  const lines = [];
+  lines.push(`<div style="color:var(--ok); font-weight:600;">✓ ISO 21771 ile hesaplandı:</div>`);
+  lines.push(`<div style="margin-top:3px;">${fmtX("xₛ", result.xs, result.reasons.xs)}</div>`);
+  lines.push(`<div>${fmtX("xₚ", result.xp, result.reasons.xp)}</div>`);
+  lines.push(`<div>${fmtX("x_r", result.xr, result.reasons.xr)}</div>`);
+  if (result.awSP_deg && result.awPR_deg) {
+    lines.push(`<div style="margin-top:4px; color:var(--accent-2);">
+      Çalışma α: sun-planet = ${result.awSP_deg.toFixed(3)}° = planet-ring = ${result.awPR_deg.toFixed(3)}° ✓
+    </div>`);
+  }
+  if (result.note) lines.push(`<div style="color:var(--err); margin-top:4px;">⚠ ${result.note}</div>`);
+  if (result.warns.length) lines.push(`<div style="color:var(--warn); margin-top:4px;">⚠ ${result.warns.join(" · ")}</div>`);
+  $("autoXOut").innerHTML = lines.join("");
   calculateAndDraw();
 });
 
@@ -1710,15 +1754,23 @@ function calculate() {
   const axisIssue    = axisMismatch > 0.01 * m;
 
   if (undercutSun || undercutPlnt || axisIssue) {
-    const probs = [];
-    if (undercutSun)  probs.push(`Sun undercut (Zs=${zs} < ${zmin.toFixed(1)})`);
-    if (undercutPlnt) probs.push(`Planet undercut (Zp=${zp} < ${zmin.toFixed(1)})`);
-    if (axisIssue)    probs.push(`eksen mesafe farkı ${axisMismatch.toFixed(3)} mm (aₛₚ=${a.toFixed(2)}, aₚᵣ=${aw_pr.toFixed(2)})`);
+    // Sebep zincirini AÇIK yaz — kullanıcı niye bu uyarı çıktığını görsün.
+    const chain = [];
+    if (undercutSun)  chain.push(`<b>Sun</b>: Zs=${zs} &lt; zmin=${zmin.toFixed(1)} → undercut, x_s ≥ ${((zmin-zs)/zmin).toFixed(2)} gerek`);
+    if (undercutPlnt) chain.push(`<b>Planet</b>: Zp=${zp} &lt; zmin=${zmin.toFixed(1)} → undercut, x_p ≥ ${((zmin-zp)/zmin).toFixed(2)} gerek`);
+    if (axisIssue) {
+      chain.push(`<b>Eksen uyumsuz</b>: a_sp=${a.toFixed(3)} mm ≠ a_pr=${aw_pr.toFixed(3)} mm (fark ${axisMismatch.toFixed(3)})`);
+      chain.push(`&nbsp;&nbsp;↳ x_s veya x_p sun-planet α_w'sını değiştirir → planet-ring tarafı dengelenmeli`);
+      chain.push(`&nbsp;&nbsp;↳ ISO 21771: x_r = x_p + (inv α_w_pr − inv α)·(Zr−Zp)/(2·tan α)`);
+    }
+    chain.push(`&nbsp;`);
+    chain.push(`<b>Çözüm:</b> Profil kayması (x_s, x_p, x_r) <em>üçü birlikte</em> hesaplanır. Tek dişliye x koymak yetmez — diğerleri zincirleme tepki verir.`);
+    chain.push(`Niemann (DIN 3992) dağılımı: küçük dişli daha pozitif x alır (sliding eşitliği).`);
     errors.push({
       severity: "warn",
-      msg: `Profil kayması ile çözülebilir`,
-      detail: `${probs.join(" · ")}.  Diş sayısı değiştirmeden ISO 21771 ile x_s/x_p/x_r hesaplanabilir.`,
-      fixes: [{ label: `🎯 Otomatik x Hesapla & Uygula`, action: "autoX" }]
+      msg: `Profil kayması ile çözülebilir (Zs/Zp/Zr DEĞİŞMEDEN)`,
+      detail: chain.join("<br>"),
+      fixes: [{ label: `🎯 Üç Dişli İçin Otomatik x Hesapla & Uygula`, action: "autoX" }]
     });
   }
 
