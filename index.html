@@ -673,6 +673,7 @@
         <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
         <button class="btn secondary" id="dxfBtn"    style="flex:0 0 auto; padding:6px 12px;">DXF İndir</button>
+        <button class="btn secondary" id="dwgBtn"    style="flex:0 0 auto; padding:6px 12px;">DWG İndir</button>
       </div>
       <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="legend">
@@ -2599,6 +2600,75 @@ $("dxfBtn").addEventListener("click", () => {
   a.click();
   URL.revokeObjectURL(url);
 });
+
+// DWG çıktısı — DWG AutoCAD'in kapalı binary formatıdır. Spec resmi olarak
+// yayınlanmamış, tarayıcı içinde saf JS ile güvenilir üretimi pratik değil.
+// Çözüm: DXF (tüm CAD'lerin açtığı standart) + içinde dönüştürme talimatı
+// olan bir README'yi indirir; kullanıcı tek tıkla DWG'ye çevirir.
+function downloadDwgPackage() {
+  if (!lastResult) return;
+  const cfg = `z${lastResult.zs}-${lastResult.zp}-${lastResult.zr}_m${lastResult.m}`;
+  const dxf = generateDXF(lastResult);
+  const readme = [
+    "PLANET DİŞLİ — DWG'YE NASIL DÖNÜŞTÜRÜLÜR",
+    "============================================",
+    "",
+    "İçerikteki .dxf dosyası tüm CAD programlarının doğrudan açtığı",
+    "standart formattadır (AutoCAD R12, AC1009). DWG'ye dönüştürme:",
+    "",
+    "YÖNTEM 1 — AutoCAD / BricsCAD / ZWCAD:",
+    "  1) Programı aç",
+    "  2) 'planet_dis_*.dxf' dosyasını sürükle veya File > Open",
+    "  3) File > Save As > tip 'AutoCAD 2018 Drawing (*.dwg)' seç > Kaydet",
+    "",
+    "YÖNTEM 2 — LibreCAD / FreeCAD / QCAD (ücretsiz):",
+    "  1) Programı aç",
+    "  2) DXF'i aç",
+    "  3) File > Save As > .dwg uzantısı ile kaydet",
+    "",
+    "YÖNTEM 3 — Çevrimiçi (tek tık, kayıt gerektirmez):",
+    "  • cloudconvert.com/dxf-to-dwg",
+    "  • convertio.co/dxf-dwg",
+    "  • aspose.app/cad/conversion/dxf-to-dwg",
+    "",
+    "YÖNTEM 4 — ODA File Converter (resmi ücretsiz araç):",
+    "  https://www.opendesign.com/guestfiles/oda_file_converter",
+    "  Toplu dönüştürme için: DXF klasörünü seç → output DWG seç → Start",
+    "",
+    "NEDEN DWG TARAYICI İÇİNDE ÜRETİLMİYOR?",
+    "  DWG, Autodesk'in patentli binary formatıdır; spec resmi olarak",
+    "  yayınlanmamış (ters mühendislikle açılmış). Açık alternatif DXF'tir",
+    "  ve bu programın ürettiği DXF tüm CAD'lerde açılır — DWG'ye dönüşüm",
+    "  CAD programlarında tek komuttur.",
+    "",
+    `Tasarım: Zs=${lastResult.zs}, Zp=${lastResult.zp}, Zr=${lastResult.zr},`,
+    `         N=${lastResult.N}, m=${lastResult.m} mm`,
+    `Çevrim oranı: ${lastResult.ratio.toFixed(3)}  (${lastResult.ratioFormula})`,
+    `Üretildi: ${new Date().toLocaleString("tr-TR")}`,
+  ].join("\r\n");
+
+  // ZIP yerine, 2 ayrı dosya indirimi (basit ve güvenilir; ZIP için
+  // ek kütüphane gerekirdi). Önce talimat bilgisi, sonra DXF.
+  alert(
+    "DWG için: tarayıcıda doğrudan DWG üretilemiyor (Autodesk'in kapalı formatı).\n\n" +
+    "İki dosya indirilecek:\n" +
+    "  1) planet_dis_*.dxf  — gerçek geometri (tüm CAD'lerde açılır)\n" +
+    "  2) DWG_NASIL_DONUSTURULUR.txt  — 4 farklı dönüştürme yöntemi\n\n" +
+    "En kolayı: DXF'i CAD programında aç → File > Save As > DWG."
+  );
+
+  const dl = (content, name, mime) => {
+    const blob = new Blob([content], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = name; a.click();
+    URL.revokeObjectURL(url);
+  };
+  dl(dxf,    `planet_dis_${cfg}.dxf`,                  "application/dxf");
+  // Tarayıcılar arka arkaya download'ları engelleyebilir → 200ms gecikme
+  setTimeout(() => dl(readme, `DWG_NASIL_DONUSTURULUR_${cfg}.txt`, "text/plain"), 250);
+}
+$("dwgBtn").addEventListener("click", downloadDwgPackage);
 
 $("exportBtn").addEventListener("click", () => {
   const svg = $("diagram");
