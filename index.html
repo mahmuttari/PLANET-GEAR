@@ -672,6 +672,7 @@
         <label>Mesh Temas Bölgesi <input type="checkbox" id="showPitchMarks" checked></label>
         <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
+        <button class="btn secondary" id="dxfBtn"    style="flex:0 0 auto; padding:6px 12px;">DXF İndir</button>
       </div>
       <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="legend">
@@ -2319,8 +2320,285 @@ function calculateAndDraw() {
   animState.planetSpin = 0;
 }
 
+// =============================================================================
+//                              DXF CAD EXPORT
+// =============================================================================
+// generateGearPath ile aynı involüt geometrisini üretir, ancak SVG path
+// stringi yerine {x, y} vertex dizisi döner. Tepe ve dip arc'ları küçük
+// doğru parçalarına ayrıştırılır (DXF LWPOLYLINE için).
+function gearVertices(opts) {
+  const { z, m, alpha, x = 0, ha = 1.0, hf = 1.25, internal = false, segments = 12, arcSegs = 6 } = opts;
+  const aRad = alpha * DEG;
+  const sign = internal ? -1 : 1;
+  const r  = (m * z) / 2;
+  const rb = r * Math.cos(aRad);
+  let ra = r + sign * (ha + sign * x) * m;
+  let rf = r - sign * (hf - sign * x) * m;
+  if (rf < 0.1) rf = 0.1;
+  const halfTooth = (Math.PI / 2 + 2 * x * Math.tan(aRad)) / z;
+  const invAlpha = Math.tan(aRad) - aRad;
+  const tAtR = (rad) => rad > rb ? Math.sqrt((rad / rb) ** 2 - 1) : 0;
+  const tRoot = tAtR(internal ? rf : Math.max(rb, rf));
+  const tTip  = tAtR(internal ? Math.max(rb, ra) : ra);
+  const segs = Math.max(3, segments);
+  const involutePts = [];
+  for (let i = 0; i <= segs; i++) {
+    const t = tRoot + (tTip - tRoot) * (i / segs);
+    involutePts.push(involute(rb, t));
+  }
+  const shiftMag = halfTooth + sign * invAlpha;
+  const mirrorY = (p) => ({ x: p.x, y: -p.y });
+  const orientUpper = (p) => rotate(internal ? p : mirrorY(p), shiftMag);
+  const orientLower = (p) => rotate(internal ? mirrorY(p) : p, -shiftMag);
+
+  // Bir yarıçapta a1 → a2 (kısa yol) arasında n parça yay örnekle
+  const arcSample = (R, a1, a2, n) => {
+    let delta = a2 - a1;
+    while (delta >  Math.PI) delta -= TAU;
+    while (delta < -Math.PI) delta += TAU;
+    const result = [];
+    for (let k = 1; k <= n; k++) {
+      const a = a1 + delta * (k / n);
+      result.push({ x: R * Math.cos(a), y: R * Math.sin(a) });
+    }
+    return result;
+  };
+
+  const pitchAngle = TAU / z;
+  const verts = [];
+
+  for (let i = 0; i < z; i++) {
+    const center = i * pitchAngle;
+    const upper = involutePts.map(p => rotate(orientUpper(p), center));
+    const lower = involutePts.map(p => rotate(orientLower(p), center));
+    upper[upper.length - 1] = projectToRadius(upper[upper.length - 1], ra);
+    lower[lower.length - 1] = projectToRadius(lower[lower.length - 1], ra);
+    const uRoot = projectToRadius(upper[0], rf);
+    const lRoot = projectToRadius(lower[0], rf);
+
+    if (i === 0) {
+      verts.push(uRoot);
+    } else {
+      const prevAng = Math.atan2(verts[verts.length - 1].y, verts[verts.length - 1].x);
+      const thisAng = Math.atan2(uRoot.y, uRoot.x);
+      verts.push(...arcSample(rf, prevAng, thisAng, arcSegs));
+    }
+    // Üst yanak (kök → tepe)
+    for (const p of upper) verts.push(p);
+    // Tepe yayı
+    const tipA1 = Math.atan2(upper[upper.length-1].y, upper[upper.length-1].x);
+    const tipA2 = Math.atan2(lower[lower.length-1].y, lower[lower.length-1].x);
+    verts.push(...arcSample(ra, tipA1, tipA2, arcSegs));
+    // Alt yanak (tepe → kök)
+    for (let k = lower.length - 2; k >= 0; k--) verts.push(lower[k]);
+    verts.push(lRoot);
+  }
+  // Kapanış yayı: son lRoot → ilk uRoot
+  const lastAng = Math.atan2(verts[verts.length - 1].y, verts[verts.length - 1].x);
+  const firstAng = Math.atan2(verts[0].y, verts[0].x);
+  verts.push(...arcSample(rf, lastAng, firstAng, arcSegs));
+  return verts;
+}
+
+// DXF (AutoCAD R12 / AC1009) çıktısı üretir. mm birimli, layer'lara ayrılmış,
+// her dişli için kapsamlı DIN 3960 ölçü annotation'ları içerir.
+function generateDXF(r) {
+  const L = [];
+  const w = (...args) => args.forEach(v => L.push(String(v)));
+
+  // ----- HEADER -----
+  w(0, "SECTION", 2, "HEADER");
+  w(9, "$ACADVER", 1, "AC1009");
+  w(9, "$INSUNITS", 70, 4);            // 4 = millimeters
+  w(9, "$MEASUREMENT", 70, 1);          // metric
+  w(0, "ENDSEC");
+
+  // ----- TABLES (layers) -----
+  w(0, "SECTION", 2, "TABLES");
+  w(0, "TABLE", 2, "LAYER", 70, 7);
+  const layer = (name, color, lt = "CONTINUOUS") => {
+    w(0, "LAYER", 2, name, 70, 0, 62, color, 6, lt);
+  };
+  layer("SUN_GEAR",     2);   // yellow
+  layer("PLANET_GEAR",  5);   // blue
+  layer("RING_GEAR",    6);   // magenta
+  layer("CARRIER",      3);   // green
+  layer("REFERENCE",    8, "DASHED");
+  layer("AXES",         9);
+  layer("ANNOTATIONS",  7);   // white/black
+  w(0, "ENDTAB", 0, "ENDSEC");
+
+  // ----- ENTITIES -----
+  w(0, "SECTION", 2, "ENTITIES");
+  const fmt = (v) => Number(v).toFixed(5);
+  // R12 (AC1009) POLYLINE: legacy POLYLINE + VERTEX + SEQEND. Modern CAD
+  // sistemlerinin hepsi destekler; LWPOLYLINE'ın aksine subclass marker
+  // gerektirmez. 70=1 ⇒ kapalı polyline.
+  const polyline = (verts, lyr) => {
+    w(0, "POLYLINE", 8, lyr, 66, 1, 70, 1, 10, 0, 20, 0, 30, 0);
+    for (const v of verts) {
+      w(0, "VERTEX", 8, lyr, 10, fmt(v.x), 20, fmt(v.y), 30, 0);
+    }
+    w(0, "SEQEND", 8, lyr);
+  };
+  const circle = (cx, cy, rad, lyr) => {
+    w(0, "CIRCLE", 8, lyr, 10, fmt(cx), 20, fmt(cy), 30, 0, 40, fmt(rad));
+  };
+  const line   = (x1, y1, x2, y2, lyr) => {
+    w(0, "LINE", 8, lyr,
+       10, fmt(x1), 20, fmt(y1), 30, 0,
+       11, fmt(x2), 21, fmt(y2), 31, 0);
+  };
+  const text   = (x, y, h, str, lyr) => {
+    w(0, "TEXT", 8, lyr, 10, fmt(x), 20, fmt(y), 30, 0, 40, fmt(h), 1, String(str));
+  };
+
+  // --- Sun gear ---
+  const sunVerts = gearVertices({
+    z: r.zs, m: r.m, alpha: r.alpha, x: r.xs,
+    ha: r.ha, hf: r.hf, internal: false, segments: 24
+  });
+  polyline(sunVerts, "SUN_GEAR");
+  circle(0, 0, r.ds / 2,  "REFERENCE");
+  circle(0, 0, r.dbs / 2, "REFERENCE");
+  // Center cross
+  const cs = r.ds * 0.12;
+  line(-cs, 0, cs, 0, "AXES");
+  line(0, -cs, 0, cs, "AXES");
+
+  // --- Planet gears (N copies, with static phase + position) ---
+  const planetVerts = gearVertices({
+    z: r.zp, m: r.m, alpha: r.alpha, x: r.xp,
+    ha: r.ha, hf: r.hf, internal: false, segments: 24
+  });
+  for (let i = 0; i < r.N; i++) {
+    const ang = (i / r.N) * TAU;
+    const phaseDeg = planetPhase(i, r.N, r.zp);
+    const phaseRad = phaseDeg * DEG;
+    const pos = polar(r.a, ang);
+    const transformed = planetVerts.map(v => {
+      const rv = rotate(v, phaseRad);
+      return { x: rv.x + pos.x, y: rv.y + pos.y };
+    });
+    polyline(transformed, "PLANET_GEAR");
+    circle(pos.x, pos.y, r.dp  / 2, "REFERENCE");
+    circle(pos.x, pos.y, r.dbp / 2, "REFERENCE");
+    // Pim
+    circle(pos.x, pos.y, r.m * 0.5, "CARRIER");
+    // Carrier kolu
+    line(0, 0, pos.x, pos.y, "CARRIER");
+  }
+  // Carrier merkez göbeği
+  circle(0, 0, r.m * 2.2, "CARRIER");
+
+  // --- Ring gear (internal teeth + outer rim) ---
+  const ringVerts = gearVertices({
+    z: r.zr, m: r.m, alpha: r.alpha, x: r.xr,
+    ha: r.ha, hf: r.hf, internal: true, segments: 24
+  });
+  polyline(ringVerts, "RING_GEAR");
+  circle(0, 0, r.dfr / 2 + r.m * 3, "RING_GEAR");  // dış disk
+  circle(0, 0, r.dr  / 2, "REFERENCE");
+  circle(0, 0, r.dbr / 2, "REFERENCE");
+
+  // --- Annotations: per-gear dimension blocks ---
+  const annoH = Math.max(r.m * 0.6, 1.5);     // text height
+  const lh = annoH * 1.4;                       // line height
+  const annotateGear = (title, g, ox, oy) => {
+    let y = oy;
+    text(ox, y, annoH * 1.6, title, "ANNOTATIONS"); y -= lh * 1.8;
+    const row = (k, v) => { text(ox, y, annoH, `${k} = ${v}`, "ANNOTATIONS"); y -= lh; };
+    row("z",          g.z);
+    row("m",          `${g.m} mm`);
+    row("alpha",      `${g.alpha} deg`);
+    row("x",          g.x);
+    text(ox, y, annoH, "----- diameters -----", "ANNOTATIONS"); y -= lh;
+    row("d (pitch)",  `${g.d.toFixed(3)} mm`);
+    row("db (base)",  `${g.db.toFixed(3)} mm`);
+    row("da (tip)",   `${g.da.toFixed(3)} mm`);
+    row("df (root)",  `${g.df.toFixed(3)} mm`);
+    text(ox, y, annoH, "----- tooth heights -----", "ANNOTATIONS"); y -= lh;
+    row("ha (addendum)", `${g.ha.toFixed(3)} mm`);
+    row("hf (dedendum)", `${g.hf.toFixed(3)} mm`);
+    row("h (total)",     `${g.h.toFixed(3)} mm`);
+    row("c (clearance)", `${g.c.toFixed(3)} mm`);
+    text(ox, y, annoH, "----- pitches -----", "ANNOTATIONS"); y -= lh;
+    row("p (circular)",  `${g.p.toFixed(3)} mm`);
+    row("pb (base)",     `${g.pb.toFixed(3)} mm`);
+    text(ox, y, annoH, "----- tooth thickness -----", "ANNOTATIONS"); y -= lh;
+    row("s (at pitch)",  `${g.s.toFixed(3)} mm`);
+    row("e (space)",     `${g.e.toFixed(3)} mm`);
+    row("sa (at tip)",   `${g.sa.toFixed(3)} mm`);
+    text(ox, y, annoH, "----- involute -----", "ANNOTATIONS"); y -= lh;
+    row("alpha_a (tip)", `${g.alpha_a_deg.toFixed(3)} deg`);
+    row("inv alpha",     g.invA.toFixed(6));
+    row("inv alpha_a",   g.invAa.toFixed(6));
+    text(ox, y, annoH, "----- undercut check -----", "ANNOTATIONS"); y -= lh;
+    row("z_min",         g.z_min.toFixed(2));
+    row("x_min required", g.x_min === 0 ? "(none, ok)" : g.x_min.toFixed(3));
+    return y;  // bottom y reached
+  };
+
+  // Annotation panellerini çizim alanının SAĞINA yerleştir
+  const ringOuter = r.dfr / 2 + r.m * 4;
+  const colW = Math.max(40, r.m * 22);
+  const colX0 = ringOuter + r.m * 4;
+  const colY0 = ringOuter;
+
+  annotateGear("SUN GEAR",            r.gSun,    colX0,            colY0);
+  annotateGear("PLANET GEAR",         r.gPlanet, colX0 + colW,     colY0);
+  annotateGear("RING GEAR (internal)", r.gRing,   colX0 + colW * 2, colY0);
+
+  // Assembly / kinematic info — sol alt blok
+  const aX = -ringOuter;
+  let aY = -ringOuter - r.m * 2;
+  text(aX, aY, annoH * 1.6, "=== PLANETARY GEAR SET ===", "ANNOTATIONS"); aY -= lh * 1.8;
+  const arow = (k, v) => { text(aX, aY, annoH, `${k} = ${v}`, "ANNOTATIONS"); aY -= lh; };
+  arow("Ratio i",            `${r.ratio.toFixed(4)}   (${r.ratioFormula})`);
+  arow("N planets",          r.N);
+  arow("Center distance a",  `${r.a.toFixed(3)} mm`);
+  arow("Module m",           `${r.m} mm`);
+  arow("Pressure angle",     `${r.alpha} deg`);
+  arow("Helix angle beta",   `${r.beta} deg`);
+  arow("Face width b",       `${r.b} mm`);
+  arow("Input torque T1",    `${r.T_input.toFixed(2)} Nm @ ${r.rpm} RPM`);
+  arow("Output torque T2",   `${r.T_out.toFixed(2)} Nm @ ${r.outRpm.toFixed(2)} RPM`);
+  arow("Input power",        `${(r.P_input/1000).toFixed(3)} kW`);
+  arow("Pitch velocity",     `${r.v_pitch.toFixed(3)} m/s`);
+  arow("Material",           r.mat.name);
+  arow("Tangential Ft/plnt", `${r.FtPerPlanet.toFixed(1)} N`);
+  arow("Contact ratio S-P",  r.meshSP.epsAlpha.toFixed(3));
+  arow("Contact ratio P-R",  r.meshPR.epsAlpha.toFixed(3));
+  arow("Bending SF",         `${r.SF_bend.toFixed(2)}  (sigma_F=${r.sigmaB_AGMA.toFixed(1)} MPa)`);
+  arow("Contact SH",         `${r.SF_contact.toFixed(2)}  (sigma_H=${r.sigmaH_SP.toFixed(1)} MPa)`);
+  arow("Allowable torque",   `${r.T_allow.toFixed(2)} Nm  @ SF=1.5`);
+
+  // Üretim notu
+  aY -= lh;
+  text(aX, aY, annoH * 0.9, "Generated by Planet Dis Hesaplayici --- units: mm",
+       "ANNOTATIONS"); aY -= lh;
+  text(aX, aY, annoH * 0.9, `Date: ${new Date().toISOString().slice(0, 10)}`,
+       "ANNOTATIONS");
+
+  w(0, "ENDSEC");
+  w(0, "EOF");
+  return L.join("\r\n");
+}
+
 $("calcBtn").addEventListener("click", calculateAndDraw);
 $("resetBtn").addEventListener("click", () => applyPreset(PRESETS[0]));
+
+$("dxfBtn").addEventListener("click", () => {
+  if (!lastResult) return;
+  const dxf = generateDXF(lastResult);
+  const blob = new Blob([dxf], { type: "application/dxf" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `planet_dis_z${lastResult.zs}-${lastResult.zp}-${lastResult.zr}_m${lastResult.m}.dxf`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
 
 $("exportBtn").addEventListener("click", () => {
   const svg = $("diagram");
