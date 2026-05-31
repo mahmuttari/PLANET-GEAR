@@ -578,6 +578,10 @@
           <button class="btn-mini" id="autoX" style="color:var(--ok); border-color:var(--ok); font-weight:600;">
             🎯 Otomatik Profil Kayması Hesapla
           </button>
+          <select id="autoXStrategy" style="background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:5px; padding:5px 8px; font-size:11px; font-family:inherit;">
+            <option value="minimum" selected>Minimum (önerilen)</option>
+            <option value="niemann">Niemann (dengeli)</option>
+          </select>
         </div>
         <div id="autoXOut" style="font-size:11px; color:var(--muted); min-height:14px; margin:2px 0 6px;"></div>
         <div class="row">
@@ -792,25 +796,25 @@ function omegasFromMode(mode, omegaIn, zs, zr) {
   }
 }
 
-// Verili Zs/Zp/Zr/N/m için optimal profil kaymalarını (x_s, x_p, x_r) hesaplar.
+// Verili Zs/Zp/Zr/N/m için profil kaymalarını (x_s, x_p, x_r) hesaplar.
 // Amaç: diş sayıları DEĞİŞTİRİLMEDEN geometrik uyum sağlanması.
 //
 // SEBEP ZİNCİRİ — neden tüm dişlilerde x değişmeli:
 //   1) Eğer Zs veya Zp < zmin (=2·ha*/sin²α ≈17 @20°) → o dişlide undercut
 //      riski; profil kayması x ≥ (zmin−z)/zmin gerek.
 //   2) Sun-planet meshindeki TOPLAM x_sp = x_s + x_p, çalışma basınç açısı
-//      α_w_sp'yi belirler:  inv(α_w_sp) = inv(α) + 2·tan(α)·(x_sp)/(z_s+z_p)
-//   3) α_w_sp ≠ α değişince çalışma eksen mesafesi değişir:
-//      a_w_sp = m·(z_s+z_p)·cos α / (2·cos α_w_sp)
-//   4) AMA aynı planet, ring ile de meshlenir: a_w_pr = a_w_sp olmalı
-//      (planet merkezi her iki taraftan da aynı yerde) → bu da x_r'yi bağlar:
-//      x_r = x_p + (inv(α_w_pr)−inv α)·(z_r−z_p) / (2·tan α)
-//   Sonuç: tek dişliye x koymak yetmez — zincirleme olarak diğerlerini de
-//   tetikler. Bu fonksiyon tümünü ISO 21771 ile EŞZAMANLI çözer.
+//      α_w_sp'yi belirler:  inv(α_w_sp) = inv(α) + 2·tan(α)·x_sp / (z_s+z_p)
+//   3) α_w_sp ≠ α → çalışma eksen mesafesi a_w_sp ≠ a_std
+//   4) AMA aynı planet, ring ile de meshlenir → a_w_pr = a_w_sp olmalı
+//      (planet merkezi her iki taraftan da aynı yerde) → bu x_r'yi bağlar:
+//      Zr=Zs+2·Zp standardında basitleşir:  x_r = x_s + 2·x_p
 //
-// DAĞITIM (Niemann): x_s + x_p toplamı, küçük dişli daha çok pozitif x alır
-// (sliding eşitlenir, tepe kalınlığı dengelenir). x_s/x_p ≈ z_p/z_s · x_p/x_s.
-function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf }) {
+// STRATEJİLER:
+//   "minimum"  : x_s ve x_p sadece undercut için (yetersizse 0). x_r = x_s+2·x_p.
+//                Sonuç en küçük profil kayması; pratik dişli (önerilen default).
+//   "niemann"  : x_s+x_p toplamı Niemann ile dağıtılır (küçük dişli daha pozitif),
+//                tepe kalınlık simetrisi iyi ama x_r daha büyük olur.
+function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf, strategy = "minimum" }) {
   const aRad  = alpha * DEG;
   const tanA  = Math.tan(aRad);
   const invA  = inv(aRad);
@@ -820,31 +824,25 @@ function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf }) {
   const xs_min = zs < zmin ? (zmin - zs) / zmin : 0;
   const xp_min = zp < zmin ? (zmin - zp) / zmin : 0;
 
-  // Adım 2: x_s + x_p toplamı + Niemann dağılımı
-  // Toplam, hem undercut'ı sağlamalı hem de simetrik dağılım için baseline
-  // bırakmalı. Eğer hiç undercut yoksa toplam = 0 (temiz tasarım).
-  // Niemann (DIN 3992 ek B): küçük dişli daha pozitif → x_s = sum·z_p/(z_s+z_p)
-  //                                                    x_p = sum·z_s/(z_s+z_p)
-  // Bu undercut'sız da uygulansa, x'in tepe kalınlığını eşitleme etkisi olur.
-  const xsp_undercut = xs_min + xp_min;
-  // Toplam: undercut için gerekli min'in 2 katı (her iki dişliye de bonus) veya 0
-  const x_sp_sum = xsp_undercut > 0 ? Math.max(xsp_undercut * 1.3, 0.15) : 0;
-  let xs = x_sp_sum * zp / (zs + zp);
-  let xp = x_sp_sum * zs / (zs + zp);
-  // Her gear için minimumun altına düşmesin
-  if (xs < xs_min) {
-    const deficit = xs_min - xs;
+  // Adım 2: Stratejiye göre x_s, x_p
+  let xs, xp;
+  if (strategy === "niemann" && (xs_min > 0 || xp_min > 0)) {
+    // Niemann: sum = max(undercut, baseline), küçük dişli ratio'da daha çok x
+    const x_sp_sum = Math.max(xs_min + xp_min, 0.15);
+    xs = x_sp_sum * zp / (zs + zp);
+    xp = x_sp_sum * zs / (zs + zp);
+    // Minimumları garanti et
+    if (xs < xs_min) { const d = xs_min - xs; xs = xs_min; xp += d * 0.5; }
+    if (xp < xp_min) { const d = xp_min - xp; xp = xp_min; xs += d * 0.5; }
+  } else {
+    // Minimum (default): sadece undercut, tepelendirme yok
     xs = xs_min;
-    xp += deficit * 0.5; // küçük bir telafi
-  }
-  if (xp < xp_min) {
-    const deficit = xp_min - xp;
     xp = xp_min;
-    xs += deficit * 0.5;
   }
 
-  // Adım 3: x_r — sun-planet ve planet-ring eksenler arası eşitliği
-  // a_w_sp = a_w_pr koşulundan: cos(α_w_pr) = cos(α_w_sp) · (z_r-z_p)/(z_s+z_p)
+  // Adım 3: x_r — sun-planet ve planet-ring eksenler arasını eşitle
+  // a_w_sp = a_w_pr ⇒ cos(α_w_pr) = cos(α_w_sp) · (z_r-z_p)/(z_s+z_p)
+  // Zr = Zs+2·Zp için bu basitleşir: α_w_pr = α_w_sp ⇒ x_r = x_s + 2·x_p
   const invAwSP = invA + 2 * tanA * (xs + xp) / (zs + zp);
   const awSP    = invInverse(invAwSP);
   const cosAwPR = Math.cos(awSP) * (zr - zp) / (zs + zp);
@@ -880,13 +878,14 @@ function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf }) {
   checkSa("Planet",  zp, xp, false);
   checkSa("Ring",    zr, xr, true);
 
-  // Hangi x neden hesaplandığını da döndürelim — UI bunu kullanıcıya açıklasın
+  // Sebep etiketleri
   const reasons = {
     xs: xs_min > 0 ? `undercut (Zs=${zs}<${zmin.toFixed(1)})` :
-        xs !== 0   ? "Niemann dağılım" : "gerekli değil",
+        xs !== 0   ? "Niemann dağılım" : "gerekli değil (Zs ≥ zmin)",
     xp: xp_min > 0 ? `undercut (Zp=${zp}<${zmin.toFixed(1)})` :
-        xp !== 0   ? "Niemann dağılım (sliding eşitliği)" : "gerekli değil",
-    xr: xr !== 0   ? "a_sp = a_pr eksen eşitliği (ISO 21771)" : "gerekli değil",
+        xp !== 0   ? "Niemann dağılım (sliding eşitliği)" : "gerekli değil (Zp ≥ zmin)",
+    xr: xr !== 0   ? "assembly: x_r = x_s + 2·x_p (ISO 21771, Zr=Zs+2Zp standardı)" :
+                     "gerekli değil",
   };
 
   return {
@@ -894,7 +893,12 @@ function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf }) {
     xp: Math.round(xp * 1000) / 1000,
     xr: Math.round(xr * 1000) / 1000,
     note, warns, reasons,
+    strategy,
     awSP_deg: awSP / DEG, awPR_deg,
+    // formül çıktısı (UI'da görünecek)
+    formula: cosAwPR > 0 && cosAwPR < 1
+      ? `x_r = x_s + 2·x_p = ${xs.toFixed(3)} + 2·${xp.toFixed(3)} = ${xr.toFixed(3)}`
+      : `(Zr ≠ Zs+2·Zp için genel formül ISO 21771)`,
   };
 }
 
@@ -1446,21 +1450,24 @@ $("autoX").addEventListener("click", () => {
   const alpha = parseFloat($("alpha").value);
   const ha = parseFloat($("haCoef").value);
   const hf = parseFloat($("hfCoef").value);
-  const result = autoProfileShift({ zs, zp, zr, m, alpha, ha, hf });
+  const strategy = $("autoXStrategy").value;
+  const result = autoProfileShift({ zs, zp, zr, m, alpha, ha, hf, strategy });
   $("xs").value = result.xs;
   $("xp").value = result.xp;
   $("xr").value = result.xr;
 
   const fmtX = (label, val, reason) =>
-    `<span style="color:var(--gold)">${label} = ${val.toFixed(3)}</span>
-     <span style="color:var(--muted); font-size:10px;"> (${reason})</span>`;
+    `<span style="color:var(--gold); font-weight:600;">${label} = ${val.toFixed(3)}</span>
+     <span style="color:var(--muted); font-size:10px;"> · ${reason}</span>`;
   const lines = [];
-  lines.push(`<div style="color:var(--ok); font-weight:600;">✓ ISO 21771 ile hesaplandı:</div>`);
+  const stratLabel = strategy === "minimum" ? "Minimum (en küçük x)" : "Niemann (dengeli dağıtım)";
+  lines.push(`<div style="color:var(--ok); font-weight:600;">✓ ${stratLabel} ile hesaplandı:</div>`);
   lines.push(`<div style="margin-top:3px;">${fmtX("xₛ", result.xs, result.reasons.xs)}</div>`);
   lines.push(`<div>${fmtX("xₚ", result.xp, result.reasons.xp)}</div>`);
   lines.push(`<div>${fmtX("x_r", result.xr, result.reasons.xr)}</div>`);
+  lines.push(`<div style="margin-top:4px; font-family:ui-monospace,monospace; color:var(--accent-2); font-size:10.5px;">${result.formula}</div>`);
   if (result.awSP_deg && result.awPR_deg) {
-    lines.push(`<div style="margin-top:4px; color:var(--accent-2);">
+    lines.push(`<div style="margin-top:2px; color:var(--muted); font-size:10.5px;">
       Çalışma α: sun-planet = ${result.awSP_deg.toFixed(3)}° = planet-ring = ${result.awPR_deg.toFixed(3)}° ✓
     </div>`);
   }
