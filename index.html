@@ -599,6 +599,44 @@
             </select>
           </div>
         </div>
+        <div class="help" style="margin-top:8px; border-left-color: var(--accent-2);">
+          <strong>Eksenler Arası Mesafe (Hedef a):</strong> Boş bırak → otomatik hesaplanır (a_std·cos α / cos α_w).
+          Manuel girersen, profil kayması o değere göre türetilir.
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Hedef a <span class="unit">mm (manuel; boş = otomatik)</span></label>
+            <input type="number" id="targetA" value="" min="0.1" step="0.01" placeholder="otomatik">
+          </div>
+          <div class="field">
+            <label>Hesaplanan a <span class="unit">mm (mevcut sonuç)</span></label>
+            <input type="text" id="computedA" value="—" disabled style="opacity:0.85;">
+          </div>
+        </div>
+        <div class="auto-size-row">
+          <button class="btn-mini" id="autoAfromX" style="color:var(--accent-2); border-color:var(--accent-2);">
+            ← Hedef a'yı mevcut sonuçla doldur
+          </button>
+          <button class="btn-mini" id="applyTargetA" style="color:var(--gold); border-color:var(--gold); font-weight:600;">
+            Hedef a'dan profil kayması hesapla →
+          </button>
+        </div>
+        <div id="targetAOut" style="font-size:11px; color:var(--muted); min-height:14px; margin:4px 0;"></div>
+
+        <div class="help" style="margin-top:8px; border-left-color: var(--warn);">
+          <strong>Backlash & Yağ Boşluğu (Klass III tipik):</strong> diş yan boşluğu jt
+          ısıl genleşme + yağ filmi için. Standart: jt ≈ 0.05·m (hassas) — 0.10·m (genel).
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Backlash jt <span class="unit">mm (radyal)</span></label>
+            <input type="number" id="backlashJt" value="" min="0" step="0.01" placeholder="0.05·m default">
+          </div>
+          <div class="field">
+            <label>Yağ Boşluğu c_oil <span class="unit">mm (tip clearance ek)</span></label>
+            <input type="number" id="oilClearance" value="" min="0" step="0.01" placeholder="0.04·m default">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -783,6 +821,95 @@ function workingCenterDistance(z1, z2, m, alphaDeg, x1, x2, internal = false) {
   return aStd * Math.cos(aRad) / Math.cos(alphaW);
 }
 
+// Manuel verilen hedef eksen mesafesi a'dan profil kaymalarını türetir.
+// Tersine ISO 21771: a verilmişse α_w sabit, x_s+x_p ve x_r türetilir.
+//   cos α_w_sp = m·(z_s+z_p)·cos α / (2·a)
+//   inv α_w_sp = inv α + 2·tan α·(x_s+x_p)/(z_s+z_p)   ⇒  x_s+x_p türet
+//   Aynı a için α_w_pr ayrı çözülür (z_r-z_p) ile.
+// Bireysel x_s, x_p dağıtımı: minimum strateji ile undercut + denge.
+function reverseProfileShift({ zs, zp, zr, m, alpha, ha, hf, a_target, strategy = "minimum" }) {
+  const aRad = alpha * DEG;
+  const tanA = Math.tan(aRad);
+  const invA = inv(aRad);
+  const zmin = 2 * ha / (Math.sin(aRad) ** 2);
+
+  // Sun-planet için gereken sum_sp = x_s + x_p
+  const cosAwSP_target = m * (zs + zp) * Math.cos(aRad) / (2 * a_target);
+  if (cosAwSP_target <= 0 || cosAwSP_target >= 1) {
+    return { ok: false, reason: `Hedef a=${a_target} sun-planet için imkansız (cos α_w = ${cosAwSP_target.toFixed(3)}).` };
+  }
+  const awSP = Math.acos(cosAwSP_target);
+  const sum_sp = (inv(awSP) - invA) * (zs + zp) / (2 * tanA);
+
+  // Planet-ring için gereken diff_pr = x_r - x_p
+  const cosAwPR_target = m * (zr - zp) * Math.cos(aRad) / (2 * a_target);
+  if (cosAwPR_target <= 0 || cosAwPR_target >= 1) {
+    return { ok: false, reason: `Hedef a=${a_target} planet-ring için imkansız (cos α_w = ${cosAwPR_target.toFixed(3)}).` };
+  }
+  const awPR = Math.acos(cosAwPR_target);
+  const diff_pr = (inv(awPR) - invA) * (zr - zp) / (2 * tanA);
+
+  // Dağıtım: undercut limitlerini gözeterek x_s, x_p seç
+  const xs_min = zs < zmin ? (zmin - zs) / zmin : 0;
+  const xp_min = zp < zmin ? (zmin - zp) / zmin : 0;
+  let xs, xp;
+  if (strategy === "niemann") {
+    // sum_sp'yi Z ile ters orantılı dağıt
+    xs = sum_sp * zp / (zs + zp);
+    xp = sum_sp * zs / (zs + zp);
+  } else {
+    // Minimum: x_s undercut'tan başla, kalan x_p'ye
+    xs = Math.max(xs_min, sum_sp);  // önce sun'a yaslan
+    xp = sum_sp - xs;
+    if (xp < xp_min) {
+      xp = xp_min;
+      xs = sum_sp - xp;
+    }
+  }
+  const xr = xp + diff_pr;
+  return {
+    ok: true,
+    xs: Math.round(xs * 1000) / 1000,
+    xp: Math.round(xp * 1000) / 1000,
+    xr: Math.round(xr * 1000) / 1000,
+    awSP_deg: awSP / DEG, awPR_deg: awPR / DEG,
+    a_actual: a_target,
+  };
+}
+
+// Backlash + yağ boşluğu hesabı (DIN 3960 / ISO 1328 referansları)
+// jt: tangential backlash (mm) — diş yanları arası
+// jn = jt·cos α: normal backlash
+// Δs (her dişlide diş kalınlığından düşülen): jt·cos α / 2 (eşit paylaşımla)
+// Veya eksen mesafesi artırılarak: Δa = jt / (2·sin α)
+function backlashCalc({ m, alpha, jt_user, c_oil_user }) {
+  const aRad = alpha * DEG;
+  const jt = jt_user != null && jt_user > 0 ? jt_user : 0.05 * m;
+  const c_oil = c_oil_user != null && c_oil_user > 0 ? c_oil_user : 0.04 * m;
+  const jn = jt * Math.cos(aRad);
+  const ds_per_gear = jt * Math.cos(aRad) / 2;  // diş kalınlığı düşümü (her dişli için)
+  const da_increase = jt / (2 * Math.sin(aRad));  // eksen mesafesi artırma alternatifi
+  // DIN 3961 backlash sınıfları (m=4 için tipik):
+  //  Klass I (çok hassas):  jt = 0.02·m
+  //  Klass II (hassas):     jt = 0.05·m
+  //  Klass III (genel):     jt = 0.10·m  ← default
+  //  Klass IV (kaba):       jt = 0.20·m
+  let cls = "Özel";
+  if      (jt <= 0.025 * m) cls = "Klass I (hassas)";
+  else if (jt <= 0.075 * m) cls = "Klass II–III";
+  else if (jt <= 0.15  * m) cls = "Klass III (genel)";
+  else                       cls = "Klass IV (kaba)";
+  // Yağ filmi tavsiyesi (Stribeck-Hertz, basitleştirilmiş):
+  // h_min ≈ 0.5·c_oil minimum film kalınlığı için
+  return {
+    jt, jn, ds_per_gear, da_increase, cls,
+    c_oil, total_radial_play: c_oil + ds_per_gear,
+    note: jt > 0.2 * m
+      ? "⚠ Yüksek backlash — düşük hassasiyetli uygulamalar için. Tork transfer/şok yüküne dikkat."
+      : null,
+  };
+}
+
 // Mod-bağlı açısal hızlar — Willis denklemiyle (animasyon için).
 // Her mod giriş şaftını farklı seçer; "input ω" giriş şaftına uygulanır,
 // diğerleri buradan türetilir. (Geleneksel: ring_fixed → sun input;
@@ -897,8 +1024,11 @@ function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf, strategy = "minimum" }
     awSP_deg: awSP / DEG, awPR_deg,
     // formül çıktısı (UI'da görünecek)
     formula: cosAwPR > 0 && cosAwPR < 1
-      ? `x_r = x_s + 2·x_p = ${xs.toFixed(3)} + 2·${xp.toFixed(3)} = ${xr.toFixed(3)}`
-      : `(Zr ≠ Zs+2·Zp için genel formül ISO 21771)`,
+      ? (zr === zs + 2 * zp
+          ? `x_r = x_s + 2·x_p = ${xs.toFixed(3)} + 2·${xp.toFixed(3)} = ${xr.toFixed(3)}`
+          : `Zr ≠ Zs+2·Zp (fark: ${zr - (zs+2*zp)}). ISO 21771 genel formül: ` +
+            `x_r = x_p + (inv α_w_pr − inv α)·(Zr−Zp)/(2·tan α) = ${xr.toFixed(3)}`)
+      : `(Zr farkı profil kayması ile çözülemez)`,
   };
 }
 
@@ -1442,6 +1572,42 @@ $("modulePreset").addEventListener("change", () => {
 
 // Otomatik boyutlandırma butonları
 // Otomatik profil kayması: diş sayıları dokunulmadan x_s/x_p/x_r hesaplanıp uygulanır
+// "← Hedef a'yı mevcut sonuçla doldur": şimdiki r.a'yı hedef olarak yaz
+$("autoAfromX").addEventListener("click", () => {
+  if (lastResult && isFinite(lastResult.a)) $("targetA").value = lastResult.a.toFixed(3);
+});
+
+// "Hedef a'dan profil kayması hesapla →": reverse-x çalıştır
+$("applyTargetA").addEventListener("click", () => {
+  const target = parseFloat($("targetA").value);
+  if (!target || target <= 0) {
+    $("targetAOut").innerHTML = `<span style="color:var(--err)">Geçerli bir hedef a girin.</span>`;
+    return;
+  }
+  const zs = parseInt($("zs").value);
+  const zp = parseInt($("zp").value);
+  const zr = parseInt($("zr").value);
+  const m  = getModule();
+  const alpha = parseFloat($("alpha").value);
+  const ha = parseFloat($("haCoef").value);
+  const hf = parseFloat($("hfCoef").value);
+  const strategy = $("autoXStrategy").value;
+  const result = reverseProfileShift({ zs, zp, zr, m, alpha, ha, hf, a_target: target, strategy });
+  if (!result.ok) {
+    $("targetAOut").innerHTML = `<span style="color:var(--err)">✗ ${result.reason}</span>`;
+    return;
+  }
+  $("xs").value = result.xs;
+  $("xp").value = result.xp;
+  $("xr").value = result.xr;
+  $("targetAOut").innerHTML = `
+    <span style="color:var(--ok)">✓ Hedef a=${target.toFixed(3)} mm için:</span>
+    <span style="color:var(--gold)"> xₛ=${result.xs}, xₚ=${result.xp}, x_r=${result.xr}</span>
+    <span style="color:var(--muted)"> · α_w(SP)=${result.awSP_deg.toFixed(2)}°, α_w(PR)=${result.awPR_deg.toFixed(2)}°</span>
+  `;
+  calculateAndDraw();
+});
+
 $("autoX").addEventListener("click", () => {
   const zs = parseInt($("zs").value);
   const zp = parseInt($("zp").value);
@@ -1674,27 +1840,44 @@ function calculate() {
   const errors = [];
 
   // 1) Temel geometri: Zr = Zs + 2·Zp
+  //    EĞER profil kayması zaten uygulanmış VE a_w_sp ≈ a_w_pr ise: konfigürasyon
+  //    GEÇERLİ (Zr farkı x ile kompanze edilmiş). Banner çıkmaz, uyarı yok.
+  //    EĞER x henüz uygulanmamış: WARN gönder, autoX ile tek tıkla çözülebilir.
+  //    EĞER Zr farkı profil kayması ile kompanze edilemeyecek kadar büyükse: ERR
   if (zr !== zs + 2 * zp) {
-    const fixes = [];
-    const zrCorrect = zs + 2 * zp;
-    fixes.push({ label: `Zr → ${zrCorrect}`, target: "zr", value: zrCorrect });
-    if ((zr - zs) >= 12 && (zr - zs) % 2 === 0) {
-      fixes.push({ label: `Zp → ${(zr - zs) / 2}`, target: "zp", value: (zr - zs) / 2 });
-    } else if ((zr - zs) >= 13 && (zr - zs) % 2 !== 0) {
-      const zpFloor = Math.floor((zr - zs) / 2);
-      fixes.push({ label: `Zp → ${zpFloor} (Zr → ${zs + 2*zpFloor})`, multi: [
-        { target: "zp", value: zpFloor }, { target: "zr", value: zs + 2*zpFloor }
-      ] });
+    const delta = zr - (zs + 2 * zp);
+    // Profil kayması ile çözülebilir mi? cos α_w_pr ≤ 1 olmalı (geometri sınırı)
+    const cosAtAlpha = Math.cos(aRad) * (zr - zp) / (zs + zp);
+    const canCompensate = cosAtAlpha > 0 && cosAtAlpha < 1;
+    // a_w_sp ≈ a_w_pr ise zaten kompanze edilmiş
+    const alreadyCompensated = Math.abs(a - aw_pr) < 0.01 * m;
+
+    if (!canCompensate) {
+      // ERR — hiçbir profil kayması çözemez (Zr farkı çok büyük)
+      errors.push({
+        severity: "err",
+        msg: `Geometri çelişkisi: Zr − Zs − 2·Zp = ${delta} diş (profil kayması ile çözülemeyecek kadar)`,
+        detail: `cos α_w_pr = ${cosAtAlpha.toFixed(3)} (geçersiz). Z değerlerinden birini değiştirin.`,
+        fixes: [
+          { label: `Zr → ${zs + 2*zp}`, target: "zr", value: zs + 2*zp },
+          ...((zr - zs) >= 12 && (zr - zs) % 2 === 0
+              ? [{ label: `Zp → ${(zr - zs) / 2}`, target: "zp", value: (zr - zs) / 2 }]
+              : []),
+        ]
+      });
+    } else if (!alreadyCompensated) {
+      // WARN — profil kayması ile çözülebilir, henüz uygulanmamış
+      errors.push({
+        severity: "warn",
+        msg: `Standart Zr=Zs+2·Zp'den ${delta > 0 ? '+' : ''}${delta} diş sapma — profil kayması ile çözülebilir`,
+        detail: `Mevcut: Zr=${zr}, standart=${zs + 2*zp}. ISO 21771 ile x_s, x_p, x_r türetilerek a_w_sp = a_w_pr sağlanır.`,
+        fixes: [
+          { label: `🎯 Profil Kayması ile Eksen Eşitle`, action: "autoX" },
+          { label: `Zr → ${zs + 2*zp} (standart geometri)`, target: "zr", value: zs + 2*zp },
+        ]
+      });
     }
-    if ((zr - 2 * zp) >= 6) {
-      fixes.push({ label: `Zs → ${zr - 2 * zp}`, target: "zs", value: zr - 2 * zp });
-    }
-    errors.push({
-      severity: "err",
-      msg: `Geometri çelişkisi: Zr ≠ Zs + 2·Zp`,
-      detail: `Mevcut: ${zr} ≠ ${zs} + 2·${zp} = ${zs + 2*zp}  (fark: ${zr - (zs+2*zp)})`,
-      fixes
-    });
+    // alreadyCompensated ise hiçbir uyarı yok — geometri x ile sağlanmış
   }
 
   // 2) Montaj koşulu: (Zs + Zr) / N ∈ ℤ
@@ -1904,12 +2087,21 @@ function calculate() {
     ds, dp, dr, das, dap, dar, dfs, dfp, dfr, dbs, dbp, dbr, a,
     // DIN 3960 (her diş için)
     gSun, gPlanet, gRing, meshSP, meshPR,
+    // çalışma eksen mesafeleri (a otomatik a_w_sp; aw_pr ayrıca)
+    aStd, aw_pr,
     // kinematik
     ratio, ratioFormula, outRpm, T_out, omegaSun, omegaCarrier, omegaPlanet,
     // mukavemet
     FtPerPlanet, v_pitch, Kv, Km, Ks, KB, Yl, Yj, Ze, Zh,
     sigmaB_Lewis, sigmaB_AGMA, sigmaH_SP, sigmaH_PR,
     SF_bend, SF_contact, T_allow, P_allow,
+    // backlash & yağ boşluğu
+    backlash: backlashCalc({
+      m,
+      alpha,
+      jt_user: parseFloat($("backlashJt").value),
+      c_oil_user: parseFloat($("oilClearance").value),
+    }),
     // doğrulama
     errors
   };
@@ -2075,6 +2267,14 @@ function renderResults(r) {
         : "✓ Güvenli" },
     { l: "İletilebilir Tork (SF=1.5)", v: fmt(r.T_allow, " Nm"), cls: "full" },
     { l: "İletilebilir Güç (SF=1.5)",  v: fmt(r.P_allow, " kW"), cls: "full" },
+    // ----- Backlash & Yağ Boşluğu -----
+    { l: "Backlash jt (tangential)", v: fmt(r.backlash.jt, " mm"), s: r.backlash.cls },
+    { l: "Backlash jn (normal)",     v: fmt(r.backlash.jn, " mm") },
+    { l: "Diş kalınlığı düşümü Δs", v: fmt(r.backlash.ds_per_gear, " mm"), s: "her dişli için" },
+    { l: "Eksen mesafesi artırma Δa", v: fmt(r.backlash.da_increase, " mm"), s: "backlash alternatifi" },
+    { l: "Yağ boşluğu c_oil", v: fmt(r.backlash.c_oil, " mm") },
+    { l: "Toplam radyal boşluk", v: fmt(r.backlash.total_radial_play, " mm"), cls: "full",
+      s: r.backlash.note || "tip clearance + diş yan boşluğu toplamı" },
   ];
   $("results-mukavemet").innerHTML = str.map(item =>
     `<div class="result-item ${item.cls || ""}">
@@ -2450,6 +2650,8 @@ function calculateAndDraw() {
   const r = calculate();
   renderResults(r);
   lastResult = r;
+  // Eksenler arası mesafe gösterimini güncelle (her hesapta görünsün)
+  if ($("computedA")) $("computedA").value = r.a.toFixed(3) + " mm  (a_std=" + r.aStd.toFixed(3) + ")";
   draw(r);
   // Animasyon birikimlerini sıfırla (statik faz draw() içinde uygulanıyor)
   animState.sunAngle = 0;
@@ -2822,6 +3024,7 @@ const watchedInputs = [
   "zs","zp","zr","np","alpha","beta","rpm","torque","power",
   "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showPitchMarks","showForces",
   "haCoef","hfCoef","cCoef","xs","xp","xr","rhoF","resolution",
+  "backlashJt","oilClearance",
   "faceWidth","ka","quality","material"
 ];
 watchedInputs.forEach(id => {
