@@ -2851,9 +2851,9 @@ function draw(r) {
   if ($("showDiameters").checked) {
     // Dik kalan değer etiketi (track=true ise animasyonda konumu carrier ile döner).
     const uprightLabel = (text, x, y, color, track) => {
-      const fs = Math.max(m * 1.35, 4.5);
-      const pw = text.length * fs * 0.62 + fs * 0.7;
-      const ph = fs * 1.5;
+      const fs = Math.max(m * 0.7, 2.4);
+      const pw = text.length * fs * 0.58 + fs * 0.5;
+      const ph = fs * 1.32;
       const g = el("g", { transform: `translate(${x.toFixed(2)} ${y.toFixed(2)})` });
       g.appendChild(el("rect", { x: -pw/2, y: -ph/2, width: pw, height: ph, rx: ph*0.3,
         fill: "#0f172a", opacity: 0.9, stroke: color, "stroke-width": Math.max(0.12, m*0.05) }));
@@ -2935,10 +2935,10 @@ function draw(r) {
   // Ayrı grup: animasyonda yalnız konumu döndürülür, metin dik kalır.
   const dimMidX  = dimLen / 2;
   const dimMidY  = -Math.max(m * 2.2, 6);       // çizginin üstünde (perpendiküler)
-  const dimFs    = Math.max(m * 1.6, 5);
+  const dimFs    = Math.max(m * 0.8, 2.8);
   const dimTxt   = `a = ${r.a.toFixed(2)} mm`;
-  const dimPillW = dimTxt.length * dimFs * 0.56 + dimFs;
-  const dimPillH = dimFs * 1.7;
+  const dimPillW = dimTxt.length * dimFs * 0.55 + dimFs * 0.6;
+  const dimPillH = dimFs * 1.45;
   const axisDimLabel = el("g", { id: "axisDimLabel", transform: `translate(${dimMidX.toFixed(2)} ${dimMidY.toFixed(2)})` });
   axisDimLabel.appendChild(el("rect", {
     x: -dimPillW / 2, y: -dimPillH / 2, width: dimPillW, height: dimPillH,
