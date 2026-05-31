@@ -737,6 +737,7 @@
         <label>Pitch Çemberleri <input type="checkbox" id="showPitch"></label>
         <label>Base Çemberleri <input type="checkbox" id="showBase"></label>
         <label>Mesh Temas Bölgesi <input type="checkbox" id="showPitchMarks" checked></label>
+        <label>Çap Ölçüleri (Ø) <input type="checkbox" id="showDiameters" checked></label>
         <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
         <button class="btn secondary" id="dxfBtn"    style="flex:0 0 auto; padding:6px 12px;">DXF İndir</button>
@@ -2524,6 +2525,18 @@ function draw(r) {
     rot.appendChild(el("circle", { cx: (r.dp / 2) * 0.6, cy: 0, r: m * 0.4, fill: COLORS.sun }));
     appendRefCircles(rot, { ...refOpts, r_pitch: r.dp / 2, r_base: r.dbp / 2, color: COLORS.planet });
     pg.appendChild(rot);
+    // Çap ölçüsü çemberleri (yalnız planet 0): pg'ye eklenir → carrier ile
+    // birlikte yörüngede döner ama kendi ekseninde dönmez (çember simetrik).
+    if (i === 0 && $("showDiameters").checked) {
+      const pdsw = Math.max(0.12, m * 0.05);
+      const pdia = (dval, dash) => el("circle", {
+        cx: 0, cy: 0, r: dval / 2, fill: "none", stroke: COLORS.planet,
+        "stroke-width": pdsw, opacity: 0.9, "stroke-dasharray": dash
+      });
+      pg.appendChild(pdia(r.dap, `${(m*0.45).toFixed(2)} ${(m*0.5).toFixed(2)}`)); // da
+      pg.appendChild(pdia(r.dp,  `${(m*1.8).toFixed(2)} ${(m*0.8).toFixed(2)}`));  // d
+      pg.appendChild(pdia(r.dfp, `${(m*0.9).toFixed(2)} ${(m*0.6).toFixed(2)}`));  // df
+    }
     carrierG.appendChild(pg);
     animCache.planets.push({ node: rot, phase });
   });
@@ -2651,6 +2664,62 @@ function draw(r) {
   const p0 = polar(carrierR, -Math.PI / 2);
   addLabel(`Planet Z=${r.zp}  Ø${r.dp.toFixed(1)}`, p0.x, p0.y - r.dap / 2 - fontSize * 0.5, COLORS.planet);
   svg.appendChild(labels);
+
+  // --- ÇAP ÖLÇÜLERİ (Ø): her dişli için da (tepe) / d (taksimat) / df (taban) ---
+  // Güneş ve ring eş-merkezli (origin) → svg köküne; planet 0 çemberleri yukarıda
+  // pg içine eklendi (carrier ile döner). Renk dişliyle aynı; çizgi stili çapı belirtir:
+  //   sık kesik = da,  uzun kesik = d (taksimat),  orta kesik = df.
+  if ($("showDiameters").checked) {
+    const ddsw = Math.max(0.12, m * 0.05);
+    const dDa = `${(m*0.45).toFixed(2)} ${(m*0.5).toFixed(2)}`;
+    const dPd = `${(m*1.8).toFixed(2)} ${(m*0.8).toFixed(2)}`;
+    const dDf = `${(m*0.9).toFixed(2)} ${(m*0.6).toFixed(2)}`;
+    const dia = (dval, color, dash) => el("circle", {
+      cx: 0, cy: 0, r: dval / 2, fill: "none", stroke: color,
+      "stroke-width": ddsw, opacity: 0.9, "stroke-dasharray": dash
+    });
+    const diaG = el("g", { id: "diaDims" });
+    diaG.appendChild(dia(r.das, COLORS.sun,  dDa));
+    diaG.appendChild(dia(r.ds,  COLORS.sun,  dPd));
+    diaG.appendChild(dia(r.dfs, COLORS.sun,  dDf));
+    diaG.appendChild(dia(r.dar, COLORS.ring, dDa));
+    diaG.appendChild(dia(r.dr,  COLORS.ring, dPd));
+    diaG.appendChild(dia(r.dfr, COLORS.ring, dDf));
+    svg.appendChild(diaG);
+
+    // Okunaklı sabit lejant (sağ-üst köşe, dönmez): tüm Ø değerleri.
+    const lgFs   = fontSize * 0.92;
+    const lgPad  = lgFs * 0.6;
+    const lgLine = lgFs * 1.45;
+    const lgRows = [
+      ["Güneş",  r.das, r.ds,  r.dfs, COLORS.sun],
+      ["Planet", r.dap, r.dp,  r.dfp, COLORS.planet],
+      ["Ring",   r.dar, r.dr,  r.dfr, COLORS.ring],
+    ];
+    const lgW = lgFs * 20.5;
+    const lgH = lgLine * (lgRows.length + 1.6) + lgPad;
+    const lgX = maxR - lgW - fontSize * 0.8;     // sağ kenar
+    const lgY = -maxR + fontSize * 0.8;          // üst kenar
+    const lg = el("g", { id: "diaLegend" });
+    lg.appendChild(el("rect", {
+      x: lgX, y: lgY, width: lgW, height: lgH, rx: lgFs * 0.5,
+      fill: "#0f172a", opacity: 0.9, stroke: "#334155", "stroke-width": Math.max(0.12, m*0.05)
+    }));
+    lg.appendChild(el("text", {
+      x: lgX + lgPad, y: lgY + lgPad + lgFs, fill: "#e2e8f0",
+      "font-family": "system-ui", "font-size": lgFs * 0.95, "font-weight": "bold"
+    }, `Ø Çap ölçüleri — da / d / df (mm)`));
+    lgRows.forEach((row, i) => {
+      const [name, da, d, df, color] = row;
+      const ry = lgY + lgPad + lgFs + lgLine * (i + 1.3);
+      lg.appendChild(el("circle", { cx: lgX + lgPad + lgFs*0.4, cy: ry - lgFs*0.3, r: lgFs*0.35, fill: color }));
+      lg.appendChild(el("text", {
+        x: lgX + lgPad + lgFs * 1.2, y: ry, fill: "#e2e8f0",
+        "font-family": "ui-monospace, monospace", "font-size": lgFs
+      }, `${name}:  ${da.toFixed(1)} / ${d.toFixed(1)} / ${df.toFixed(1)}`));
+    });
+    svg.appendChild(lg);
+  }
 
   // --- EKSEN MESAFESİ ÖLÇÜSÜ (güneş merkezi ↔ planet 0 merkezi) ---
   // Teknik-resim tarzı kotalı ölçü: çizgi + iki uçta ok + ORTASINDA değer etiketi.
@@ -3330,7 +3399,7 @@ $("exportBtn").addEventListener("click", () => {
 // Tüm parametre değişimlerinde otomatik yeniden çiz
 const watchedInputs = [
   "zs","zp","zr","np","alpha","beta","rpm","torque","power",
-  "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showPitchMarks","showForces",
+  "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showPitchMarks","showDiameters","showForces",
   "haCoef","hfCoef","cCoef","xs","xp","xr","rhoF","resolution",
   "backlashJt","oilClearance",
   "faceWidth","ka","quality","material"
