@@ -2652,22 +2652,58 @@ function draw(r) {
   addLabel(`Planet Z=${r.zp}  Ø${r.dp.toFixed(1)}`, p0.x, p0.y - r.dap / 2 - fontSize * 0.5, COLORS.planet);
   svg.appendChild(labels);
 
-  // --- EKSEN MESAFESİ ÖLÇÜ ÇİZGİSİ (güneş merkezi ↔ planet 0 merkezi) ---
-  // En son svg köküne eklenir → tüm dişli gövdelerinin ÖNÜNDE kalır, arkada
-  // kaybolmaz. Animasyonda carrierG ile AYNI açıyla döndürülür (bkz. animate),
-  // böylece planet 0'ı takip eder; statikte ikisi de döndürülmemiş = hizalı.
-  const dimP0  = planetPositions[0];           // = (a, 0)
-  const dimDot = Math.max(0.7, m * 0.4);
+  // --- EKSEN MESAFESİ ÖLÇÜSÜ (güneş merkezi ↔ planet 0 merkezi) ---
+  // Teknik-resim tarzı kotalı ölçü: çizgi + iki uçta ok + ORTASINDA değer etiketi.
+  // En son svg köküne eklenir → tüm dişli gövdelerinin ÖNÜNDE durur (arkada
+  // kaybolmaz). Animasyonda:
+  //   • çizgi grubu carrier açısıyla döndürülür → planet 0'ı takip eder,
+  //   • değer etiketi yalnızca KONUMU döndürülür (kendisi dik kalır, ters dönmez).
+  const dimP0    = planetPositions[0];          // = (a, 0)
+  const dimLen   = Math.hypot(dimP0.x, dimP0.y);
+  const dimSw    = Math.max(0.25, m * 0.10);
+  const dimAh    = Math.max(2.2, m * 1.1);      // ok boyu
+  const dimAw    = Math.max(1.0, m * 0.45);     // ok yarı-genişliği
+  const dimColor = "#fde68a";
   const axisDimG = el("g", { id: "axisDim" });
+  // Ölçü çizgisi (sun merkezi 0,0 → planet 0 merkezi a,0 — döndürülmemiş frame)
   axisDimG.appendChild(el("line", {
-    x1: 0, y1: 0, x2: dimP0.x, y2: dimP0.y,
-    stroke: "#fde68a", "stroke-width": Math.max(0.18, m * 0.08), opacity: 0.97,
-    "stroke-dasharray": `${(m * 1.3).toFixed(2)} ${(m * 0.7).toFixed(2)}`
+    x1: 0, y1: 0, x2: dimLen, y2: 0,
+    stroke: dimColor, "stroke-width": dimSw, opacity: 0.98
   }));
-  axisDimG.appendChild(el("circle", { cx: 0, cy: 0, r: dimDot, fill: "#fde68a" }));
-  axisDimG.appendChild(el("circle", { cx: dimP0.x, cy: dimP0.y, r: dimDot, fill: "#fde68a" }));
+  // İki uçta içe bakan ok başları (üçgen)
+  axisDimG.appendChild(el("path", {
+    d: `M 0 0 L ${dimAh} ${-dimAw} L ${dimAh} ${dimAw} Z`, fill: dimColor
+  }));
+  axisDimG.appendChild(el("path", {
+    d: `M ${dimLen} 0 L ${dimLen - dimAh} ${-dimAw} L ${dimLen - dimAh} ${dimAw} Z`, fill: dimColor
+  }));
+  // Uç merkez noktaları
+  axisDimG.appendChild(el("circle", { cx: 0, cy: 0, r: Math.max(0.7, m * 0.35), fill: dimColor }));
+  axisDimG.appendChild(el("circle", { cx: dimLen, cy: 0, r: Math.max(0.7, m * 0.35), fill: dimColor }));
   svg.appendChild(axisDimG);
   animCache.axisDim = axisDimG;
+
+  // Değer etiketi — çizginin ortasının biraz üstünde, koyu arkaplan pili.
+  // Ayrı grup: animasyonda yalnız konumu döndürülür, metin dik kalır.
+  const dimMidX  = dimLen / 2;
+  const dimMidY  = -Math.max(m * 2.2, 6);       // çizginin üstünde (perpendiküler)
+  const dimFs    = Math.max(m * 1.6, 5);
+  const dimTxt   = `a = ${r.a.toFixed(2)} mm`;
+  const dimPillW = dimTxt.length * dimFs * 0.56 + dimFs;
+  const dimPillH = dimFs * 1.7;
+  const axisDimLabel = el("g", { id: "axisDimLabel", transform: `translate(${dimMidX.toFixed(2)} ${dimMidY.toFixed(2)})` });
+  axisDimLabel.appendChild(el("rect", {
+    x: -dimPillW / 2, y: -dimPillH / 2, width: dimPillW, height: dimPillH,
+    rx: dimPillH * 0.3, fill: "#0f172a", opacity: 0.9,
+    stroke: dimColor, "stroke-width": Math.max(0.15, m * 0.06)
+  }));
+  axisDimLabel.appendChild(el("text", {
+    x: 0, y: dimFs * 0.35, "text-anchor": "middle",
+    fill: dimColor, "font-family": "system-ui", "font-size": dimFs, "font-weight": "bold"
+  }, dimTxt));
+  svg.appendChild(axisDimLabel);
+  animCache.axisDimLabel = axisDimLabel;
+  animCache.axisDimMid = { x: dimMidX, y: dimMidY };
 
   // --- SABİT EKSEN MESAFESİ ROZETİ (sol-alt köşe, dönmez, her zaman okunur) ---
   // Animasyonda carrier dönse de bu etiket sabit ve dik kalır; üstteki sarı
@@ -2752,9 +2788,17 @@ function animate(ts) {
     if (animCache.sunG)     animCache.sunG.setAttribute("transform",     `rotate(${animState.sunAngle.toFixed(3)})`);
     if (animCache.ringG)    animCache.ringG.setAttribute("transform",    `rotate(${animState.ringAngle.toFixed(3)})`);
     if (animCache.carrierG) animCache.carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
-    // Eksen mesafesi çizgisi carrierG dışında (öne alındı) ama planet 0'ı
-    // takip etmesi için aynı carrier açısıyla döndürülür.
-    if (animCache.axisDim)  animCache.axisDim.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
+    // Eksen mesafesi ölçüsü carrierG dışında (öne alındı) ama planet 0'ı takip
+    // etmeli: çizgi grubu carrier açısıyla döner, değer etiketi ise yalnızca
+    // KONUMU döndürülür (metin dik kalır, ters dönmez).
+    if (animCache.axisDim) animCache.axisDim.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
+    if (animCache.axisDimLabel && animCache.axisDimMid) {
+      const ca = animState.carrierAngle * DEG;
+      const { x: mx, y: my } = animCache.axisDimMid;
+      const rx = mx * Math.cos(ca) - my * Math.sin(ca);
+      const ry = mx * Math.sin(ca) + my * Math.cos(ca);
+      animCache.axisDimLabel.setAttribute("transform", `translate(${rx.toFixed(2)} ${ry.toFixed(2)})`);
+    }
     for (const { node, phase } of animCache.planets) {
       node.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
     }
