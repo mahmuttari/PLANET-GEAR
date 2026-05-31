@@ -1006,14 +1006,25 @@ function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf, strategy = "minimum" }
   checkSa("Ring",    zr, xr, true);
 
   // Sebep etiketleri
+  const isStandardZr = (zr === zs + 2 * zp);
   const reasons = {
     xs: xs_min > 0 ? `undercut (Zs=${zs}<${zmin.toFixed(1)})` :
         xs !== 0   ? "Niemann dağılım" : "gerekli değil (Zs ≥ zmin)",
     xp: xp_min > 0 ? `undercut (Zp=${zp}<${zmin.toFixed(1)})` :
         xp !== 0   ? "Niemann dağılım (sliding eşitliği)" : "gerekli değil (Zp ≥ zmin)",
-    xr: xr !== 0   ? "assembly: x_r = x_s + 2·x_p (ISO 21771, Zr=Zs+2Zp standardı)" :
-                     "gerekli değil",
+    xr: xr !== 0
+      ? (isStandardZr
+          ? "assembly: x_r = x_s + 2·x_p (Zr=Zs+2·Zp standart)"
+          : `Zr ≠ Zs+2·Zp (fark ${zr-(zs+2*zp)}) — eksen eşitliği için ISO 21771`)
+      : "gerekli değil",
   };
+
+  // Çalışma açıları: standart Zr ise eşit, değilse farklı (eksen mesafesi eşit)
+  const aw_eq_msg = (isStandardZr && Math.abs((awPR_deg ?? 0) - (awSP / DEG)) < 0.01)
+    ? `α_w(SP) = α_w(PR) = ${(awSP/DEG).toFixed(3)}° ✓ (Zr=Zs+2·Zp standart)`
+    : (awPR_deg
+        ? `α_w(SP) = ${(awSP/DEG).toFixed(3)}°, α_w(PR) = ${awPR_deg.toFixed(3)}° (farklı, ama a aynı ✓ Zr ≠ Zs+2·Zp için normal)`
+        : null);
 
   return {
     xs: Math.round(xs * 1000) / 1000,
@@ -1022,11 +1033,12 @@ function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf, strategy = "minimum" }
     note, warns, reasons,
     strategy,
     awSP_deg: awSP / DEG, awPR_deg,
+    aw_eq_msg,
     // formül çıktısı (UI'da görünecek)
     formula: cosAwPR > 0 && cosAwPR < 1
-      ? (zr === zs + 2 * zp
+      ? (isStandardZr
           ? `x_r = x_s + 2·x_p = ${xs.toFixed(3)} + 2·${xp.toFixed(3)} = ${xr.toFixed(3)}`
-          : `Zr ≠ Zs+2·Zp (fark: ${zr - (zs+2*zp)}). ISO 21771 genel formül: ` +
+          : `Zr − (Zs+2·Zp) = ${zr-(zs+2*zp)}. Genel ISO 21771: ` +
             `x_r = x_p + (inv α_w_pr − inv α)·(Zr−Zp)/(2·tan α) = ${xr.toFixed(3)}`)
       : `(Zr farkı profil kayması ile çözülemez)`,
   };
@@ -1632,10 +1644,8 @@ $("autoX").addEventListener("click", () => {
   lines.push(`<div>${fmtX("xₚ", result.xp, result.reasons.xp)}</div>`);
   lines.push(`<div>${fmtX("x_r", result.xr, result.reasons.xr)}</div>`);
   lines.push(`<div style="margin-top:4px; font-family:ui-monospace,monospace; color:var(--accent-2); font-size:10.5px;">${result.formula}</div>`);
-  if (result.awSP_deg && result.awPR_deg) {
-    lines.push(`<div style="margin-top:2px; color:var(--muted); font-size:10.5px;">
-      Çalışma α: sun-planet = ${result.awSP_deg.toFixed(3)}° = planet-ring = ${result.awPR_deg.toFixed(3)}° ✓
-    </div>`);
+  if (result.aw_eq_msg) {
+    lines.push(`<div style="margin-top:2px; color:var(--muted); font-size:10.5px;">${result.aw_eq_msg}</div>`);
   }
   if (result.note) lines.push(`<div style="color:var(--err); margin-top:4px;">⚠ ${result.note}</div>`);
   if (result.warns.length) lines.push(`<div style="color:var(--warn); margin-top:4px;">⚠ ${result.warns.join(" · ")}</div>`);
