@@ -2528,25 +2528,6 @@ function draw(r) {
     animCache.planets.push({ node: rot, phase });
   });
 
-  // --- EKSEN MESAFESİ a (güneş merkezi ↔ planet 0 merkezi) ---
-  // carrierG içinde, planetlerden SONRA eklenir: hem dişli gövdelerinin üstünde
-  // görünür hem de carrier dönünce planet 0'ı takip eder. (Okunaklı sayı için
-  // ayrıca dönmeyen sabit bir rozet svg köküne eklenir — draw() sonuna bakın.)
-  const dimP0 = planetPositions[0];           // = (a, 0), yatay sağdaki planet
-  const dimSw = Math.max(0.18, m * 0.08);
-  const dimDot = Math.max(0.7, m * 0.4);
-  const dimG = el("g", { id: "axisDim" });
-  // İki merkezi birleştiren ölçü çizgisi
-  dimG.appendChild(el("line", {
-    x1: 0, y1: 0, x2: dimP0.x, y2: dimP0.y,
-    stroke: "#fde68a", "stroke-width": dimSw, opacity: 0.95,
-    "stroke-dasharray": `${(m * 1.3).toFixed(2)} ${(m * 0.7).toFixed(2)}`
-  }));
-  // Uçlardaki merkez işaretleri
-  dimG.appendChild(el("circle", { cx: 0, cy: 0, r: dimDot, fill: "#fde68a" }));
-  dimG.appendChild(el("circle", { cx: dimP0.x, cy: dimP0.y, r: dimDot, fill: "#fde68a" }));
-  carrierG.appendChild(dimG);
-
   svg.appendChild(carrierG);
   animCache.carrierG = carrierG;
 
@@ -2671,6 +2652,23 @@ function draw(r) {
   addLabel(`Planet Z=${r.zp}  Ø${r.dp.toFixed(1)}`, p0.x, p0.y - r.dap / 2 - fontSize * 0.5, COLORS.planet);
   svg.appendChild(labels);
 
+  // --- EKSEN MESAFESİ ÖLÇÜ ÇİZGİSİ (güneş merkezi ↔ planet 0 merkezi) ---
+  // En son svg köküne eklenir → tüm dişli gövdelerinin ÖNÜNDE kalır, arkada
+  // kaybolmaz. Animasyonda carrierG ile AYNI açıyla döndürülür (bkz. animate),
+  // böylece planet 0'ı takip eder; statikte ikisi de döndürülmemiş = hizalı.
+  const dimP0  = planetPositions[0];           // = (a, 0)
+  const dimDot = Math.max(0.7, m * 0.4);
+  const axisDimG = el("g", { id: "axisDim" });
+  axisDimG.appendChild(el("line", {
+    x1: 0, y1: 0, x2: dimP0.x, y2: dimP0.y,
+    stroke: "#fde68a", "stroke-width": Math.max(0.18, m * 0.08), opacity: 0.97,
+    "stroke-dasharray": `${(m * 1.3).toFixed(2)} ${(m * 0.7).toFixed(2)}`
+  }));
+  axisDimG.appendChild(el("circle", { cx: 0, cy: 0, r: dimDot, fill: "#fde68a" }));
+  axisDimG.appendChild(el("circle", { cx: dimP0.x, cy: dimP0.y, r: dimDot, fill: "#fde68a" }));
+  svg.appendChild(axisDimG);
+  animCache.axisDim = axisDimG;
+
   // --- SABİT EKSEN MESAFESİ ROZETİ (sol-alt köşe, dönmez, her zaman okunur) ---
   // Animasyonda carrier dönse de bu etiket sabit ve dik kalır; üstteki sarı
   // ölçü çizgisi hangi mesafeyi gösterdiğini görsel olarak işaret eder.
@@ -2754,6 +2752,9 @@ function animate(ts) {
     if (animCache.sunG)     animCache.sunG.setAttribute("transform",     `rotate(${animState.sunAngle.toFixed(3)})`);
     if (animCache.ringG)    animCache.ringG.setAttribute("transform",    `rotate(${animState.ringAngle.toFixed(3)})`);
     if (animCache.carrierG) animCache.carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
+    // Eksen mesafesi çizgisi carrierG dışında (öne alındı) ama planet 0'ı
+    // takip etmesi için aynı carrier açısıyla döndürülür.
+    if (animCache.axisDim)  animCache.axisDim.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
     for (const { node, phase } of animCache.planets) {
       node.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
     }
