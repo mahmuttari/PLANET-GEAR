@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>İstinat Duvarı Projelendirme</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <h1>İstinat Duvarı Projelendirme</h1>
+    <p>Ölçüleri girin → ölçekli kesit çizimi ve stabilite hesabı</p>
+  </header>
+
+  <main class="layout">
+    <!-- SOL: GİRDİLER -->
+    <section class="panel inputs">
+      <div class="type-switch">
+        <button class="type-btn" data-type="cantilever">Konsol (Betonarme)</button>
+        <button class="type-btn" data-type="gravity">Ağırlık Duvarı</button>
+      </div>
+
+      <!-- KONSOL ÖLÇÜLERİ -->
+      <div data-type="cantilever">
+        <h2>Geometri — Konsol</h2>
+        <div class="grid">
+          <label>Toplam yükseklik H (m)<input id="c_H" type="number" step="0.05" value="6.00"></label>
+          <label>Temel kalınlığı tf (m)<input id="c_tf" type="number" step="0.05" value="0.60"></label>
+          <label>Ön ökçe Lt (m)<input id="c_Lt" type="number" step="0.05" value="1.00"></label>
+          <label>Arka topuk Lh (m)<input id="c_Lh" type="number" step="0.05" value="2.20"></label>
+          <label>Gövde üst kalınlığı (m)<input id="c_tTop" type="number" step="0.05" value="0.30"></label>
+          <label>Gövde alt kalınlığı (m)<input id="c_tBot" type="number" step="0.05" value="0.60"></label>
+        </div>
+      </div>
+
+      <!-- AĞIRLIK ÖLÇÜLERİ -->
+      <div data-type="gravity">
+        <h2>Geometri — Ağırlık</h2>
+        <div class="grid">
+          <label>Yükseklik H (m)<input id="g_H" type="number" step="0.05" value="4.00"></label>
+          <label>Üst genişlik a (m)<input id="g_a" type="number" step="0.05" value="0.80"></label>
+          <label>Alt genişlik b (m)<input id="g_b" type="number" step="0.05" value="2.80"></label>
+        </div>
+      </div>
+
+      <h2>Zemin & Malzeme</h2>
+      <div class="grid">
+        <label>Dolgu birim ağırlığı γ (kN/m³)<input id="gammaSoil" type="number" step="0.5" value="18"></label>
+        <label>Beton birim ağırlığı γc (kN/m³)<input id="gammaConcrete" type="number" step="0.5" value="24"></label>
+        <label>İçsel sürtünme açısı φ (°)<input id="phi" type="number" step="1" value="30"></label>
+        <label>Dolgu yüzey eğimi β (°)<input id="beta" type="number" step="1" value="0"></label>
+        <label>Sürşarj yükü q (kPa)<input id="q" type="number" step="1" value="10"></label>
+        <label>Taban sürtünme açısı (°)<input id="baseFriction" type="number" step="1" placeholder="boş = φ"></label>
+        <label>Zemin emniyet gerilmesi (kPa)<input id="sigmaAllow" type="number" step="5" value="250"></label>
+      </div>
+
+      <h2>Güvenlik Sayıları</h2>
+      <div class="grid">
+        <label>Devrilme min<input id="fsOtMin" type="number" step="0.1" value="1.5"></label>
+        <label>Kayma min<input id="fsSlMin" type="number" step="0.1" value="1.5"></label>
+      </div>
+
+      <div class="actions">
+        <button id="btnCalc" class="primary">Hesapla & Çiz</button>
+        <button id="btnDownload">SVG indir</button>
+        <button id="btnPrint">Yazdır</button>
+      </div>
+
+      <div id="messages" class="messages"></div>
+    </section>
+
+    <!-- ORTA: ÇİZİM -->
+    <section class="panel drawing-panel">
+      <div id="drawing" class="drawing"></div>
+    </section>
+
+    <!-- SAĞ: SONUÇLAR -->
+    <section class="panel results-panel">
+      <div id="results" class="results"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <small>
+      Yöntem: Rankine aktif itki, 1 m duvar uzunluğu için. Pasif direnç ihmal edilmiştir (güvenli taraf).
+      Ön tasarım amaçlıdır; nihai proje için yürürlükteki yönetmeliklere (TS, Eurocode 7 vb.) göre kontrol gereklidir.
+    </small>
+  </footer>
+
+  <script src="js/engineering.js"></script>
+  <script src="js/geometry.js"></script>
+  <script src="js/draw.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
