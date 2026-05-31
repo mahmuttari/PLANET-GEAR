@@ -741,6 +741,7 @@
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
         <button class="btn secondary" id="dxfBtn"    style="flex:0 0 auto; padding:6px 12px;">DXF İndir</button>
         <button class="btn secondary" id="dwgBtn"    style="flex:0 0 auto; padding:6px 12px;">DWG İndir</button>
+        <button class="btn secondary" id="pdfBtn"    style="flex:0 0 auto; padding:6px 12px;">PDF İndir</button>
       </div>
       <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
       <div class="legend">
@@ -780,6 +781,8 @@
   kritik uygulamalar için tam ISO/AGMA hesabı yapın.
 </footer>
 
+<!-- jsPDF for PDF export -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script>
 // =============================================================================
 //                                MATEMATİK
@@ -2471,6 +2474,38 @@ function draw(r) {
   }
   carrierG.appendChild(el("circle", { cx: 0, cy: 0, r: m * 2.2, fill: COLORS.carrier, opacity: 0.30 }));
 
+  // İlk planet (yatay sağda) için eksen mesafesi ölçü etiketi:
+  // sun merkezi (0,0) → planet 0 (a, 0). Çizgi + uçlarda küçük marker + metin.
+  const p0 = planetPositions[0];
+  const dimY = -Math.max(m * 0.9, 2.5);  // çizginin biraz yukarısına
+  const tickH = Math.max(m * 0.4, 1);
+  const dimG = el("g", { id: "axisDim", opacity: 0.9 });
+  // Ölçü çizgisi (sun merkezinden planet merkezine, biraz üstte)
+  dimG.appendChild(el("line", {
+    x1: 0, y1: dimY, x2: p0.x, y2: dimY,
+    stroke: "#e2e8f0", "stroke-width": Math.max(0.15, m * 0.06),
+    "stroke-dasharray": `${m * 0.7} ${m * 0.4}`
+  }));
+  // Uç çentikleri
+  dimG.appendChild(el("line", {
+    x1: 0, y1: dimY - tickH, x2: 0, y2: dimY + tickH,
+    stroke: "#e2e8f0", "stroke-width": Math.max(0.15, m * 0.08)
+  }));
+  dimG.appendChild(el("line", {
+    x1: p0.x, y1: dimY - tickH, x2: p0.x, y2: dimY + tickH,
+    stroke: "#e2e8f0", "stroke-width": Math.max(0.15, m * 0.08)
+  }));
+  // Mesafe etiketi
+  const dimFs = Math.max(m * 0.9, 2.5);
+  dimG.appendChild(el("text", {
+    x: p0.x / 2, y: dimY - tickH - dimFs * 0.4,
+    "text-anchor": "middle", fill: "#e2e8f0",
+    "font-family": "system-ui", "font-size": dimFs, "font-weight": "bold"
+  }, `a = ${r.a.toFixed(2)} mm`));
+  // Carrier grubu içine değil, yan grup olarak: carrier dönerken etiket de
+  // planet pozisyonunu takip etmesi için carrierG'nin İÇİNE koyalım.
+  carrierG.appendChild(dimG);
+
   // Planet dişliler. Her birine statik mesh fazı (planetPhase) uygulanır;
   // assembly koşulu sağlanırsa tüm planetler için aynı, sağlanmazsa farklı.
   // Aynı zamanda animasyon cache'ini doldurur (60fps döngüsünde DOM sorgusu olmasın).
@@ -3050,6 +3085,145 @@ function downloadDwgPackage() {
   setTimeout(() => dl(readme, `DWG_NASIL_DONUSTURULUR_${cfg}.txt`, "text/plain"), 250);
 }
 $("dwgBtn").addEventListener("click", downloadDwgPackage);
+
+// PDF çıktısı: jsPDF (CDN) ile dişli çizimi (SVG→PNG) + tablo + assembly özeti.
+// Tek sayfa A4 yatay. SVG bg "#0a1020", canvas üzerinde aynı zeminde basılır.
+function svgToPngDataURL(svgEl, width = 1100, height = 1100) {
+  return new Promise((resolve, reject) => {
+    const svgString = new XMLSerializer().serializeToString(svgEl);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = width; canvas.height = height;
+      const ctx = canvas.getContext("2d");
+      ctx.fillStyle = "#0a1020";
+      ctx.fillRect(0, 0, width, height);
+      ctx.drawImage(img, 0, 0, width, height);
+      resolve(canvas.toDataURL("image/png"));
+    };
+    img.onerror = (e) => reject(e);
+    img.src = "data:image/svg+xml;charset=utf-8," + encodeURIComponent(svgString);
+  });
+}
+
+$("pdfBtn").addEventListener("click", async () => {
+  if (!lastResult) return;
+  if (typeof window.jspdf === "undefined") {
+    alert("PDF kütüphanesi yüklenemedi (CDN engelli olabilir). DXF kullanın.");
+    return;
+  }
+  const { jsPDF } = window.jspdf;
+  const r = lastResult;
+  const cfg = `z${r.zs}-${r.zp}-${r.zr}_m${r.m}`;
+
+  try {
+    // SVG → PNG
+    const svgEl = $("diagram");
+    const pngData = await svgToPngDataURL(svgEl, 1200, 1200);
+
+    // A4 yatay (297 x 210 mm)
+    const pdf = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const PW = 297, PH = 210;
+
+    // --- Başlık ---
+    pdf.setFontSize(16); pdf.setFont("helvetica", "bold");
+    pdf.text("Planet Dişli Seti — Tasarım Çizimi", 10, 12);
+    pdf.setFontSize(9); pdf.setFont("helvetica", "normal");
+    pdf.text(`Zs=${r.zs}  ·  Zp=${r.zp}  ·  Zr=${r.zr}  ·  N=${r.N}  ·  m=${r.m} mm  ·  α=${r.alpha}°`, 10, 18);
+    pdf.text(`Tarih: ${new Date().toLocaleString("tr-TR")}`, 10, 23);
+
+    // --- Çizim (sol blok) ---
+    const drawX = 8, drawY = 28, drawW = 130, drawH = 130;
+    pdf.setDrawColor(150); pdf.rect(drawX, drawY, drawW, drawH);
+    pdf.addImage(pngData, "PNG", drawX, drawY, drawW, drawH);
+    pdf.setFontSize(7);
+    pdf.text(`a (sun→planet) = ${r.a.toFixed(3)} mm   ·   a_std = ${r.aStd.toFixed(3)} mm`,
+             drawX, drawY + drawH + 4);
+    pdf.text(`i = ${r.ratio.toFixed(4)}   (${r.ratioFormula})`, drawX, drawY + drawH + 8);
+
+    // --- DIN 3960 Tablosu (sağ blok) ---
+    const tx = 145, ty = 28;
+    pdf.setFontSize(11); pdf.setFont("helvetica", "bold");
+    pdf.text("DIN 3960 — Dişli Boyutları", tx, ty);
+    pdf.setFontSize(8); pdf.setFont("helvetica", "normal");
+    const colX = [tx, tx + 50, tx + 80, tx + 110, tx + 140];
+    let y = ty + 5;
+    const header = ["Parametre", "Güneş", "Planet", "Ring"];
+    pdf.setFont("helvetica", "bold");
+    header.forEach((h, i) => pdf.text(h, colX[i], y));
+    pdf.setLineWidth(0.2); pdf.line(tx, y + 1, tx + 145, y + 1);
+    pdf.setFont("helvetica", "normal");
+    y += 5;
+    const fmt = (v, u = "") => isFinite(v) ? v.toFixed(3) + u : "—";
+    const row = (label, sun, plnt, ring) => {
+      pdf.text(label, colX[0], y);
+      pdf.text(String(sun), colX[1], y);
+      pdf.text(String(plnt), colX[2], y);
+      pdf.text(String(ring), colX[3], y);
+      y += 4;
+    };
+    row("Diş sayısı z", r.gSun.z, r.gPlanet.z, r.gRing.z);
+    row("Modül m [mm]", fmt(r.gSun.m), fmt(r.gPlanet.m), fmt(r.gRing.m));
+    row("Profil kayması x", fmt(r.gSun.x), fmt(r.gPlanet.x), fmt(r.gRing.x));
+    row("Pitch çapı d [mm]", fmt(r.gSun.d), fmt(r.gPlanet.d), fmt(r.gRing.d));
+    row("Base çapı db [mm]", fmt(r.gSun.db), fmt(r.gPlanet.db), fmt(r.gRing.db));
+    row("Tip çapı da [mm]", fmt(r.gSun.da), fmt(r.gPlanet.da), fmt(r.gRing.da));
+    row("Root çapı df [mm]", fmt(r.gSun.df), fmt(r.gPlanet.df), fmt(r.gRing.df));
+    row("Diş üstü ha [mm]", fmt(r.gSun.ha), fmt(r.gPlanet.ha), fmt(r.gRing.ha));
+    row("Diş dibi hf [mm]", fmt(r.gSun.hf), fmt(r.gPlanet.hf), fmt(r.gRing.hf));
+    row("Boşluk c [mm]", fmt(r.gSun.c), fmt(r.gPlanet.c), fmt(r.gRing.c));
+    row("p adım [mm]", fmt(r.gSun.p), fmt(r.gPlanet.p), fmt(r.gRing.p));
+    row("pb base adım [mm]", fmt(r.gSun.pb), fmt(r.gPlanet.pb), fmt(r.gRing.pb));
+    row("s pitch'te [mm]", fmt(r.gSun.s), fmt(r.gPlanet.s), fmt(r.gRing.s));
+    row("sa tepede [mm]", fmt(r.gSun.sa), fmt(r.gPlanet.sa), fmt(r.gRing.sa));
+    row("αa tepe [°]", fmt(r.gSun.alpha_a_deg), fmt(r.gPlanet.alpha_a_deg), fmt(r.gRing.alpha_a_deg));
+    row("zmin", fmt(r.gSun.z_min), fmt(r.gPlanet.z_min), fmt(r.gRing.z_min));
+
+    // --- Assembly + Mukavemet bilgisi (sol-alt) ---
+    y = drawY + drawH + 14;
+    pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
+    pdf.text("Assembly + Kinematik", 10, y);
+    pdf.setFontSize(8); pdf.setFont("helvetica", "normal");
+    y += 5;
+    const irow = (a, b) => { pdf.text(`${a}:`, 10, y); pdf.text(b, 55, y); y += 4; };
+    irow("Çevrim oranı i", `${r.ratio.toFixed(4)}  (${r.ratioFormula})`);
+    irow("Planet sayısı N", String(r.N));
+    irow("Eksen mesafesi a", `${r.a.toFixed(3)} mm  (sun → planet center)`);
+    irow("Giriş n₁ / T₁", `${r.rpm} d/dk  /  ${r.T_input.toFixed(2)} Nm`);
+    irow("Çıkış n₂ / T₂", `${r.outRpm.toFixed(2)} d/dk  /  ${r.T_out.toFixed(2)} Nm`);
+    irow("Pitch hızı v", `${r.v_pitch.toFixed(3)} m/s`);
+    irow("Malzeme", r.mat.name);
+    irow("Yüzey gen. b", `${r.b} mm`);
+    irow("εα (S–P / P–R)", `${r.meshSP.epsAlpha.toFixed(3)} / ${r.meshPR.epsAlpha.toFixed(3)}`);
+
+    // --- Mukavemet + backlash (orta-alt) ---
+    y = drawY + drawH + 14;
+    const mx = 145;
+    pdf.setFontSize(10); pdf.setFont("helvetica", "bold");
+    pdf.text("Mukavemet + Backlash", mx, y);
+    pdf.setFontSize(8); pdf.setFont("helvetica", "normal");
+    y += 5;
+    const mrow = (a, b) => { pdf.text(`${a}:`, mx, y); pdf.text(b, mx + 55, y); y += 4; };
+    mrow("Ft/planet", `${r.FtPerPlanet.toFixed(1)} N`);
+    mrow("σ_F (AGMA)", `${r.sigmaB_AGMA.toFixed(1)} MPa  →  SF=${r.SF_bend.toFixed(2)}`);
+    mrow("σ_H (Hertz)", `${r.sigmaH_SP.toFixed(1)} MPa  →  SH=${r.SF_contact.toFixed(2)}`);
+    mrow("İletilebilir T (SF=1.5)", `${r.T_allow.toFixed(2)} Nm`);
+    mrow("Backlash jt / sınıf", `${r.backlash.jt.toFixed(3)} mm  ·  ${r.backlash.cls}`);
+    mrow("Δs (her dişli)", `${r.backlash.ds_per_gear.toFixed(3)} mm`);
+    mrow("Yağ boşluğu c_oil", `${r.backlash.c_oil.toFixed(3)} mm`);
+    mrow("Toplam radyal play", `${r.backlash.total_radial_play.toFixed(3)} mm`);
+
+    // Footer
+    pdf.setFontSize(7); pdf.setTextColor(120);
+    pdf.text("Generated by Planet Dişli Hesaplayıcı  ·  AC1009 DXF, ISO 21771 profil kayması, DIN 3960 boyutlandırma",
+             10, PH - 5);
+
+    pdf.save(`planet_dis_${cfg}.pdf`);
+  } catch (e) {
+    alert("PDF üretiminde hata: " + e.message);
+    console.error(e);
+  }
+});
 
 $("exportBtn").addEventListener("click", () => {
   const svg = $("diagram");
