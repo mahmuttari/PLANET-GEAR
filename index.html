@@ -720,6 +720,45 @@
       </div>
     </div>
 
+    <div class="panel">
+      <h2><span class="collapser" data-target="machineBody">4 · Torna / İmalat Ölçüleri <span class="arrow">▼</span></span></h2>
+      <div class="panel-body" id="machineBody">
+        <div class="help" style="border-left-color: var(--accent-2);">
+          Kütük (blank) torna ölçüleri otomatik hesaplanır: dış çap = diş ucu çapı,
+          delik H7, dış çap h-tolerans (ISO 286 IT), pah ve yüzey pürüzlülüğü.
+          Aşağıdaki alanlar <em>boş = otomatik</em>; doldurursanız o değer kullanılır.
+        </div>
+        <div class="row three">
+          <div class="field">
+            <label>Güneş şaft deliği Ø <span class="unit">mm</span></label>
+            <input type="number" id="boreSun" value="" step="0.5" min="0" placeholder="otomatik">
+          </div>
+          <div class="field">
+            <label>Planet pim deliği Ø <span class="unit">mm</span></label>
+            <input type="number" id="borePlanet" value="" step="0.5" min="0" placeholder="otomatik">
+          </div>
+          <div class="field">
+            <label>Ring jant kalınlığı <span class="unit">mm</span></label>
+            <input type="number" id="ringRim" value="" step="0.5" min="0" placeholder="otomatik">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Pah (chamfer) <span class="unit">mm × 45°</span></label>
+            <input type="number" id="chamfer" value="" step="0.1" min="0" placeholder="otomatik">
+          </div>
+          <div class="field">
+            <label>Dış çap toleransı (ISO 286)</label>
+            <select id="odTol">
+              <option value="9" selected>h9 (kütük dış çap)</option>
+              <option value="8">h8</option>
+              <option value="11">h11 (kaba)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- AKSIYONLAR -->
     <div class="actions">
       <button class="btn" id="calcBtn">Hesapla & Çiz</button>
@@ -738,6 +777,8 @@
         <label>Base Çemberleri <input type="checkbox" id="showBase"></label>
         <label>Mesh Temas Bölgesi <input type="checkbox" id="showPitchMarks" checked></label>
         <label>Çap Ölçüleri (Ø) <input type="checkbox" id="showDiameters" checked></label>
+        <label>Gerçekçi Görünüm <input type="checkbox" id="realistic" checked></label>
+        <label>Torna Kesiti <input type="checkbox" id="showSection" checked></label>
         <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
         <button class="btn secondary" id="dxfBtn"    style="flex:0 0 auto; padding:6px 12px;">DXF İndir</button>
@@ -745,6 +786,12 @@
         <button class="btn secondary" id="pdfBtn"    style="flex:0 0 auto; padding:6px 12px;">PDF İndir</button>
       </div>
       <svg id="diagram" viewBox="-300 -300 600 600" preserveAspectRatio="xMidYMid meet"></svg>
+      <div id="sectionWrap" style="margin-top:8px; border-top:1px solid var(--border); padding-top:8px;">
+        <div style="font-size:12px; color:var(--muted); margin-bottom:4px; font-weight:600;">
+          Eksenel Kesit (A–A) — Torna İmalat Ölçüleri
+        </div>
+        <svg id="sectionView" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid meet" style="width:100%; height:auto; background:var(--panel-2); border-radius:8px;"></svg>
+      </div>
       <div class="legend">
         <span><span class="dot" style="background:#fbbf24"></span>Güneş (Sun)</span>
         <span><span class="dot" style="background:#60a5fa"></span>Planet</span>
@@ -930,6 +977,60 @@ function backlashCalc({ m, alpha, jt_user, c_oil_user }) {
     note: jt > 0.2 * m
       ? "⚠ Yüksek backlash — düşük hassasiyetli uygulamalar için. Tork transfer/şok yüküne dikkat."
       : null,
+  };
+}
+
+// ISO 286 standart tolerans (IT) — D [mm], grade (5..16) → tolerans bandı [mm].
+// Tolerans birimi i = 0.45·∛D + 0.001·D (µm). IT katsayıları (IT5=7i ... IT11=100i).
+function itGrade(D, grade) {
+  const Dm = Math.max(1, D);
+  const i = 0.45 * Math.cbrt(Dm) + 0.001 * Dm;        // µm
+  const mult = { 5:7, 6:10, 7:16, 8:25, 9:40, 10:64, 11:100, 12:160, 13:250, 14:400 };
+  const k = mult[grade] || 40;
+  return (k * i) / 1000;                               // mm
+}
+
+// Torna (kütük) imalat ölçüleri — her dişli için hesaplanır.
+// Harici dişli kütüğü: dış çap = diş ucu çapı da; merkez delik (H7); genişlik b; pah.
+// Dahili (ring) kütüğü: dış çap = diş dibi çapı + 2·jant; iç (kesilecek) çap ≈ da_r.
+function computeTurning(r, opts) {
+  const { m, b } = r;
+  const odGrade = opts.odGrade || 9;
+  // Otomatik varsayılanlar (kullanıcı boş bıraktıysa)
+  const boreSun    = opts.boreSun    > 0 ? opts.boreSun    : Math.max(6, Math.round(r.dfs / 3));
+  const borePlanet = opts.borePlanet > 0 ? opts.borePlanet : Math.max(5, Math.round(r.dfp / 3.2));
+  const ringRim    = opts.ringRim    > 0 ? opts.ringRim    : Math.max(2.5 * m, 6);
+  const chamfer    = opts.chamfer    > 0 ? opts.chamfer    : Math.max(0.4, Math.round(0.5 * m * 10) / 10);
+  const hub = (bore) => Math.round((bore + Math.max(4, 1.8 * m)) * 2) / 2; // göbek (hub) çapı
+  // tol metin yardımcısı
+  const odTolStr = (D) => `h${odGrade} (0 / −${itGrade(D, odGrade).toFixed(3)})`;
+  const boreTolStr = (D) => `H7 (+${itGrade(D, 7).toFixed(3)} / 0)`;
+  const widthTol = itGrade(b, 12);
+  const ext = (name, da, df, d, bore) => ({
+    name, type: "harici",
+    od: da, odTol: odTolStr(da),
+    bore, boreTol: boreTolStr(bore),
+    hub: hub(bore),
+    width: b, widthTol,
+    chamfer,
+    root: df, pitch: d,
+    raOuter: 3.2, raBore: 1.6,
+  });
+  const ringOuter = r.dfr + 2 * ringRim;
+  return {
+    sun:    ext("Güneş",  r.das, r.dfs, r.ds, boreSun),
+    planet: ext("Planet", r.dap, r.dfp, r.dp, borePlanet),
+    ring: {
+      name: "Ring", type: "dahili",
+      od: ringOuter, odTol: odTolStr(ringOuter),
+      bore: r.dar, boreTol: `(diş ucu, kesilir)`,
+      innerCut: r.dar, root: r.dfr, pitch: r.dr,
+      rim: ringRim,
+      width: b, widthTol,
+      chamfer,
+      raOuter: 3.2, raBore: 1.6,
+    },
+    common: { odGrade, chamfer, ringRim },
   };
 }
 
@@ -2166,6 +2267,17 @@ function calculate() {
       jt_user: parseFloat($("backlashJt").value),
       c_oil_user: parseFloat($("oilClearance").value),
     }),
+    // torna / imalat (kütük) ölçüleri
+    turning: computeTurning(
+      { m, b, das, dfs, ds, dap, dfp, dp, dar, dfr, dr },
+      {
+        boreSun:    parseFloat($("boreSun").value),
+        borePlanet: parseFloat($("borePlanet").value),
+        ringRim:    parseFloat($("ringRim").value),
+        chamfer:    parseFloat($("chamfer").value),
+        odGrade:    parseInt($("odTol").value),
+      }
+    ),
     // doğrulama
     errors
   };
@@ -2301,6 +2413,33 @@ function renderResults(r) {
     </div>
   `;
   $("results-geometri").innerHTML = tbl;
+
+  // ----- TORNA / İMALAT (kütük) ÖLÇÜLERİ -----
+  if (r.turning) {
+    const S = r.turning.sun, P = r.turning.planet, R = r.turning.ring;
+    const trow = (label, sv, pv, rv) =>
+      `<tr><td>${label}</td><td class="sun">${sv}</td><td class="planet">${pv}</td><td class="ring">${rv}</td></tr>`;
+    const tbl2 = `
+      <table class="geo-table" style="margin-top:14px;">
+        <thead><tr><th>Torna / İmalat (kütük)</th><th class="sun">Güneş</th><th class="planet">Planet</th><th class="ring">Ring (iç)</th></tr></thead>
+        <tbody>
+          ${trow("Kütük dış çapı Ø", S.od.toFixed(2), P.od.toFixed(2), R.od.toFixed(2))}
+          ${trow("Dış çap toleransı", S.odTol, P.odTol, R.odTol)}
+          ${trow("Merkez delik / iç Ø", S.bore.toFixed(2), P.bore.toFixed(2), `${R.innerCut.toFixed(2)} (diş ucu)`)}
+          ${trow("Delik toleransı", S.boreTol, P.boreTol, R.boreTol)}
+          ${trow("Göbek Ø / jant", S.hub.toFixed(1), P.hub.toFixed(1), `jant ${R.rim.toFixed(1)} mm`)}
+          ${trow("Eksenel genişlik b", `${S.width.toFixed(1)} ±${S.widthTol.toFixed(2)}`, `${P.width.toFixed(1)} ±${P.widthTol.toFixed(2)}`, `${R.width.toFixed(1)} ±${R.widthTol.toFixed(2)}`)}
+          ${trow("Pah (chamfer)", `${S.chamfer}×45°`, `${P.chamfer}×45°`, `${R.chamfer}×45°`)}
+          ${trow("Yüzey Ra (dış/delik)", `${S.raOuter}/${S.raBore}`, `${P.raOuter}/${P.raBore}`, `${R.raOuter}/${R.raBore}`)}
+        </tbody>
+      </table>
+      <div class="help" style="border-left-color: var(--accent-2);">
+        <strong>Torna kütük resmi:</strong> Diş açma (hobbing/fellows) öncesi kütük bu ölçülerde tornalanır.
+        Dış çap = diş ucu çapı (da); delik H7 geçme; eksenel genişlik = yüzey genişliği b.
+        Toleranslar ISO 286 IT esaslı. Eksenel kesit (A–A) çizim altında gösterilir.
+      </div>`;
+    $("results-geometri").innerHTML += tbl2;
+  }
 
   // ----- MUKAVEMET -----
   const sfClass = statusClass(r.SF_bend, 1.5, 1.0);
@@ -2460,6 +2599,29 @@ function draw(r) {
   const alpha = r.alpha;
   const m = r.m;
 
+  // Gerçekçi (metalik) görünüm: radyal gradyan dolgular + merkez delikleri + göbek.
+  const realistic = $("realistic").checked;
+  if (realistic) {
+    const defs = el("defs");
+    const metal = (id, c0, c1, c2) => {
+      const g = el("radialGradient", { id, cx: "40%", cy: "35%", r: "80%" });
+      g.appendChild(el("stop", { offset: "0%",   "stop-color": c0 }));
+      g.appendChild(el("stop", { offset: "55%",  "stop-color": c1 }));
+      g.appendChild(el("stop", { offset: "100%", "stop-color": c2 }));
+      defs.appendChild(g);
+    };
+    metal("gradSun",    "#fde7b0", "#b9821f", "#5b3a0c");
+    metal("gradPlanet", "#c2dbff", "#3f6ea8", "#152f4d");
+    metal("gradRing",   "#ddd2ff", "#6b5bb0", "#221d45");
+    metal("gradSteel",  "#cfd8e3", "#7d8b9c", "#2b3340");
+    svg.appendChild(defs);
+  }
+  const fillSun    = realistic ? "url(#gradSun)"    : COLORS.sunBody;
+  const fillPlanet = realistic ? "url(#gradPlanet)" : COLORS.planetBody;
+  const fillRing   = realistic ? "url(#gradRing)"   : COLORS.ringBody;
+  const boreFill   = "#0a0f18";   // delik (koyu)
+  const t = r.turning || null;    // torna ölçüleri (delik/göbek için)
+
   // Stroke genişlikleri modüle göre ölçeklensin. viewBox birimi mm olduğundan
   // mutlak değerler küçük dişlilerde görece kalın görünüyordu. Modülün ~%10'u
   // gerçek dişli desenleriyle örtüşür (DIN: çizgi kalınlığı ≈ 0.1·m önerilir).
@@ -2479,14 +2641,23 @@ function draw(r) {
 
   // --- RING (en dıştaki çember + iç dişler) ---
   const ringG = el("g", { id: "ringG" });
+  // Dış jant: gerçekçi modda kütük dış çapı (df + 2·jant) kadar; değilse pitch payı.
+  const ringOuterR = realistic && t ? t.ring.od / 2 : (r.dfr / 2) + ringDiscPad;
   ringG.appendChild(el("circle", {
-    cx: 0, cy: 0, r: (r.dfr / 2) + ringDiscPad,
-    fill: COLORS.ringBody, stroke: COLORS.ring, "stroke-width": sw
+    cx: 0, cy: 0, r: ringOuterR,
+    fill: fillRing, stroke: COLORS.ring, "stroke-width": sw
   }));
   ringG.appendChild(el("path", {
     d: gearPathFor(r.zr, r.xr, r.dr / 2, true),
     fill: COLORS.cavityFill, stroke: COLORS.ring, "stroke-width": sw
   }));
+  if (realistic) {
+    // Jant iç/dış pah vurgusu
+    ringG.appendChild(el("circle", {
+      cx: 0, cy: 0, r: ringOuterR - Math.max(0.4, m*0.5), fill: "none",
+      stroke: "#ffffff", "stroke-width": Math.max(0.1, m*0.04), opacity: 0.18
+    }));
+  }
   appendRefCircles(ringG, { ...refOpts, r_pitch: r.dr / 2, r_base: r.dbr / 2, color: COLORS.ring });
   svg.appendChild(ringG);
   animCache.ringG = ringG;
@@ -2523,10 +2694,17 @@ function draw(r) {
       "data-planet": i,
     });
     const rot = el("g", { class: "planet-rot", transform: `rotate(${phase.toFixed(3)})` });
-    rot.appendChild(el("path", { d: planetPath, fill: COLORS.planetBody, stroke: COLORS.planet, "stroke-width": sw }));
-    rot.appendChild(el("circle", { cx: (r.dp / 2) * 0.6, cy: 0, r: m * 0.4, fill: COLORS.sun }));
+    rot.appendChild(el("path", { d: planetPath, fill: fillPlanet, stroke: COLORS.planet, "stroke-width": sw }));
+    if (!realistic) rot.appendChild(el("circle", { cx: (r.dp / 2) * 0.6, cy: 0, r: m * 0.4, fill: COLORS.sun }));
     appendRefCircles(rot, { ...refOpts, r_pitch: r.dp / 2, r_base: r.dbp / 2, color: COLORS.planet });
     pg.appendChild(rot);
+    // Gerçekçi: göbek (hub) + pim deliği (merkez). pg'ye eklenir → dönmez.
+    if (realistic && t) {
+      const hubR = t.planet.hub / 2, boreR = t.planet.bore / 2;
+      pg.appendChild(el("circle", { cx: 0, cy: 0, r: hubR, fill: "url(#gradSteel)", stroke: COLORS.planet, "stroke-width": Math.max(0.08, m*0.04), opacity: 0.95 }));
+      pg.appendChild(el("circle", { cx: 0, cy: 0, r: boreR, fill: boreFill, stroke: "#94a3b8", "stroke-width": Math.max(0.1, m*0.05) }));
+      pg.appendChild(el("circle", { cx: 0, cy: 0, r: boreR*0.92, fill: "none", stroke: "#ffffff", "stroke-width": Math.max(0.06, m*0.03), opacity: 0.2 }));
+    }
     carrierG.appendChild(pg);
     animCache.planets.push({ node: rot, phase });
   });
@@ -2538,13 +2716,24 @@ function draw(r) {
   const sunG = el("g", { id: "sunG" });
   sunG.appendChild(el("path", {
     d: gearPathFor(r.zs, r.xs, r.ds / 2, false),
-    fill: COLORS.sunBody, stroke: COLORS.sun, "stroke-width": sw
+    fill: fillSun, stroke: COLORS.sun, "stroke-width": sw
   }));
-  sunG.appendChild(el("circle", { cx: 0, cy: 0, r: m * 1.0, fill: COLORS.cavityFill, stroke: COLORS.sun, "stroke-width": sw }));
-  sunG.appendChild(el("line", {
-    x1: 0, y1: 0, x2: (r.ds / 2) * 0.85, y2: 0,
-    stroke: "#fff", "stroke-width": Math.max(0.8, m * 0.25), opacity: 0.7
-  }));
+  if (realistic && t) {
+    // Göbek + şaft deliği (kamalı kanal göstergesiyle)
+    const hubR = t.sun.hub / 2, boreR = t.sun.bore / 2;
+    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: hubR, fill: "url(#gradSteel)", stroke: COLORS.sun, "stroke-width": Math.max(0.08, m*0.04), opacity: 0.95 }));
+    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: boreR, fill: boreFill, stroke: "#94a3b8", "stroke-width": Math.max(0.1, m*0.05) }));
+    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: boreR*0.92, fill: "none", stroke: "#ffffff", "stroke-width": Math.max(0.06, m*0.03), opacity: 0.2 }));
+    // kama kanalı (keyway)
+    const kw = Math.max(0.8, boreR*0.28);
+    sunG.appendChild(el("rect", { x: -kw/2, y: -boreR - kw*0.9, width: kw, height: kw*0.9, fill: boreFill, stroke: "#94a3b8", "stroke-width": Math.max(0.08, m*0.04) }));
+  } else {
+    sunG.appendChild(el("circle", { cx: 0, cy: 0, r: m * 1.0, fill: COLORS.cavityFill, stroke: COLORS.sun, "stroke-width": sw }));
+    sunG.appendChild(el("line", {
+      x1: 0, y1: 0, x2: (r.ds / 2) * 0.85, y2: 0,
+      stroke: "#fff", "stroke-width": Math.max(0.8, m * 0.25), opacity: 0.7
+    }));
+  }
   appendRefCircles(sunG, { ...refOpts, r_pitch: r.ds / 2, r_base: r.dbs / 2, color: COLORS.sun });
   svg.appendChild(sunG);
   animCache.sunG = sunG;
@@ -2818,6 +3007,145 @@ function draw(r) {
 }
 
 // =============================================================================
+//        EKSENEL KESİT (A–A) — TORNA İMALAT RESMİ (yandan görünüş)
+// =============================================================================
+// Her dişli kütüğü ayrı bir sütunda, kendi ölçeğinde eksenel yarı-kesit olarak
+// çizilir: dış çap, delik/iç çap, göbek, pah + eksenel genişlik b ve radyal Ø
+// kotaları. Gerçek imalat resmi mantığı.
+function drawSection(r) {
+  const svg = $("sectionView");
+  if (!svg) return;
+  svg.innerHTML = "";
+  if (!$("showSection").checked || !r.turning) {
+    svg.setAttribute("viewBox", "0 0 600 60");
+    if (!$("showSection").checked) return;
+    svg.appendChild(el("text", { x: 300, y: 35, "text-anchor": "middle", fill: "#64748b",
+      "font-family": "system-ui", "font-size": 14 }, "Torna kesiti için geçerli bir hesap gerekli."));
+    return;
+  }
+  const t = r.turning, m = r.m, b = r.b;
+  const W = 900, H = 330;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+
+  // Kesit tarama (hatch) deseni
+  const defs = el("defs");
+  const mkHatch = (id, color) => {
+    const p = el("pattern", { id, width: 7, height: 7, patternUnits: "userSpaceOnUse", patternTransform: "rotate(45)" });
+    p.appendChild(el("rect", { width: 7, height: 7, fill: color, opacity: 0.18 }));
+    p.appendChild(el("line", { x1: 0, y1: 0, x2: 0, y2: 7, stroke: color, "stroke-width": 1, opacity: 0.55 }));
+    defs.appendChild(p);
+  };
+  mkHatch("hatchSun", "#fbbf24");
+  mkHatch("hatchPlanet", "#60a5fa");
+  mkHatch("hatchRing", "#a78bfa");
+  svg.appendChild(defs);
+
+  const colW = W / 3;
+  const cY = 150;                 // eksenel merkez çizgisi (radyal 0)
+  const colH = 96;                // yarı yükseklik (radyal) piksel
+  const fs = 12;
+
+  // Tek bir kütük kesiti çizer.
+  // g: { name, od, bore, hub, width, chamfer, odTol, boreTol, raOuter, raBore }
+  // internal: ring (annulus, iç çap = innerCut)
+  const drawCol = (cx0, g, color, hatch, internal) => {
+    const grp = el("g");
+    svg.appendChild(grp);
+    const cx = cx0 + colW / 2;
+    const outerR = g.od / 2;
+    const sc = colH / outerR;       // radyal ölçek (bu sütuna özel)
+    const bPx = Math.max(16, Math.min(colW * 0.42, b * sc));   // eksenel genişlik (okunur sınırlar)
+    const xL = cx - bPx / 2, xR = cx + bPx / 2;
+    const rPx = (rad) => rad * sc;  // radius → px (merkez çizgisinden)
+    const ch = Math.max(2, g.chamfer * sc);
+
+    // Merkez çizgisi (dash-dot)
+    grp.appendChild(el("line", { x1: cx0 + 14, y1: cY, x2: cx0 + colW - 14, y2: cY,
+      stroke: "#64748b", "stroke-width": 0.8, "stroke-dasharray": "10 3 2 3", opacity: 0.8 }));
+
+    // Katı kesit bölgesi: dış yarıçap ile iç (delik/iç çap) arası, hem üstte hem altta.
+    const innerR = internal ? g.innerCut / 2 : g.bore / 2;
+    const oPx = rPx(outerR), iPx = rPx(innerR);
+    const band = (yTop, yBot) => {
+      // pahlı köşeli katı dikdörtgen (üst veya alt bant)
+      const top = cY - yTop, bot = cY - yBot;   // SVG y aşağı +; radyal yukarı
+      // dış kenarda pah (köşe kesimi)
+      grp.appendChild(el("path", {
+        d: `M ${xL+ch} ${top} L ${xR-ch} ${top} L ${xR} ${top+ch} L ${xR} ${bot} L ${xL} ${bot} L ${xL} ${top+ch} Z`,
+        fill: `url(#${hatch})`, stroke: color, "stroke-width": 1.4
+      }));
+    };
+    // üst bant (innerR..outerR) ve alt bant (-outerR..-innerR)
+    band(oPx, iPx);                 // üst
+    // alt bant: y from -innerR to -outerR
+    {
+      const top = cY + iPx, bot = cY + oPx;
+      grp.appendChild(el("path", {
+        d: `M ${xL} ${top} L ${xR} ${top} L ${xR} ${bot-ch} L ${xR-ch} ${bot} L ${xL+ch} ${bot} L ${xL} ${bot-ch} Z`,
+        fill: `url(#${hatch})`, stroke: color, "stroke-width": 1.4
+      }));
+    }
+    // Göbek (hub) — harici dişlilerde delik çevresi kalınlaştırması
+    if (!internal && g.hub) {
+      const hPx = rPx(g.hub / 2);
+      [[+1],[-1]].forEach(([s]) => {
+        const yIn = cY - s*iPx, yHub = cY - s*hPx;
+        grp.appendChild(el("rect", { x: xL, y: Math.min(yIn,yHub), width: bPx, height: Math.abs(yHub-yIn),
+          fill: "url(#hatchSteel)", stroke: color, "stroke-width": 0.8, opacity: 0.9 }));
+      });
+    }
+
+    // --- KOTALAR ---
+    // Eksenel genişlik b (üstte)
+    const dimY = cY - oPx - 26;
+    grp.appendChild(el("line", { x1: xL, y1: dimY, x2: xR, y2: dimY, stroke: "#e2e8f0", "stroke-width": 1 }));
+    grp.appendChild(el("line", { x1: xL, y1: dimY-4, x2: xL, y2: dimY+4, stroke: "#e2e8f0", "stroke-width": 1 }));
+    grp.appendChild(el("line", { x1: xR, y1: dimY-4, x2: xR, y2: dimY+4, stroke: "#e2e8f0", "stroke-width": 1 }));
+    grp.appendChild(el("text", { x: cx, y: dimY-5, "text-anchor": "middle", fill: "#e2e8f0",
+      "font-family": "system-ui", "font-size": fs, "font-weight": "bold" }, `b = ${b.toFixed(1)} mm`));
+
+    // Dış çap Ø (sağda, dikey ok)
+    const dimX = xR + 30;
+    const yt = cY - oPx, yb = cY + oPx;
+    grp.appendChild(el("line", { x1: dimX, y1: yt, x2: dimX, y2: yb, stroke: color, "stroke-width": 1 }));
+    grp.appendChild(el("path", { d: `M ${dimX} ${yt} l -3 6 l 6 0 Z`, fill: color }));
+    grp.appendChild(el("path", { d: `M ${dimX} ${yb} l -3 -6 l 6 0 Z`, fill: color }));
+    grp.appendChild(el("line", { x1: xR, y1: yt, x2: dimX, y2: yt, stroke: color, "stroke-width": 0.5, opacity: 0.6 }));
+    grp.appendChild(el("line", { x1: xR, y1: yb, x2: dimX, y2: yb, stroke: color, "stroke-width": 0.5, opacity: 0.6 }));
+    grp.appendChild(el("text", { x: dimX + 10, y: cY, fill: color, "text-anchor": "middle",
+      "font-family": "system-ui", "font-size": fs*0.85, "font-weight": "bold",
+      transform: `rotate(90 ${dimX+10} ${cY})` }, internal ? `Ø${g.od.toFixed(1)} dış` : `Øda ${g.od.toFixed(1)}`));
+
+    // Delik / iç çap (sol leader)
+    grp.appendChild(el("text", { x: cx, y: cY + fs*0.35, "text-anchor": "middle", fill: "#cbd5e1",
+      "font-family": "system-ui", "font-size": fs*0.92 },
+      internal ? `Ø${g.innerCut.toFixed(1)} iç` : `Ø${g.bore.toFixed(1)} delik`));
+
+    // Pah notu
+    grp.appendChild(el("text", { x: xR - ch - 2, y: cY - oPx + 12, "text-anchor": "end", fill: "#94a3b8",
+      "font-family": "system-ui", "font-size": fs*0.8 }, `${g.chamfer}×45°`));
+
+    // Başlık + tolerans/Ra
+    grp.appendChild(el("text", { x: cx, y: cY + oPx + 28, "text-anchor": "middle", fill: color,
+      "font-family": "system-ui", "font-size": fs*1.05, "font-weight": "bold" }, `${g.name} kütüğü (${g.type})`));
+    grp.appendChild(el("text", { x: cx, y: cY + oPx + 44, "text-anchor": "middle", fill: "#94a3b8",
+      "font-family": "ui-monospace, monospace", "font-size": fs*0.8 },
+      internal ? `delik: ${g.boreTol} · Ra ${g.raBore}` : `delik: ${g.boreTol} · Ra ${g.raOuter}/${g.raBore}`));
+  };
+
+  // çelik hatch (göbek)
+  mkHatch("hatchSteel", "#94a3b8");
+  drawCol(0,         t.sun,    "#fbbf24", "hatchSun",    false);
+  drawCol(colW,      t.planet, "#60a5fa", "hatchPlanet", false);
+  drawCol(colW * 2,  t.ring,   "#a78bfa", "hatchRing",   true);
+  // Sütun ayraçları + ölçek notu
+  [colW, colW*2].forEach(x => svg.appendChild(el("line", { x1: x, y1: 12, x2: x, y2: H-12,
+    stroke: "#334155", "stroke-width": 1, "stroke-dasharray": "3 4" })));
+  svg.appendChild(el("text", { x: W/2, y: H-6, "text-anchor": "middle", fill: "#64748b",
+    "font-family": "system-ui", "font-size": 11 }, "Her kütük kendi ölçeğinde · tam ölçüler Geometri sekmesindeki Torna tablosunda"));
+}
+
+// =============================================================================
 //                                ANIMASYON
 // =============================================================================
 let lastResult = null;
@@ -2883,6 +3211,7 @@ function calculateAndDraw() {
       `sun merkezi → planet merkezi)`;
   }
   draw(r);
+  drawSection(r);
   // Animasyon birikimlerini sıfırla (statik faz draw() içinde uygulanıyor)
   animState.sunAngle = 0;
   animState.ringAngle = 0;
@@ -3392,6 +3721,7 @@ $("exportBtn").addEventListener("click", () => {
 const watchedInputs = [
   "zs","zp","zr","np","alpha","beta","rpm","torque","power",
   "modulePreset","moduleCustom","teethDetail","showPitch","showBase","showPitchMarks","showDiameters","showForces",
+  "realistic","showSection","boreSun","borePlanet","ringRim","chamfer","odTol",
   "haCoef","hfCoef","cCoef","xs","xp","xr","rhoF","resolution",
   "backlashJt","oilClearance",
   "faceWidth","ka","quality","material"
