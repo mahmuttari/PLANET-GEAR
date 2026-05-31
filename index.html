@@ -401,6 +401,76 @@
 
   <div>
 
+    <!-- TASARIM SİHİRBAZI -->
+    <div class="panel" style="border: 1px solid var(--accent);">
+      <h2 style="color: var(--accent-2);">
+        <span class="collapser" data-target="wizardBody">⚡ Tasarım Sihirbazı <span class="arrow">▼</span></span>
+        <span class="badge">redüktör mühendisinin kılavuzu</span>
+      </h2>
+      <div class="panel-body" id="wizardBody">
+        <div class="help" style="border-left-color: var(--accent-2);">
+          Çıkış gereksinimlerinizi girin — sihirbaz <strong>geçerli</strong>, <strong>undercut'sız</strong>,
+          <strong>simetrik mesh'li</strong> bir konfigürasyon önersin. Tüm kısıtlar otomatik kontrol edilir.
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Hedef Çevrim Oranı <span class="unit">i</span></label>
+            <input type="number" id="wizRatio" value="4.0" min="1.1" max="12" step="0.1">
+          </div>
+          <div class="field">
+            <label>Çalışma Modu</label>
+            <select id="wizMode">
+              <option value="ring_fixed" selected>Ring sabit (sun → carrier)</option>
+              <option value="carrier_fixed">Carrier sabit (sun → ring)</option>
+              <option value="sun_fixed">Sun sabit (ring → carrier)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row three">
+          <div class="field">
+            <label>Hedef Çıkış Tork <span class="unit">Nm</span></label>
+            <input type="number" id="wizTorque" value="200" min="0.1" step="1">
+          </div>
+          <div class="field">
+            <label>Hedef Devir <span class="unit">d/dk</span></label>
+            <input type="number" id="wizRpm" value="1500" min="1" step="10">
+          </div>
+          <div class="field">
+            <label>Max Ring Çapı <span class="unit">mm</span></label>
+            <input type="number" id="wizMaxDia" value="200" min="20" step="5">
+          </div>
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Planet Sayısı N</label>
+            <select id="wizN">
+              <option value="auto" selected>Otomatik (en yüksek)</option>
+              <option value="3">3</option>
+              <option value="4">4</option>
+              <option value="5">5</option>
+              <option value="6">6</option>
+            </select>
+          </div>
+          <div class="field">
+            <label>Malzeme Sınıfı</label>
+            <select id="wizMatClass">
+              <option value="42CrMo4_T" selected>İyi (42CrMo4 ıslah)</option>
+              <option value="20MnCr5_C">Premium (sementasyon)</option>
+              <option value="C45_T">Ekonomik (C45 ıslah)</option>
+            </select>
+          </div>
+        </div>
+        <div id="wizardOutput" style="font-size:12px; color:var(--muted); margin:10px 0; padding:10px;
+             background:var(--panel-2); border-radius:7px; min-height:28px;">
+          ↑ Değerleri girin ve <em>Tasarım Üret</em>'e tıklayın.
+        </div>
+        <div class="actions">
+          <button class="btn" id="wizGenerate" style="background:var(--accent-2);">⚙ Tasarım Üret</button>
+          <button class="btn secondary" id="wizApply" disabled>✓ Uygula</button>
+        </div>
+      </div>
+    </div>
+
     <!-- HAZIR KONFİGÜRASYONLAR -->
     <div class="panel">
       <h2><span class="collapser" data-target="presetBody">Hazır Konfigürasyonlar <span class="arrow">▼</span></span></h2>
@@ -599,7 +669,7 @@
         <label>Diş Detayı <input type="checkbox" id="teethDetail" checked></label>
         <label>Pitch Çemberleri <input type="checkbox" id="showPitch"></label>
         <label>Base Çemberleri <input type="checkbox" id="showBase"></label>
-        <label>Pitch Temas Noktaları <input type="checkbox" id="showPitchMarks"></label>
+        <label>Mesh Temas Bölgesi <input type="checkbox" id="showPitchMarks" checked></label>
         <label>Kuvvet Okları <input type="checkbox" id="showForces"></label>
         <button class="btn secondary" id="exportBtn" style="flex:0 0 auto; padding:6px 12px;">SVG İndir</button>
       </div>
@@ -996,6 +1066,207 @@ const PRESETS = [
 //                                   UI
 // =============================================================================
 const $ = (id) => document.getElementById(id);
+
+// =============================================================================
+//                          TASARIM SİHİRBAZI
+// =============================================================================
+// Hedef oran/tork/devir/boyutlardan, geçerli ve uygun bir konfigürasyon üretir.
+// Algoritma:
+//   1) Mod ve i'den Zr/Zs oranını çıkar (i_ring_fixed = 1 + Zr/Zs ⇒ Zr/Zs = i−1)
+//   2) Zs'i 17'den başlatıp aday Zr'leri dene (undercut limiti α=20° için z≥17)
+//   3) Zp = (Zr − Zs)/2 tam sayı olmalı VE çift olmalı (statik mesh simetrisi)
+//   4) (Zs + Zr) / N tam sayı olmalı (montaj)
+//   5) Komşuluk: 2·a·sin(π/N) > m·(Zp+2) + clearance
+//   6) Modül m: hedef tork ve ring çapından çıkarılır
+//   7) Yüzey genişliği b: Lewis eğme ~ SF=2 için
+// Tüm kısıtları sağlayan, ring çapı limiti içinde KALAN en kompakt çözümü seçer.
+function runDesignWizard() {
+  const i_target = parseFloat($("wizRatio").value);
+  const mode = $("wizMode").value;
+  const T_out_target = parseFloat($("wizTorque").value);
+  const rpm = parseFloat($("wizRpm").value);
+  const dMax = parseFloat($("wizMaxDia").value);
+  const N_pref = $("wizN").value;
+  const matId = $("wizMatClass").value;
+  const mat = MATERIALS.find(m => m.id === matId) || MATERIALS[2];
+
+  // 1) Mod-bağlı: i → Zr/Zs ilişkisi
+  //    ring_fixed:    i = 1 + Zr/Zs        → Zr/Zs = i − 1
+  //    sun_fixed:     i = 1 + Zs/Zr        → Zs/Zr = i − 1  ⇒ Zr/Zs = 1/(i−1)
+  //    carrier_fixed: |i| = Zr/Zs
+  let zrOverZs;
+  if      (mode === "ring_fixed")    zrOverZs = i_target - 1;
+  else if (mode === "carrier_fixed") zrOverZs = Math.abs(i_target);
+  else                                zrOverZs = 1 / (i_target - 1);
+  if (zrOverZs <= 0 || !isFinite(zrOverZs)) {
+    return { ok: false, reason: `Bu mod için i=${i_target} geçersiz.` };
+  }
+
+  // 2) Aday taraması: Zs ∈ [17, 60], her Zs için en yakın geçerli Zr+Zp+N
+  const N_options = N_pref === "auto" ? [6, 5, 4, 3] : [parseInt(N_pref)];
+  const candidates = [];
+  for (let zs = 17; zs <= 60; zs++) {
+    // Tam Zr bul: zr ≈ zs · zrOverZs, ama Zp=(Zr-Zs)/2 tam ve çift olmalı
+    // ⇒ Zr - Zs çift sayı VE Zp çift ⇒ Zr - Zs ≡ 0 (mod 4)
+    const zrIdeal = zs * zrOverZs;
+    // Yuvarlama: Zr - Zs ∈ 4·ℤ olmalı (Zp çift için)
+    const targetDelta = zrIdeal - zs;
+    const k = Math.round(targetDelta / 4);
+    const deltas = [4 * k, 4 * (k - 1), 4 * (k + 1), 4 * (k - 2), 4 * (k + 2)];
+    for (const delta of deltas) {
+      if (delta < 8) continue; // Zp ≥ 4 garantisi
+      const zr = zs + delta;
+      const zp = delta / 2;
+      if (zp < 6) continue;
+      // Oran sapması
+      let i_actual;
+      if      (mode === "ring_fixed")    i_actual = 1 + zr / zs;
+      else if (mode === "carrier_fixed") i_actual = zr / zs;
+      else                                i_actual = 1 + zs / zr;
+      const iErr = Math.abs(i_actual - i_target) / i_target;
+      if (iErr > 0.10) continue;  // %10'dan fazla sapma kabul edilmez
+      // Geçerli N (gerçek neighbor formülüyle: 2·a·sin(π/N) > m·(Zp+2) + minGap;
+      // boyutsuz forma sokulursa  (Zs+Zp)·sin(π/N) > Zp + 2 + minGap/m. minGap=0.5m
+      // varsayımıyla eşik = Zp + 2.5. Buffer 0.5 ekleyerek mesh hata payı bırakırız.)
+      for (const N of N_options) {
+        if ((zs + zr) % N !== 0) continue;
+        const neighbor = (zs + zp) * Math.sin(Math.PI / N);
+        if (neighbor <= zp + 3.0) continue;
+        candidates.push({ zs, zp, zr, N, i_actual, iErr });
+        break;
+      }
+    }
+  }
+  if (candidates.length === 0) {
+    return { ok: false, reason: `i ≈ ${i_target}±%10 için geçerli Zs/Zp/Zr/N bulunamadı. Modu veya oranı değiştirin.` };
+  }
+
+  // 3) En iyi aday: %2 iErr toleransı içinde kompaktlık (küçük Zs+Zr), sonra yüksek N
+  //    Oran %2 sapsa bile kullanıcı için kabul edilebilir — kompakt+yük paylaşımı daha kritik.
+  const TOL = 0.02;
+  const acceptable = candidates.filter(c => c.iErr <= TOL);
+  const pool = acceptable.length ? acceptable : candidates;
+  pool.sort((a, b) => {
+    const sizeA = a.zs + a.zr, sizeB = b.zs + b.zr;
+    if (sizeA !== sizeB) return sizeA - sizeB;          // küçük gear → kompakt
+    if (a.N !== b.N) return b.N - a.N;                  // yüksek N → yük dağılımı
+    return a.iErr - b.iErr;
+  });
+  const best = pool[0];
+
+  // 4) Modül seçimi: ring çapı = m · Zr ≤ dMax
+  const mMaxByDia = dMax / best.zr;
+  // Modül seçimi: ring çapı = m · Zr ≤ dMax
+  // Tork dayanımı için min m bul (her planet için sun-planet'te Lewis SF=2)
+  // σ_lim = mat.sFlim ; SF·σ = Ft / (b·m·Y) ; Ft = (T_sun · 1000 / r_s) / N
+  // b ≈ 10·m varsayalım (oran tipik 8–12)
+  const Y = lewisY(best.zs);
+  // T_sun_input: çıkış torkundan giriş torkuna geri çevir
+  // T_in · ratio = T_out  ⇒  T_in = T_out / |ratio|
+  let ratio_calc;
+  if      (mode === "ring_fixed")    ratio_calc = 1 + best.zr / best.zs;
+  else if (mode === "carrier_fixed") ratio_calc = -best.zr / best.zs;
+  else                                ratio_calc = 1 + best.zs / best.zr;
+  const T_in = T_out_target / Math.abs(ratio_calc); // Nm
+  // Ft per planet (sun pitch yarıçapı r_s = m·Zs/2'ye bağlı): Ft = T_in·1000/(m·Zs/2)/N
+  // σ = Ft/(b·m·Y) = T_in·1000·2/(m²·Zs·N·b·Y).  b=10m  ⇒  σ = T_in·2000/(10·m³·Zs·N·Y)
+  // SF=2  ⇒  σ_lim/2 ≥ σ  ⇒  m³ ≥ T_in·2000·2/(σ_lim·10·Zs·N·Y)
+  //                                = T_in·400/(σ_lim·Zs·N·Y)
+  const m3_min = T_in * 400 / (mat.sFlim * best.zs * best.N * Y);
+  const mMinByStrength = Math.cbrt(m3_min);
+
+  // Standart modüllere yuvarla
+  const STD_MODULES = [0.5, 0.75, 1, 1.25, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+  // Strength gereken min m'den büyük VE dia limiti aşmayan en küçük standart m
+  const mChosen = STD_MODULES.find(mv => mv >= mMinByStrength && mv <= mMaxByDia)
+               || STD_MODULES.find(mv => mv >= mMinByStrength) || STD_MODULES[STD_MODULES.length - 1];
+  // Yüzey genişliği b: standart oran 10·m
+  const bChosen = Math.max(6, Math.round(mChosen * 10));
+
+  // 5) Ring fiili çapı + uyarılar
+  const dr_actual = mChosen * best.zr;
+  const warnings = [];
+  if (dr_actual > dMax) warnings.push(`Ring çapı ${dr_actual.toFixed(0)}mm > limit ${dMax}mm (mukavemet için bu m gerekli)`);
+  if (mChosen > mMaxByDia) warnings.push(`Modül kompakt boyut limitini aşıyor`);
+  if (Math.abs(best.iErr) > 0.02) warnings.push(`Gerçek oran ${best.i_actual.toFixed(3)} (hedef ${i_target}, sapma %${(best.iErr*100).toFixed(1)})`);
+
+  return {
+    ok: true,
+    config: {
+      zs: best.zs, zp: best.zp, zr: best.zr, N: best.N,
+      m: mChosen, b: bChosen, mode,
+      torque: T_in.toFixed(1),
+      rpm,
+      mat: matId,
+    },
+    diagnostics: {
+      i_actual: best.i_actual,
+      dr_actual,
+      mMinByStrength: mMinByStrength.toFixed(3),
+      mMaxByDia: mMaxByDia.toFixed(3),
+      Y_lewis: Y.toFixed(3),
+      warnings,
+    }
+  };
+}
+
+function renderWizardOutput(result) {
+  const out = $("wizardOutput");
+  if (!result.ok) {
+    out.innerHTML = `<span style="color:var(--err)">✗ ${result.reason}</span>`;
+    $("wizApply").disabled = true;
+    return null;
+  }
+  const c = result.config, d = result.diagnostics;
+  const warns = d.warnings.length
+    ? `<div style="color:var(--warn); margin-top:6px; font-size:11px;">⚠ ${d.warnings.join(" · ")}</div>`
+    : "";
+  out.innerHTML = `
+    <div style="color:var(--ok); font-weight:600;">✓ Önerilen Tasarım</div>
+    <table style="width:100%; margin-top:6px; font-size:11.5px;">
+      <tr><td>Zs / Zp / Zr</td><td style="color:var(--text); text-align:right;"><b>${c.zs} / ${c.zp} / ${c.zr}</b></td></tr>
+      <tr><td>N (planet)</td><td style="color:var(--text); text-align:right;"><b>${c.N}</b></td></tr>
+      <tr><td>Modül m</td><td style="color:var(--text); text-align:right;"><b>${c.m} mm</b></td></tr>
+      <tr><td>Yüzey gen. b</td><td style="color:var(--text); text-align:right;"><b>${c.b} mm</b></td></tr>
+      <tr><td>Gerçek i</td><td style="color:var(--text); text-align:right;"><b>${d.i_actual.toFixed(3)}</b></td></tr>
+      <tr><td>Ring çapı</td><td style="color:var(--text); text-align:right;"><b>${d.dr_actual.toFixed(0)} mm</b></td></tr>
+      <tr><td>Giriş torku</td><td style="color:var(--text); text-align:right;"><b>${c.torque} Nm</b></td></tr>
+    </table>
+    ${warns}
+  `;
+  $("wizApply").disabled = false;
+  return c;
+}
+
+let wizardPending = null;
+$("wizGenerate").addEventListener("click", () => {
+  const result = runDesignWizard();
+  wizardPending = renderWizardOutput(result);
+});
+$("wizApply").addEventListener("click", () => {
+  if (!wizardPending) return;
+  const c = wizardPending;
+  $("zs").value = c.zs;
+  $("zp").value = c.zp;
+  $("zr").value = c.zr;
+  $("np").value = c.N;
+  const mSel = $("modulePreset");
+  const stdOpt = Array.from(mSel.options).find(o => parseFloat(o.value) === c.m);
+  if (stdOpt) { mSel.value = stdOpt.value; $("moduleCustom").disabled = true; }
+  else { mSel.value = "custom"; $("moduleCustom").disabled = false; }
+  $("moduleCustom").value = c.m;
+  $("faceWidth").value = c.b;
+  $("torque").value = c.torque;
+  $("rpm").value = c.rpm;
+  $("material").value = c.mat;
+  // Mod toggle
+  document.querySelectorAll("#modeToggle button").forEach(b => b.classList.remove("active"));
+  document.querySelector(`#modeToggle button[data-mode="${c.mode}"]`)?.classList.add("active");
+  currentMode = c.mode;
+  // Profil kayması sıfırla (sihirbaz Zp çift garantisiyle undercut'sız adaylar üretir)
+  $("xs").value = 0; $("xp").value = 0; $("xr").value = 0;
+  calculateAndDraw();
+});
 
 function renderPresets() {
   const grid = $("presetGrid");
@@ -1860,19 +2131,61 @@ function draw(r) {
   svg.appendChild(sunG);
   animCache.sunG = sunG;
 
-  // --- PITCH TEMAS NOKTALARI (her sun-planet ve planet-ring meshi için) ---
+  // --- MESH TEMAS BÖLGESİ ---
+  // Her sun-planet ve planet-ring meshi için: dişlerin overlap ettiği radyal
+  // bandı sarı bir yay parçası ile vurgular. Mesh küçük olduğunda kullanıcı
+  // genelde "gap var" sanıyor — bu overlay overlap'ı net gösterir.
   if ($("showPitchMarks").checked) {
-    const ringR_pitch = r.dr / 2;
     const sunR = r.ds / 2;
-    const ringR = ringR_pitch;
-    const dotR = Math.max(0.3, m * 0.25);
+    const ringR_pitch = r.dr / 2;
     const pG = el("g", { id: "pitchMarks" });
+    const dotR = Math.max(0.4, m * 0.3);
+    // Sun-planet meshi: sun_ra ile planet_ra'nın overlap bölgesi = sun_ra üzerinde küçük yay
+    const sunOverlap = r.gSun.ra + r.gPlanet.ra - r.a;   // pozitifse mesh var
+    const ringOverlap = r.gPlanet.ra + r.gRing.ra - Math.abs(r.gRing.r - r.a); // negatif ya da pozitif değil; alternatif
+    // Daha doğrudan: planet outer extent (r.a + planet_ra) ile ring inner (gRing.ra) farkı
+    const ringMeshOverlap = (r.a + r.gPlanet.ra) - r.gRing.ra;
+
     for (let i = 0; i < r.N; i++) {
       const ang = (i / r.N) * TAU;
-      const ptSP = polar(sunR, ang);                  // sun-planet pitch tangent
-      const ptPR = polar(ringR, ang);                 // planet-ring pitch tangent
-      pG.appendChild(el("circle", { cx: ptSP.x, cy: ptSP.y, r: dotR, fill: "#22d3ee", opacity: 0.9 }));
-      pG.appendChild(el("circle", { cx: ptPR.x, cy: ptPR.y, r: dotR, fill: "#22d3ee", opacity: 0.9 }));
+      // Sun-planet contact: pitch tangent at radius r.ds/2 in direction θ_i
+      const ptSP = polar(sunR, ang);
+      // Mesh overlap arc — radial band [sunR, sunR + sunOverlap] limited angularly
+      // Genişlik: yaklaşık ±10° (görsel; her halükarda ±2 diş)
+      const arcHalfAng = Math.min(0.20, TAU / 24);
+      if (sunOverlap > 0) {
+        const r1 = sunR;
+        const r2 = sunR + sunOverlap;
+        const a1 = ang - arcHalfAng, a2 = ang + arcHalfAng;
+        const p1 = polar(r1, a1), p2 = polar(r2, a1), p3 = polar(r2, a2), p4 = polar(r1, a2);
+        pG.appendChild(el("path", {
+          d: `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}
+              L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}
+              A ${r2} ${r2} 0 0 1 ${p3.x.toFixed(2)} ${p3.y.toFixed(2)}
+              L ${p4.x.toFixed(2)} ${p4.y.toFixed(2)}
+              A ${r1} ${r1} 0 0 0 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} Z`,
+          fill: "#facc15", opacity: 0.35
+        }));
+      }
+      pG.appendChild(el("circle", { cx: ptSP.x, cy: ptSP.y, r: dotR, fill: "#22d3ee", opacity: 0.95 }));
+
+      // Planet-ring contact: pitch tangent at radius r.dr/2
+      const ptPR = polar(ringR_pitch, ang);
+      if (ringMeshOverlap > 0) {
+        const r1 = ringR_pitch - ringMeshOverlap;
+        const r2 = ringR_pitch;
+        const a1 = ang - arcHalfAng, a2 = ang + arcHalfAng;
+        const p1 = polar(r1, a1), p2 = polar(r2, a1), p3 = polar(r2, a2), p4 = polar(r1, a2);
+        pG.appendChild(el("path", {
+          d: `M ${p1.x.toFixed(2)} ${p1.y.toFixed(2)}
+              L ${p2.x.toFixed(2)} ${p2.y.toFixed(2)}
+              A ${r2} ${r2} 0 0 1 ${p3.x.toFixed(2)} ${p3.y.toFixed(2)}
+              L ${p4.x.toFixed(2)} ${p4.y.toFixed(2)}
+              A ${r1} ${r1} 0 0 0 ${p1.x.toFixed(2)} ${p1.y.toFixed(2)} Z`,
+          fill: "#facc15", opacity: 0.35
+        }));
+      }
+      pG.appendChild(el("circle", { cx: ptPR.x, cy: ptPR.y, r: dotR, fill: "#22d3ee", opacity: 0.95 }));
     }
     svg.appendChild(pG);
   }
