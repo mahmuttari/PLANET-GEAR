@@ -574,6 +574,12 @@
           <div class="field"><label>x · Planet</label><input type="number" id="xp" value="0" min="-0.7" max="0.7" step="0.05"></div>
           <div class="field"><label>x · Ring</label><input type="number" id="xr" value="0" min="-0.7" max="0.7" step="0.05"></div>
         </div>
+        <div class="auto-size-row" style="margin-top:6px;">
+          <button class="btn-mini" id="autoX" style="color:var(--ok); border-color:var(--ok); font-weight:600;">
+            🎯 Otomatik Profil Kayması Hesapla
+          </button>
+        </div>
+        <div id="autoXOut" style="font-size:11px; color:var(--muted); min-height:14px; margin:2px 0 6px;"></div>
         <div class="row">
           <div class="field">
             <label>Diş Yan Yuvarlatma ρf*</label>
@@ -784,6 +790,78 @@ function omegasFromMode(mode, omegaIn, zs, zr) {
     case "sun_fixed":     return { sun: 0,       ring: omegaIn,                 carrier: omegaIn * zr / (zs + zr) };
     default:              return { sun: omegaIn, ring: 0,                       carrier: omegaIn * zs / (zs + zr) };
   }
+}
+
+// Verili Zs/Zp/Zr/N/m için optimal profil kaymalarını (x_s, x_p, x_r) hesaplar.
+// Amaç: diş sayıları DEĞİŞTİRİLMEDEN geometrik uyum sağlanması.
+//   1) Undercut riski olan dişlilere (Z < zmin) gerekli x_min uygulanır
+//   2) Sun-planet ve planet-ring çalışma eksen mesafelerinin EŞİT olması için
+//      x_r türetilir (ISO 21771: cos(α_w_pr) = cos(α_w_sp)·(Zr-Zp)/(Zs+Zp))
+//   3) Tepedeki diş kalınlığı (sa) çok küçükse uyarı döndürülür
+// Profil kayması ÇÖZEMEDİĞİ durumlar: (Zs+Zr)/N tam sayı değil (montaj — pür
+// topolojik), Zp tek (statik görsel simetri). Bu durumlar ayrıca işaretlenir.
+function autoProfileShift({ zs, zp, zr, m, alpha, ha, hf }) {
+  const aRad  = alpha * DEG;
+  const tanA  = Math.tan(aRad);
+  const invA  = inv(aRad);
+  const zmin  = 2 * ha / (Math.sin(aRad) ** 2);
+
+  // Adım 1: Undercut'a karşı taban
+  const xs = Math.max(0, zs < zmin ? (zmin - zs) / zmin : 0);
+  const xp = Math.max(0, zp < zmin ? (zmin - zp) / zmin : 0);
+
+  // Adım 2: x_r — sun-planet ve planet-ring eksenler arasını eşitle
+  // α_w_sp: sun-planet (harici) çalışma basınç açısı
+  const invAwSP = invA + 2 * tanA * (xs + xp) / (zs + zp);
+  const awSP    = invInverse(invAwSP);
+  // Cos ilişkisi: cos(αw_pr) = cos(αw_sp) · (Zr-Zp) / (Zs+Zp)
+  // (Bu, a_w_sp = a_w_pr koşulundan gelir)
+  const cosAwPR = Math.cos(awSP) * (zr - zp) / (zs + zp);
+  let xr = 0;
+  let note = null;
+  if (cosAwPR <= 0 || cosAwPR >= 1) {
+    note = `Aşırı geometri sapması (cos α_w_pr = ${cosAwPR.toFixed(3)}). ` +
+           `Zr ≠ Zs+2·Zp farkı profil kayması ile kapatılamayacak kadar büyük.`;
+  } else {
+    const awPR    = Math.acos(cosAwPR);
+    const invAwPR = inv(awPR);
+    xr = xp + (invAwPR - invA) * (zr - zp) / (2 * tanA);
+  }
+
+  // Adım 3: sa (tepe diş kalınlığı) sağlığı
+  // sa < 0.25·m sivrilme riski. Profil kayması arttıkça sa düşer (harici dişli).
+  // Eğer xs/xp çok yüksekse, kullanıcı uyarılır (otomatik düşürme yapmıyoruz,
+  // çünkü undercut limitini ihlal edecek).
+  const warns = [];
+  const checkSa = (label, z, x, internal) => {
+    const r = m * z / 2;
+    const ra = internal ? r - (ha - x) * m : r + (ha + x) * m;
+    const rb = r * Math.cos(aRad);
+    const cosAa = Math.min(1, rb / ra);
+    const aa = Math.acos(cosAa);
+    const invAa = inv(aa);
+    const s = m * (Math.PI / 2 + 2 * x * tanA);
+    const sa = internal ? (m * z) * (s / (m * z) - invA + invAa)
+                        : (m * z) * (s / (m * z) + invA - invAa) * (ra / (m * z / 2));
+    // Yukarıdaki formül için da ile çarpılmalı. Düzeltme:
+    const da = 2 * ra;
+    const saReal = internal ? da * (s / (m * z) - invA + invAa)
+                            : da * (s / (m * z) + invA - invAa);
+    if (saReal < 0.25 * m) warns.push(`${label} sa = ${saReal.toFixed(2)} mm (<0.25·m=${(0.25*m).toFixed(2)})`);
+  };
+  checkSa("Güneş",   zs, xs, false);
+  checkSa("Planet",  zp, xp, false);
+  checkSa("Ring",    zr, xr, true);
+
+  return {
+    xs: Math.round(xs * 100) / 100,
+    xp: Math.round(xp * 100) / 100,
+    xr: Math.round(xr * 100) / 100,
+    note, warns,
+    // diagnostics
+    invAwSP, awSP_deg: awSP / DEG,
+    awPR_deg: (cosAwPR > 0 && cosAwPR < 1) ? Math.acos(cosAwPR) / DEG : null,
+  };
 }
 
 // =============================================================================
@@ -1325,6 +1403,29 @@ $("modulePreset").addEventListener("change", () => {
 });
 
 // Otomatik boyutlandırma butonları
+// Otomatik profil kayması: diş sayıları dokunulmadan x_s/x_p/x_r hesaplanıp uygulanır
+$("autoX").addEventListener("click", () => {
+  const zs = parseInt($("zs").value);
+  const zp = parseInt($("zp").value);
+  const zr = parseInt($("zr").value);
+  const m  = getModule();
+  const alpha = parseFloat($("alpha").value);
+  const ha = parseFloat($("haCoef").value);
+  const hf = parseFloat($("hfCoef").value);
+  const result = autoProfileShift({ zs, zp, zr, m, alpha, ha, hf });
+  $("xs").value = result.xs;
+  $("xp").value = result.xp;
+  $("xr").value = result.xr;
+  const parts = [
+    `<span style="color:var(--ok)">✓ Uygulandı</span> xs=${result.xs}, xp=${result.xp}, xr=${result.xr}`,
+    result.awSP_deg && result.awPR_deg ? ` · α_w(SP)=${result.awSP_deg.toFixed(2)}° ≈ α_w(PR)=${result.awPR_deg.toFixed(2)}°` : "",
+  ];
+  if (result.note) parts.push(`<br><span style="color:var(--err)">⚠ ${result.note}</span>`);
+  if (result.warns.length) parts.push(`<br><span style="color:var(--warn)">⚠ ${result.warns.join(", ")}</span>`);
+  $("autoXOut").innerHTML = parts.join("");
+  calculateAndDraw();
+});
+
 $("autoZp").addEventListener("click", () => {
   const zs = parseInt($("zs").value);
   const zr = parseInt($("zr").value);
@@ -1599,61 +1700,37 @@ function calculate() {
     });
   }
 
-  // 4) Eksenel paylaşım: tüm pitch çapları aynı modülü kullanmalı (otomatik)
-  // 5) Undercut: zmin = 2·ha*/sin²α
+  // 4) Profil-kayması ile çözülebilen tüm sorunları TEK BİR uyarıda topla.
+  //    Kullanıcı diş sayısı değiştirmek zorunda kalmasın → primary fix
+  //    "🎯 Otomatik x Hesapla" butonudur (autoProfileShift'i çağırır).
   const zmin = 2 * ha / (Math.sin(aRad) ** 2);
-  if (zs < zmin) {
-    const x_min = (zmin - zs) / zmin;
-    if (xs < x_min - 0.01) {
-      errors.push({
-        severity: "warn",
-        msg: `Güneş alttan kesilme (undercut) riski`,
-        detail: `Z=${zs} < zmin=${zmin.toFixed(1)} (α=${alpha}°). Gerekli profil kayması x ≥ ${x_min.toFixed(2)}, mevcut ${xs}`,
-        fixes: [{ label: `xs → ${x_min.toFixed(2)}`, target: "xs", value: x_min.toFixed(2) }]
-      });
-    }
-  }
-  if (zp < zmin) {
-    const x_min = (zmin - zp) / zmin;
-    if (xp < x_min - 0.01) {
-      errors.push({
-        severity: "warn",
-        msg: `Planet alttan kesilme (undercut) riski`,
-        detail: `Z=${zp} < zmin=${zmin.toFixed(1)}. Gerekli x ≥ ${x_min.toFixed(2)}, mevcut ${xp}`,
-        fixes: [{ label: `xp → ${x_min.toFixed(2)}`, target: "xp", value: x_min.toFixed(2) }]
-      });
-    }
-  }
-
-  // 6) Profil kayması tutarlılığı — sun-planet ile planet-ring çalışma eksen
-  //    mesafeleri eşit olmalı (her ikisi de aynı planet merkezini görüyor)
+  const undercutSun  = zs < zmin && xs < (zmin - zs) / zmin - 0.01;
+  const undercutPlnt = zp < zmin && xp < (zmin - zp) / zmin - 0.01;
   const axisMismatch = Math.abs(a - aw_pr);
-  if (axisMismatch > 0.01 * m && (xs !== 0 || xp !== 0 || xr !== 0)) {
-    // xr çözümü: xr = xp + (xs+xp) için yaklaşık (küçük kaymalar)
-    const xrSuggest = (xs + 2 * xp).toFixed(2); // ilk yaklaşım — kullanıcı ince ayar yapar
+  const axisIssue    = axisMismatch > 0.01 * m;
+
+  if (undercutSun || undercutPlnt || axisIssue) {
+    const probs = [];
+    if (undercutSun)  probs.push(`Sun undercut (Zs=${zs} < ${zmin.toFixed(1)})`);
+    if (undercutPlnt) probs.push(`Planet undercut (Zp=${zp} < ${zmin.toFixed(1)})`);
+    if (axisIssue)    probs.push(`eksen mesafe farkı ${axisMismatch.toFixed(3)} mm (aₛₚ=${a.toFixed(2)}, aₚᵣ=${aw_pr.toFixed(2)})`);
     errors.push({
       severity: "warn",
-      msg: `Profil kayması: sun-planet & planet-ring eksen mesafeleri uyuşmuyor`,
-      detail: `aₛₚ = ${a.toFixed(3)} mm,  aₚᵣ = ${aw_pr.toFixed(3)} mm  (fark ${axisMismatch.toFixed(3)} mm)`,
-      fixes: [{ label: `xr → ${xrSuggest}`, target: "xr", value: xrSuggest }]
+      msg: `Profil kayması ile çözülebilir`,
+      detail: `${probs.join(" · ")}.  Diş sayısı değiştirmeden ISO 21771 ile x_s/x_p/x_r hesaplanabilir.`,
+      fixes: [{ label: `🎯 Otomatik x Hesapla & Uygula`, action: "autoX" }]
     });
   }
 
-  // 7) Planet diş sayısı tek — statik çizimde sun-side gap ile ring-side gap
-  //    aynı anda hizalanmıyor (geometri: 180° = Zp/2·diş adımı; Zp tek → yarım adım kayık)
+  // 5) Planet diş sayısı tek — sadece BİLGİ amaçlı: gerçek dişlilerde sorun yok,
+  //    statik çizimde sun ve ring tarafları yarım-adım kayık görünür. Kullanıcı
+  //    isterse Zp'yi değiştirir; "fix" eklemiyoruz (önermek yerine bilgi).
   if (zp % 2 !== 0) {
     errors.push({
       severity: "warn",
-      msg: `Planet diş sayısı tek (Zp=${zp}) — statik çizimde ring tarafında diş-üstüne-diş görünebilir`,
-      detail: `Gerçek dişlilerde sorun değil (sürekli yuvarlanma kompanze eder), ama tek bir anlık görüntüde sun mesh düzgün, ring mesh half-pitch kayık görünür. Önerilen: Zp=${zp+1} veya Zp=${zp-1}`,
-      fixes: [
-        { label: `Zp → ${zp + 1} (Zr → ${zs + 2*(zp+1)})`, multi: [
-          { target: "zp", value: zp + 1 }, { target: "zr", value: zs + 2*(zp+1) }
-        ]},
-        { label: `Zp → ${zp - 1} (Zr → ${zs + 2*(zp-1)})`, multi: [
-          { target: "zp", value: zp - 1 }, { target: "zr", value: zs + 2*(zp-1) }
-        ]}
-      ]
+      msg: `ℹ️ Bilgi: Planet diş sayısı tek (Zp=${zp})`,
+      detail: `Fiziksel dişli SORUNSUZ çalışır; sürekli yuvarlanma yarım-adım kaymayı kompanze eder. Statik çizimde ring tarafında diş üstüne diş görünüyorsa endişelenme — animasyonu çalıştırınca temas noktasında kayma olduğunu görürsün.`,
+      fixes: []
     });
   }
 
@@ -1956,7 +2033,8 @@ function renderResults(r) {
     const hasErr = r.errors.some(e => e.severity === "err");
     const errHtml = r.errors.map((e, idx) => {
       const fixButtons = (e.fixes || []).map((fx, j) => {
-        const id = `fix_${idx}_${j}`;
+        // action: özel fonksiyonu tetikler (örn. "autoX" → autoProfileShift uygula)
+        if (fx.action) return `<button class="fix-btn" data-action="${fx.action}">${fx.label}</button>`;
         // multi fix: birden çok input set eder
         if (fx.multi) {
           const data = fx.multi.map(m => `data-set-${m.target}="${m.value}"`).join(" ");
@@ -2696,6 +2774,12 @@ watchedInputs.forEach(id => {
 $("validation").addEventListener("click", (e) => {
   const btn = e.target.closest(".fix-btn");
   if (!btn) return;
+  // action="autoX" — autoProfileShift'i çalıştırıp uygulanan x'leri yaz
+  const action = btn.getAttribute("data-action");
+  if (action === "autoX") {
+    $("autoX").click();
+    return;
+  }
   let changed = false;
   for (const attr of Array.from(btn.attributes)) {
     if (attr.name.startsWith("data-set-")) {
