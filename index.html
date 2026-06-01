@@ -2737,7 +2737,7 @@ function draw(r) {
   // Tek noktada path üretimi: r.ha/r.hf burada katsayıdır (yükseklik değil).
   // Görsel backlash: meshlenen dişler tam temasta dip dibe görünmesin diye
   // dişleri simetrik ~%7 inceltir (faz/merkez korunur, geometri konjuge kalır).
-  const VIS_BACKLASH = 0.05;
+  const VIS_BACKLASH = 0.10;
   const gearPathFor = (z, x, pitchR, internal) => detail
     ? generateGearPath({ z, m, alpha, x, ha: r.ha, hf: r.hf, internal, segments: segs, backlashFrac: VIS_BACKLASH })
     : simpleGearPath(pitchR);
