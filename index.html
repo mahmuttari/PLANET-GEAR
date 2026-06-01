@@ -1232,7 +1232,8 @@ function generateGearPath(opts) {
     z, m, alpha, x = 0,
     ha = 1.0, hf = 1.25,
     internal = false,
-    segments = 12
+    segments = 12,
+    backlashFrac = 0   // görsel backlash: diş yarı-kalınlığını simetrik inceltir
   } = opts;
 
   // Harici (sign=+1) ve dahili (sign=−1) dişlide tüm yön/işaret farkları tek
@@ -1248,7 +1249,9 @@ function generateGearPath(opts) {
 
   // Pitch çemberinde diş yarı kalınlık açısı
   // s = m · (π/2 + 2·x·tan α)   ;   ψ = s / (2r)
-  const halfTooth = (Math.PI / 2 + 2 * x * Math.tan(aRad)) / z;
+  // Diş yarı kalınlık açısı; görsel backlash simetrik inceltir (merkez sabit →
+  // mesh fazı değişmez), meshlenen dişler arasında görünür boşluk bırakır.
+  const halfTooth = (Math.PI / 2 + 2 * x * Math.tan(aRad)) / z * (1 - backlashFrac);
   // İnvolütün pitch çemberindeki polar açısı: inv(α) = tan α − α
   const invAlpha = Math.tan(aRad) - aRad;
 
@@ -2676,8 +2679,11 @@ function draw(r) {
   const ringDiscPad = m * 3;
   const refOpts = { m, showPitch, showBase, swThin, swDash };
   // Tek noktada path üretimi: r.ha/r.hf burada katsayıdır (yükseklik değil).
+  // Görsel backlash: meshlenen dişler tam temasta dip dibe görünmesin diye
+  // dişleri simetrik ~%7 inceltir (faz/merkez korunur, geometri konjuge kalır).
+  const VIS_BACKLASH = 0.07;
   const gearPathFor = (z, x, pitchR, internal) => detail
-    ? generateGearPath({ z, m, alpha, x, ha: r.ha, hf: r.hf, internal, segments: segs })
+    ? generateGearPath({ z, m, alpha, x, ha: r.ha, hf: r.hf, internal, segments: segs, backlashFrac: VIS_BACKLASH })
     : simpleGearPath(pitchR);
 
   // --- RING (en dıştaki çember + iç dişler) ---
