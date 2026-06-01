@@ -1063,6 +1063,11 @@ function omegasFromMode(mode, omegaIn, zs, zr) {
 const MESH_C_SP = 0.5;
 const MESH_C_PR = 0.0;
 
+// Görsel backlash: meshlenen diş konturları tam temasta dip dibe görünmesin diye
+// dişleri simetrik inceltir (faz/merkez korunur). Hem ekran çizimi hem teknik
+// resim (DXF) aynı değeri kullanır → tutarlı, çizgiler üst üste binmez.
+const VIS_BACKLASH = 0.10;
+
 // Master açıya göre her grubun oryantasyon katsayısı (c = dθ/dM).
 function kinematicCoefs(mode, zs, zr, zp) {
   let cSun, cRing, cCarrier;
@@ -2735,9 +2740,7 @@ function draw(r) {
   const ringDiscPad = m * 3;
   const refOpts = { m, showPitch, showBase, swThin, swDash };
   // Tek noktada path üretimi: r.ha/r.hf burada katsayıdır (yükseklik değil).
-  // Görsel backlash: meshlenen dişler tam temasta dip dibe görünmesin diye
-  // dişleri simetrik ~%7 inceltir (faz/merkez korunur, geometri konjuge kalır).
-  const VIS_BACKLASH = 0.10;
+  // Görsel backlash modül seviyesinde (VIS_BACKLASH) — ekran ve DXF aynı değeri kullanır.
   const gearPathFor = (z, x, pitchR, internal) => detail
     ? generateGearPath({ z, m, alpha, x, ha: r.ha, hf: r.hf, internal, segments: segs, backlashFrac: VIS_BACKLASH })
     : simpleGearPath(pitchR);
@@ -3321,7 +3324,7 @@ function calculateAndDraw() {
 // stringi yerine {x, y} vertex dizisi döner. Tepe ve dip arc'ları küçük
 // doğru parçalarına ayrıştırılır (DXF LWPOLYLINE için).
 function gearVertices(opts) {
-  const { z, m, alpha, x = 0, ha = 1.0, hf = 1.25, internal = false, segments = 12, arcSegs = 6 } = opts;
+  const { z, m, alpha, x = 0, ha = 1.0, hf = 1.25, internal = false, segments = 12, arcSegs = 6, backlashFrac = 0 } = opts;
   const aRad = alpha * DEG;
   const sign = internal ? -1 : 1;
   const r  = (m * z) / 2;
@@ -3329,7 +3332,7 @@ function gearVertices(opts) {
   let ra = r + sign * (ha + sign * x) * m;
   let rf = r - sign * (hf - sign * x) * m;
   if (rf < 0.1) rf = 0.1;
-  const halfTooth = (Math.PI / 2 + 2 * x * Math.tan(aRad)) / z;
+  const halfTooth = (Math.PI / 2 + 2 * x * Math.tan(aRad)) / z * (1 - backlashFrac);
   const invAlpha = Math.tan(aRad) - aRad;
   const tAtR = (rad) => rad > rb ? Math.sqrt((rad / rb) ** 2 - 1) : 0;
   const tRoot = tAtR(internal ? rf : Math.max(rb, rf));
@@ -3447,10 +3450,11 @@ function generateDXF(r) {
     w(0, "TEXT", 8, lyr, 10, fmt(x), 20, fmt(y), 30, 0, 40, fmt(h), 1, String(str));
   };
 
-  // --- Sun gear ---
+  const dxfPhases = computeMeshPhases(r);
+  // --- Sun gear --- (sunPhase0 = 0)
   const sunVerts = gearVertices({
     z: r.zs, m: r.m, alpha: r.alpha, x: r.xs,
-    ha: r.ha, hf: r.hf, internal: false, segments: 24
+    ha: r.ha, hf: r.hf, internal: false, segments: 24, backlashFrac: VIS_BACKLASH
   });
   polyline(sunVerts, "SUN_GEAR");
   circle(0, 0, r.ds / 2,  "REFERENCE");
@@ -3463,9 +3467,8 @@ function generateDXF(r) {
   // --- Planet gears (N copies, with static phase + position) ---
   const planetVerts = gearVertices({
     z: r.zp, m: r.m, alpha: r.alpha, x: r.xp,
-    ha: r.ha, hf: r.hf, internal: false, segments: 24
+    ha: r.ha, hf: r.hf, internal: false, segments: 24, backlashFrac: VIS_BACKLASH
   });
-  const dxfPhases = computeMeshPhases(r);
   for (let i = 0; i < r.N; i++) {
     const ang = (i / r.N) * TAU;
     const phaseDeg = dxfPhases.planetPhase0[i];
@@ -3487,10 +3490,12 @@ function generateDXF(r) {
   circle(0, 0, r.m * 2.2, "CARRIER");
 
   // --- Ring gear (internal teeth + outer rim) ---
+  // ÖNEMLİ: ring de mesh fazıyla (ringPhase0) döndürülür — yoksa planet-ring çakışır.
+  const ringPhaseRad = dxfPhases.ringPhase0 * DEG;
   const ringVerts = gearVertices({
     z: r.zr, m: r.m, alpha: r.alpha, x: r.xr,
-    ha: r.ha, hf: r.hf, internal: true, segments: 24
-  });
+    ha: r.ha, hf: r.hf, internal: true, segments: 24, backlashFrac: VIS_BACKLASH
+  }).map(v => rotate(v, ringPhaseRad));
   polyline(ringVerts, "RING_GEAR");
   circle(0, 0, r.dfr / 2 + r.m * 3, "RING_GEAR");  // dış disk
   circle(0, 0, r.dr  / 2, "REFERENCE");
