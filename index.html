@@ -1095,9 +1095,65 @@ function computeMeshPhases(r) {
     planetPhase0.push(minimal(ph, pitchP));
   }
   // planet0↔ring mesh (C_pr) → ring fazı (assembly koşulu tüm planetler için tutar)
-  const ringPhase0 = minimal((zp / zr) * planetPhase0[0] - MESH_C_PR * 360 / zr, pitchR);
+  let ringPhase0 = minimal((zp / zr) * planetPhase0[0] - MESH_C_PR * 360 / zr, pitchR);
+  // KURAL (kullanıcı önerisi): hareket mesh'i koruduğundan, ring'in BAŞLANGIÇ
+  // fazı çakışmasız olursa sonsuza dek çakışmaz. Analitik fazı, planet 0 dişini
+  // ring boşluğunda en fazla/dengeli boşlukla konumlandıracak şekilde rafine et
+  // — profil kayması (x_p≠x_r) kaynaklı asimetrik sıkışmayı da otomatik giderir.
+  ringPhase0 = refineRingPhase(r, ringPhase0, planetPhase0[0]);
   return { sunPhase0: 0, planetPhase0, ringPhase0 };
 }
+
+// Ring fazını, planet 0 dişini ring boşluğunda EN FAZLA boşlukla (çakışmasız)
+// konumlandıracak δ ile rafine eder. Gerçek diş profilleri (gearVertices) kullanılır;
+// planet dişinin ring iç-profiline (bore) işaretli en yakın mesafesi maksimize edilir.
+function refineRingPhase(r, ringPhase0, phi0) {
+  try {
+    if (!r || !isFinite(r.a) || !isFinite(r.m)) return ringPhase0;
+    const pitchR = 360 / r.zr, a = r.a;
+    const pv = gearVertices({ z: r.zp, m: r.m, alpha: r.alpha, x: r.xp, ha: r.ha, hf: r.hf, internal: false, segments: 6, arcSegs: 1 });
+    const rv = gearVertices({ z: r.zr, m: r.m, alpha: r.alpha, x: r.xr, ha: r.ha, hf: r.hf, internal: true,  segments: 6, arcSegs: 1 });
+    // planet 0 köşeleri → dünya (faz phi0, (a,0)'a taşı); ring'e bakan temas bölgesi.
+    const cp = Math.cos(phi0 * DEG), sp = Math.sin(phi0 * DEG);
+    const pPts = [];
+    for (const p of pv) {
+      const x = p.x * cp - p.y * sp + a, y = p.x * sp + p.y * cp;
+      if (x > a && Math.abs(Math.atan2(y, x)) < 22 * DEG) pPts.push({ x, y });
+    }
+    if (pPts.length < 3) return ringPhase0;
+    // Ring kenar segmentleri (lokal), yalnız temas bölgesi (±28°) — sabit.
+    const segL = [];
+    for (let i = 0, j = rv.length - 1; i < rv.length; j = i++) {
+      const mx = (rv[i].x + rv[j].x) / 2, my = (rv[i].y + rv[j].y) / 2;
+      if (Math.abs(Math.atan2(my, mx)) < 28 * DEG) segL.push([rv[j].x, rv[j].y, rv[i].x, rv[i].y]);
+    }
+    if (!segL.length) return ringPhase0;
+    // Performans: RING'i döndürmek yerine PLANET noktalarını ring-lokal çerçeveye
+    // (−(ringPhase0+δ)) döndürüp sabit segmentlere İŞARETSİZ min mesafeyi hesapla;
+    // bunu maksimize eden δ, planet dişini ring boşluğunda dengeli ortalar.
+    const distSq = (px, py) => {
+      let best = Infinity;
+      for (let k = 0; k < segL.length; k++) {
+        const s = segL[k]; const dx = s[2]-s[0], dy = s[3]-s[1], l2 = dx*dx+dy*dy||1e-9;
+        let t = ((px-s[0])*dx + (py-s[1])*dy)/l2; t = t<0?0:t>1?1:t;
+        const ex = s[0]+t*dx-px, ey = s[1]+t*dy-py, d = ex*ex+ey*ey;
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    let bestDelta = 0, bestScore = -Infinity;
+    const steps = 36;
+    for (let k = 0; k <= steps; k++) {
+      const d = -pitchR / 2 + pitchR * (k / steps);
+      const ang = -(ringPhase0 + d) * DEG, c = Math.cos(ang), s = Math.sin(ang);
+      let minClear = Infinity;
+      for (const pt of pPts) { const dd = distSq(pt.x*c - pt.y*s, pt.x*s + pt.y*c); if (dd < minClear) minClear = dd; }
+      if (minClear > bestScore) { bestScore = minClear; bestDelta = d; }
+    }
+    return ringPhase0 + bestDelta;
+  } catch (e) { return ringPhase0; }
+}
+
 
 // Verili Zs/Zp/Zr/N/m için profil kaymalarını (x_s, x_p, x_r) hesaplar.
 // Amaç: diş sayıları DEĞİŞTİRİLMEDEN geometrik uyum sağlanması.
@@ -2681,7 +2737,7 @@ function draw(r) {
   // Tek noktada path üretimi: r.ha/r.hf burada katsayıdır (yükseklik değil).
   // Görsel backlash: meshlenen dişler tam temasta dip dibe görünmesin diye
   // dişleri simetrik ~%7 inceltir (faz/merkez korunur, geometri konjuge kalır).
-  const VIS_BACKLASH = 0.10;
+  const VIS_BACKLASH = 0.05;
   const gearPathFor = (z, x, pitchR, internal) => detail
     ? generateGearPath({ z, m, alpha, x, ha: r.ha, hf: r.hf, internal, segments: segs, backlashFrac: VIS_BACKLASH })
     : simpleGearPath(pitchR);
