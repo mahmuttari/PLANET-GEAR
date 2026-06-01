@@ -1047,6 +1047,58 @@ function omegasFromMode(mode, omegaIn, zs, zr) {
   }
 }
 
+// =============================================================================
+//   KESİN MESH MODELİ — faz (statik) + kinematik katsayılar (drift'siz animasyon)
+// =============================================================================
+// Her grubun oryantasyonu tek bir master açının (M, giriş şaftı açısı) DOĞRUSAL
+// fonksiyonudur: θ = faz0 + c·M. Oranlar tam olduğundan (Willis) mesh sonsuza
+// kadar korunur; ayrı hız entegrasyonundaki drift/tutarsızlık ortadan kalkar.
+//
+// Diş-merkezi konvansiyonu (generateGearPath): θ=0'da diş MERKEZİ açı 0'da.
+// polar() ve SVG rotate() aynı yönde → diş-merkezi dünya açısı = θ + k·(360/z),
+// planet ışın açısı = ψ_i + θ_carrier.  Aynı koordinat sistemi → işaret tutarlı.
+//
+// Harici-harici (sun↔planet): diş ↔ boşluk  → yarım-pitch offset (C=1/2).
+// Harici-dahili (planet↔ring): diş-merkezleri hizalı → C=0 (kalibrasyonla doğrulandı).
+const MESH_C_SP = 0.5;
+const MESH_C_PR = 0.0;
+
+// Master açıya göre her grubun oryantasyon katsayısı (c = dθ/dM).
+function kinematicCoefs(mode, zs, zr, zp) {
+  let cSun, cRing, cCarrier;
+  switch (mode) {
+    case "carrier_fixed": cSun = 1; cRing = -zs / zr;     cCarrier = 0; break;
+    case "sun_fixed":     cSun = 0; cRing = 1;            cCarrier = zr / (zs + zr); break;
+    case "ring_fixed":
+    default:              cSun = 1; cRing = 0;            cCarrier = zs / (zs + zr); break;
+  }
+  // Planet'in carrier ÇERÇEVESİNDEKİ spin katsayısı (rot grubuna uygulanır):
+  //   ω_p,world − ω_c = −(zs/zp)(ω_s − ω_c)
+  const cPlanetRot = -(zs / zp) * (cSun - cCarrier);
+  return { cSun, cRing, cCarrier, cPlanetRot };
+}
+
+// Statik mesh fazları: sun (0 referans), her planet, ring.
+function computeMeshPhases(r) {
+  const { zs, zp, zr, N } = r;
+  const pitchP = 360 / zp, pitchR = 360 / zr;
+  // Açıyı [−p/2, +p/2] minimal aralığa indir (kozmetik; pitch katı mesh-değişmez).
+  const minimal = (a, p) => { a = ((a % p) + p) % p; if (a > p / 2) a -= p; return a; };
+  const planetPhase0 = [];
+  for (let i = 0; i < N; i++) {
+    const psi = (i / N) * 360;                       // planet i ışın açısı (carrier=0)
+    // sun↔planet mesh: harici-harici → planet güneşe TERS döner. Mesh'in korunma
+    // (türev=0, Willis) koşulundan türetilen DOĞRU faz:
+    //   φ_i = ψ·(1 + z_s/z_p) + 180° − (360/z_p)·C_sp
+    // (Eski "1 − z_s/z_p" işareti yalnız z_s=z_p'de doğruydu; z_s≠z_p'de paradoks.)
+    const ph = psi * (1 + zs / zp) + 180 - MESH_C_SP * 360 / zp;
+    planetPhase0.push(minimal(ph, pitchP));
+  }
+  // planet0↔ring mesh (C_pr) → ring fazı (assembly koşulu tüm planetler için tutar)
+  const ringPhase0 = minimal((zp / zr) * planetPhase0[0] - MESH_C_PR * 360 / zr, pitchR);
+  return { sunPhase0: 0, planetPhase0, ringPhase0 };
+}
+
 // Verili Zs/Zp/Zr/N/m için profil kaymalarını (x_s, x_p, x_r) hesaplar.
 // Amaç: diş sayıları DEĞİŞTİRİLMEDEN geometrik uyum sağlanması.
 //
@@ -2521,8 +2573,9 @@ function renderResults(r) {
 //                                  ÇİZİM
 // =============================================================================
 const NS = "http://www.w3.org/2000/svg";
-// planetSpin: carrier referans çerçevesinde planet'in birikimli açısı (derece, SVG +CW)
-let animState = { sunAngle: 0, ringAngle: 0, carrierAngle: 0, planetSpin: 0, lastTs: 0 };
+// master: giriş şaftının birikimli açısı (derece). Tüm gruplar bunun analitik
+// fonksiyonu (θ = faz0 + c·master) → oranlar tam, mesh drift'siz korunur.
+let animState = { master: 0, lastTs: 0 };
 
 function el(name, attrs = {}, text = null) {
   const e = document.createElementNS(NS, name);
@@ -2563,26 +2616,8 @@ function appendRefCircles(group, { r_pitch, r_base, color, m, showPitch, showBas
     }));
   }
 }
-
-// Planet i'nin statik mesh fazı. Assembly koşulu sağlandığında tüm planetler
-// için aynı değeri, sağlanmadığında uygun yaklaşımı verir.
-// ψ_i = (θ_i + 180° − 180°/Zp + oddShift)  mod  (360°/Zp), [-toothPitch/2, +toothPitch/2]
-//
-// PARADOKS DÜZELTMESİ (Zp tek): planet üzerindeki 0° (ring tarafı) ile 180°
-// (sun tarafı) yarım-pitch farklıdır. Zp ÇİFT ise 180° tam pitch katı → her
-// iki taraf da aynı tipte (gap veya tooth). Zp TEK ise 180° yarım-pitch
-// offsetli → bir tarafta gap, diğer tarafta tooth merkezi olur.
-// Çözüm: Zp tek için fazı çeyrek-pitch (90/Zp) kaydır. Böylece HER İKİ temas
-// da gap'ten eşit uzaklıkta planet diş yanağında olur (gerçek dişli
-// rolling'inde de mesh teeth FLANK'larında temas eder, merkezde değil).
-function planetPhase(i, N, Zp) {
-  const toothPitch = 360 / Zp;
-  const oddShift = (Zp % 2 !== 0) ? 90 / Zp : 0;
-  let phase = (i / N) * 360 + 180 - 180 / Zp + oddShift;
-  phase = ((phase % toothPitch) + toothPitch) % toothPitch;
-  if (phase > toothPitch / 2) phase -= toothPitch;
-  return phase;
-}
+// (Eski yaklaşık planetPhase kaldırıldı — yerini ilk-prensiplerden türetilen,
+//  z_s'e bağlı ve Willis ile tutarlı computeMeshPhases() aldı; yukarıya bakınız.)
 
 function draw(r) {
   const svg = $("diagram");
@@ -2590,6 +2625,12 @@ function draw(r) {
 
   const maxR = (r.dfr / 2) + r.m * 5 + 30;
   svg.setAttribute("viewBox", `${-maxR} ${-maxR} ${maxR*2} ${maxR*2}`);
+
+  // Kesin mesh modeli: statik fazlar + kinematik katsayılar (analitik animasyon).
+  const phases = computeMeshPhases(r);
+  const coefs  = kinematicCoefs(currentMode, r.zs, r.zr, r.zp);
+  animCache.phases = phases;
+  animCache.coefs  = coefs;
 
   const detail = $("teethDetail").checked;
   const showPitch = $("showPitch").checked;
@@ -2640,7 +2681,7 @@ function draw(r) {
     : simpleGearPath(pitchR);
 
   // --- RING (en dıştaki çember + iç dişler) ---
-  const ringG = el("g", { id: "ringG" });
+  const ringG = el("g", { id: "ringG", transform: `rotate(${phases.ringPhase0.toFixed(4)})` });
   // Dış jant: gerçekçi modda kütük dış çapı (df + 2·jant) kadar; değilse pitch payı.
   const ringOuterR = realistic && t ? t.ring.od / 2 : (r.dfr / 2) + ringDiscPad;
   ringG.appendChild(el("circle", {
@@ -2688,12 +2729,12 @@ function draw(r) {
   animCache.uprightLabels = [];   // yörüngede dönen ama dik kalan ölçü etiketleri
   animCache.planetDiaG = null;
   planetPositions.forEach((p, i) => {
-    const phase = planetPhase(i, r.N, r.zp);
+    const phase = phases.planetPhase0[i];
     const pg = el("g", {
       transform: `translate(${p.x.toFixed(2)} ${p.y.toFixed(2)})`,
       "data-planet": i,
     });
-    const rot = el("g", { class: "planet-rot", transform: `rotate(${phase.toFixed(3)})` });
+    const rot = el("g", { class: "planet-rot", transform: `rotate(${phase.toFixed(4)})` });
     rot.appendChild(el("path", { d: planetPath, fill: fillPlanet, stroke: COLORS.planet, "stroke-width": sw }));
     if (!realistic) rot.appendChild(el("circle", { cx: (r.dp / 2) * 0.6, cy: 0, r: m * 0.4, fill: COLORS.sun }));
     appendRefCircles(rot, { ...refOpts, r_pitch: r.dp / 2, r_base: r.dbp / 2, color: COLORS.planet });
@@ -2706,7 +2747,7 @@ function draw(r) {
       pg.appendChild(el("circle", { cx: 0, cy: 0, r: boreR*0.92, fill: "none", stroke: "#ffffff", "stroke-width": Math.max(0.06, m*0.03), opacity: 0.2 }));
     }
     carrierG.appendChild(pg);
-    animCache.planets.push({ node: rot, phase });
+    animCache.planets.push({ node: rot, base: phase });
   });
 
   svg.appendChild(carrierG);
@@ -3156,40 +3197,35 @@ function animate(ts) {
   if (!lastResult) { requestAnimationFrame(animate); return; }
   const dt = animState.lastTs ? (ts - animState.lastTs) / 1000 : 0;
   animState.lastTs = ts;
-  if ($("anim").checked) {
+  if ($("anim").checked && animCache.coefs && animCache.phases) {
     const speedFactor = parseFloat($("speed").value) / 30;
-    const omegaIn = 50 * speedFactor; // giriş şaftı açısal hızı (deg/sn)
-    const r = lastResult;
-    // Modlara göre üç şaftın da hızı (sun/ring/carrier). Geleneksel:
-    //   ring_fixed: sun input    carrier_fixed: sun input   sun_fixed: ring input
-    const w = omegasFromMode(currentMode, omegaIn, r.zs, r.zr);
-    // Planet dünya açısal hızı (Willis): ω_p = (ω_s − ω_c)·(−Zs/Zp) + ω_c
-    const planetOmegaWorld = (w.sun - w.carrier) * (-r.zs / r.zp) + w.carrier;
-    const planetSpinRel    = planetOmegaWorld - w.carrier;
+    const omegaIn = 50 * speedFactor;            // giriş şaftı açısal hızı (deg/sn)
+    animState.master += omegaIn * dt;            // tek birikimli açı
+    const M = animState.master;
+    const c = animCache.coefs, ph = animCache.phases;
 
-    animState.sunAngle     += w.sun     * dt;
-    animState.ringAngle    += w.ring    * dt;
-    animState.carrierAngle += w.carrier * dt;
-    animState.planetSpin   += planetSpinRel * dt;
+    // Tüm gruplar master'ın analitik fonksiyonu: θ = faz0 + c·M (drift'siz).
+    const thetaSun     = ph.sunPhase0  + c.cSun     * M;
+    const thetaRing    = ph.ringPhase0 + c.cRing    * M;
+    const thetaCarrier =                 c.cCarrier * M;
 
-    if (animCache.sunG)     animCache.sunG.setAttribute("transform",     `rotate(${animState.sunAngle.toFixed(3)})`);
-    if (animCache.ringG)    animCache.ringG.setAttribute("transform",    `rotate(${animState.ringAngle.toFixed(3)})`);
-    if (animCache.carrierG) animCache.carrierG.setAttribute("transform", `rotate(${animState.carrierAngle.toFixed(3)})`);
-    // carrierG dışında olup planet 0'ı takip etmesi gereken ölçü grafikleri
-    // (eksen mesafesi çizgisi + planet çap kotaları) carrier açısıyla döner.
-    const cTr = `rotate(${animState.carrierAngle.toFixed(3)})`;
+    if (animCache.sunG)     animCache.sunG.setAttribute("transform",     `rotate(${thetaSun.toFixed(4)})`);
+    if (animCache.ringG)    animCache.ringG.setAttribute("transform",    `rotate(${thetaRing.toFixed(4)})`);
+    if (animCache.carrierG) animCache.carrierG.setAttribute("transform", `rotate(${thetaCarrier.toFixed(4)})`);
+    // Eksen mesafesi çizgisi + planet çap kotaları carrier ile döner.
+    const cTr = `rotate(${thetaCarrier.toFixed(4)})`;
     if (animCache.axisDim)     animCache.axisDim.setAttribute("transform", cTr);
     if (animCache.planetDiaG)  animCache.planetDiaG.setAttribute("transform", cTr);
-    // Yörüngede dönen ama METNİ dik kalması gereken etiketler: yalnız konumları
-    // döndürülür (eksen mesafesi değeri + planet Ø değerleri).
+    // Yörüngede konumu dönen ama metni dik kalan etiketler.
     if (animCache.uprightLabels && animCache.uprightLabels.length) {
-      const ca = animState.carrierAngle * DEG, cos = Math.cos(ca), sin = Math.sin(ca);
+      const ca = thetaCarrier * DEG, cos = Math.cos(ca), sin = Math.sin(ca);
       for (const { node, x, y } of animCache.uprightLabels) {
         node.setAttribute("transform", `translate(${(x*cos - y*sin).toFixed(2)} ${(x*sin + y*cos).toFixed(2)})`);
       }
     }
-    for (const { node, phase } of animCache.planets) {
-      node.setAttribute("transform", `rotate(${(phase + animState.planetSpin).toFixed(3)})`);
+    // Planet rot grubu (carrier çerçevesinde): θ = faz0_i + cPlanetRot·M
+    for (const { node, base } of animCache.planets) {
+      node.setAttribute("transform", `rotate(${(base + c.cPlanetRot * M).toFixed(4)})`);
     }
   }
   requestAnimationFrame(animate);
@@ -3212,11 +3248,8 @@ function calculateAndDraw() {
   }
   draw(r);
   drawSection(r);
-  // Animasyon birikimlerini sıfırla (statik faz draw() içinde uygulanıyor)
-  animState.sunAngle = 0;
-  animState.ringAngle = 0;
-  animState.carrierAngle = 0;
-  animState.planetSpin = 0;
+  // Master açıyı sıfırla — statik mesh fazları draw() içinde uygulandı.
+  animState.master = 0;
 }
 
 // =============================================================================
@@ -3370,9 +3403,10 @@ function generateDXF(r) {
     z: r.zp, m: r.m, alpha: r.alpha, x: r.xp,
     ha: r.ha, hf: r.hf, internal: false, segments: 24
   });
+  const dxfPhases = computeMeshPhases(r);
   for (let i = 0; i < r.N; i++) {
     const ang = (i / r.N) * TAU;
-    const phaseDeg = planetPhase(i, r.N, r.zp);
+    const phaseDeg = dxfPhases.planetPhase0[i];
     const phaseRad = phaseDeg * DEG;
     const pos = polar(r.a, ang);
     const transformed = planetVerts.map(v => {
