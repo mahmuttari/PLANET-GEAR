@@ -528,6 +528,26 @@
           </div>
         </div>
 
+        <div class="help" style="border-left-color: var(--gold);">
+          <strong>Çap ile boyutlandır:</strong> Bir dişlinin çapını girin → modül otomatik seçilir,
+          diğer iki çap diş sayılarından (geometriye uygun) hesaplanır. Alanlar mevcut çapları gösterir.
+        </div>
+        <div class="row">
+          <div class="field">
+            <label>Çap tipi</label>
+            <select id="diaSizeType">
+              <option value="d" selected>Taksimat çapı (d)</option>
+              <option value="da">Diş üstü çapı (da)</option>
+              <option value="df">Diş dibi çapı (df)</option>
+            </select>
+          </div>
+        </div>
+        <div class="row three">
+          <div class="field"><label>Güneş Ø <span class="unit">mm</span></label><input type="number" id="diaSun" value="" step="0.1" min="0" placeholder="—"></div>
+          <div class="field"><label>Gezegen Ø <span class="unit">mm</span></label><input type="number" id="diaPlanet" value="" step="0.1" min="0" placeholder="—"></div>
+          <div class="field"><label>Ring Ø <span class="unit">mm</span></label><input type="number" id="diaRing" value="" step="0.1" min="0" placeholder="—"></div>
+        </div>
+
         <div class="row">
           <div class="field">
             <label>Basınç Açısı α <span class="unit">°</span></label>
@@ -1821,6 +1841,57 @@ $("modulePreset").addEventListener("change", () => {
   if (!isCustom) $("moduleCustom").value = $("modulePreset").value;
   calculateAndDraw();
 });
+
+// ── ÇAP İLE BOYUTLANDIRMA ────────────────────────────────────────────────
+// Kullanıcı bir dişlinin çapını girince, o çapı verecek MODÜL hesaplanır; diş
+// sayıları sabit kaldığından diğer çaplar geometriye uygun (d = m·z) otomatik
+// çıkar. Tip: d (taksimat) / da (diş üstü) / df (diş dibi).
+function moduleFromDiameter(gear, value) {
+  const v = parseFloat(value);
+  if (!isFinite(v) || v <= 0) return null;
+  const zMap = { sun: "zs", planet: "zp", ring: "zr" };
+  const xMap = { sun: "xs", planet: "xp", ring: "xr" };
+  const z = parseInt($(zMap[gear]).value);
+  const x = parseFloat($(xMap[gear]).value) || 0;
+  const ha = parseFloat($("haCoef").value) || 1;
+  const hf = parseFloat($("hfCoef").value) || 1.25;
+  const beta = parseFloat($("beta").value) || 0;
+  const cosB = Math.cos(beta * DEG);
+  const s = gear === "ring" ? -1 : 1;   // harici +1, dahili −1
+  const type = $("diaSizeType").value;
+  // çap = m · denom :  d=z/cosβ ; da=z/cosβ+s·2(ha+s·x) ; df=z/cosβ−s·2(hf−s·x)
+  let denom;
+  if (type === "da")      denom = z / cosB + s * 2 * (ha + s * x);
+  else if (type === "df") denom = z / cosB - s * 2 * (hf - s * x);
+  else                    denom = z / cosB;            // d (taksimat)
+  if (!isFinite(denom) || denom <= 0) return null;
+  return v / denom;
+}
+function applyDiameterSizing(gear) {
+  const inputId = { sun: "diaSun", planet: "diaPlanet", ring: "diaRing" }[gear];
+  const m = moduleFromDiameter(gear, $(inputId).value);
+  if (m == null) { refreshDiameterInputs(); return; }
+  $("modulePreset").value = "custom";
+  $("moduleCustom").disabled = false;
+  $("moduleCustom").value = +m.toFixed(4);
+  calculateAndDraw();   // refreshDiameterInputs() içeride çağrılır
+}
+function refreshDiameterInputs() {
+  if (!lastResult) return;
+  const r = lastResult, type = $("diaSizeType").value;
+  const v = type === "da" ? [r.das, r.dap, r.dar]
+          : type === "df" ? [r.dfs, r.dfp, r.dfr]
+          : [r.ds, r.dp, r.dr];
+  // Odaklı alanı (kullanıcı yazarken) ezme
+  const af = document.activeElement && document.activeElement.id;
+  if (af !== "diaSun")    $("diaSun").value    = v[0].toFixed(2);
+  if (af !== "diaPlanet") $("diaPlanet").value = v[1].toFixed(2);
+  if (af !== "diaRing")   $("diaRing").value   = v[2].toFixed(2);
+}
+$("diaSun").addEventListener("change",    () => applyDiameterSizing("sun"));
+$("diaPlanet").addEventListener("change", () => applyDiameterSizing("planet"));
+$("diaRing").addEventListener("change",   () => applyDiameterSizing("ring"));
+$("diaSizeType").addEventListener("change", refreshDiameterInputs);
 
 // Otomatik boyutlandırma butonları
 // Otomatik profil kayması: diş sayıları dokunulmadan x_s/x_p/x_r hesaplanıp uygulanır
@@ -3313,6 +3384,9 @@ function calculateAndDraw() {
   }
   draw(r);
   drawSection(r);
+  // Çap-ile-boyutlandırma alanlarını güncel değerlerle yenile (seçilen hariç
+  // diğer çaplar otomatik görünür).
+  if (typeof refreshDiameterInputs === "function") refreshDiameterInputs();
   // Master açıyı sıfırla — statik mesh fazları draw() içinde uygulandı.
   animState.master = 0;
 }
