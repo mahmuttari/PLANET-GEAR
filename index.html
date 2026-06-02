@@ -1137,6 +1137,15 @@ function computeMeshPhases(r) {
     const ph = psi * (1 + zs / zp) + 180 - MESH_C_SP * 360 / zp;
     planetPhase0.push(minimal(ph, pitchP));
   }
+  // EVRENSEL KURAL: hareket mesh'i koruduğundan, BAŞLANGIÇ konumu çakışmasızsa
+  // sonsuza dek çakışmaz. Analitik fazlara güvenmek yerine HER İKİ meshi de aynı
+  // sayısal prensiple (gerçek diş profillerine göre dengeli boşluk) rafine et →
+  // hangi ölçü girilirse girilsin (profil kayması, standart-dışı vs.) çakışma olmaz.
+  // 1) sun↔planet: ortak Δp (tüm planetler özdeş) planet 0'dan bulunur, hepsine uygulanır.
+  const phi0ref = refinePlanetPhase(r, planetPhase0[0]);
+  const deltaP = phi0ref - planetPhase0[0];
+  if (isFinite(deltaP) && deltaP !== 0)
+    for (let i = 0; i < N; i++) planetPhase0[i] = minimal(planetPhase0[i] + deltaP, pitchP);
   // planet0↔ring mesh (C_pr) → ring fazı (assembly koşulu tüm planetler için tutar)
   let ringPhase0 = minimal((zp / zr) * planetPhase0[0] - MESH_C_PR * 360 / zr, pitchR);
   // KURAL (kullanıcı önerisi): hareket mesh'i koruduğundan, ring'in BAŞLANGIÇ
@@ -1195,6 +1204,50 @@ function refineRingPhase(r, ringPhase0, phi0) {
     }
     return ringPhase0 + bestDelta;
   } catch (e) { return ringPhase0; }
+}
+
+// Planet fazını, planet dişini GÜNEŞ boşluğunda en dengeli (çakışmasız) konumlandıracak
+// δ ile rafine eder (sun↔planet meshi). Tüm planetler özdeş olduğundan tek δ yeterli.
+// refineRingPhase ile aynı prensip: gerçek profillerin temas bölgesinde min mesafe maks.
+function refinePlanetPhase(r, phi0) {
+  try {
+    if (!r || !isFinite(r.a) || !isFinite(r.m)) return phi0;
+    const a = r.a, pitchP = 360 / r.zp;
+    const pv = gearVertices({ z: r.zp, m: r.m, alpha: r.alpha, x: r.xp, ha: r.ha, hf: r.hf, internal: false, segments: 6, arcSegs: 1 });
+    const sv = gearVertices({ z: r.zs, m: r.m, alpha: r.alpha, x: r.xs, ha: r.ha, hf: r.hf, internal: false, segments: 6, arcSegs: 1 });
+    // Güneş kenar segmentleri (world=local, sun@O), temas bölgesi +x ±32°
+    const segL = [];
+    for (let i = 0, j = sv.length - 1; i < sv.length; j = i++) {
+      const mx = (sv[i].x + sv[j].x) / 2, my = (sv[i].y + sv[j].y) / 2;
+      if (Math.abs(Math.atan2(my, mx)) < 32 * DEG) segL.push([sv[j].x, sv[j].y, sv[i].x, sv[i].y]);
+    }
+    if (!segL.length) return phi0;
+    const distSq = (px, py) => {
+      let best = Infinity;
+      for (let k = 0; k < segL.length; k++) {
+        const s = segL[k]; const dx = s[2]-s[0], dy = s[3]-s[1], l2 = dx*dx+dy*dy||1e-9;
+        let t = ((px-s[0])*dx + (py-s[1])*dy)/l2; t = t<0?0:t>1?1:t;
+        const ex = s[0]+t*dx-px, ey = s[1]+t*dy-py, d = ex*ex+ey*ey;
+        if (d < best) best = d;
+      }
+      return best;
+    };
+    let bestDelta = 0, bestScore = -Infinity;
+    const steps = 36;
+    for (let k = 0; k <= steps; k++) {
+      const d = -pitchP / 2 + pitchP * (k / steps);
+      const ang = (phi0 + d) * DEG, c = Math.cos(ang), s = Math.sin(ang);
+      let minClear = Infinity;
+      for (const p of pv) {
+        const x = p.x * c - p.y * s + a, y = p.x * s + p.y * c;   // planet 0 dünya
+        if (x >= a) continue;                                      // yalnız güneşe bakan iç yarı
+        if (Math.abs(Math.atan2(y, x)) > 32 * DEG) continue;
+        const dd = distSq(x, y); if (dd < minClear) minClear = dd;
+      }
+      if (minClear !== Infinity && minClear > bestScore) { bestScore = minClear; bestDelta = d; }
+    }
+    return phi0 + bestDelta;
+  } catch (e) { return phi0; }
 }
 
 
