@@ -483,6 +483,17 @@
       <h2><span class="collapser" data-target="presetBody">Hazır Konfigürasyonlar <span class="arrow">▼</span></span></h2>
       <div class="panel-body" id="presetBody">
         <div class="preset-grid" id="presetGrid"></div>
+        <div style="margin-top:12px; border-top:1px solid var(--border); padding-top:10px;">
+          <label style="font-size:12px; color:var(--text); font-weight:600;">Bonfiglioli 300 Serisi — Tek Kademe Katalog (temsili)</label>
+          <select id="bonfiglioliCatalog" style="width:100%; margin-top:6px; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:7px 9px; font-size:12px; font-family:inherit;">
+            <option value="">— Katalogdan seç —</option>
+          </select>
+          <div class="help" style="border-left-color: var(--accent-2); margin-top:8px; font-size:11px;">
+            Bonfiglioli 300 serisinin <strong>yayınlanmış kademe redüksiyon oranlarına</strong> (≈3.4–7) uyan,
+            geometrik + Fellows kısıtlarını sağlayan <strong>temsili</strong> konfigürasyonlardır.
+            İç diş sayıları firmaya özel olduğundan bunlar üreticinin gerçek değerleri değil, aynı oranı veren denk tasarımlardır.
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1650,6 +1661,18 @@ const PRESETS = [
     values: { zs: 30, zp: 30, zr: 90, np: 3, m: 3, b: 36, T: 400 } },
 ];
 
+// Bonfiglioli 300 serisi TEK KADEME katalog — TEMSİLİ.
+// Bonfiglioli'nin yayınlanmış kademe oranlarına (≈3.4–7, ring sabit i=1+Zr/Zs) uyan,
+// undercut'sız + Fellows-shapelenebilir (z≥z_min, z_ring−kesici≥Δmin) geçerli setler.
+// İç diş sayıları firmaya özeldir; bunlar aynı oranı veren denk/temsili tasarımlardır.
+const BONFIGLIOLI = [
+  { ratio: 3.5, frame: "3xx / i≈3.5",  values: { zs: 24, zp: 18, zr: 60,  np: 4, m: 2, b: 24, T: 100 } },
+  { ratio: 4.0, frame: "3xx / i≈4",    values: { zs: 18, zp: 18, zr: 54,  np: 3, m: 2, b: 20, T: 90  } },
+  { ratio: 5.0, frame: "3xx / i≈5",    values: { zs: 18, zp: 27, zr: 72,  np: 3, m: 3, b: 30, T: 220 } },
+  { ratio: 6.0, frame: "3xx / i≈6",    values: { zs: 18, zp: 36, zr: 90,  np: 3, m: 3, b: 32, T: 320 } },
+  { ratio: 7.0, frame: "3xx / i≈7",    values: { zs: 18, zp: 45, zr: 108, np: 3, m: 4, b: 40, T: 600 } },
+];
+
 // =============================================================================
 //                                   UI
 // =============================================================================
@@ -1874,6 +1897,26 @@ function renderPresets() {
     btn.innerHTML = `<span class="ptitle">${p.name}</span><span class="pdesc">${p.desc}</span>`;
     btn.addEventListener("click", () => applyPreset(p));
     grid.appendChild(btn);
+  });
+  renderBonfiglioli();
+}
+
+function renderBonfiglioli() {
+  const sel = $("bonfiglioliCatalog");
+  if (!sel) return;
+  sel.innerHTML = `<option value="">— Katalogdan seç —</option>`;
+  BONFIGLIOLI.forEach((c, i) => {
+    const v = c.values;
+    const opt = document.createElement("option");
+    opt.value = String(i);
+    opt.textContent = `i≈${c.ratio.toFixed(1)} · Zs=${v.zs} Zp=${v.zp} Zr=${v.zr} N=${v.np} m=${v.m} (${c.frame})`;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener("change", () => {
+    const i = parseInt(sel.value);
+    if (isNaN(i) || !BONFIGLIOLI[i]) return;
+    const c = BONFIGLIOLI[i];
+    applyPreset({ name: `Bonfiglioli i≈${c.ratio}`, desc: c.frame, values: c.values });
   });
 }
 
