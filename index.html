@@ -460,6 +460,13 @@
             </select>
           </div>
         </div>
+        <div class="row">
+          <label style="font-size:12px; color:var(--text); display:flex; align-items:center; gap:8px;">
+            <input type="checkbox" id="wizFellows">
+            <span>Yalnız <strong>Fellows (shaping)</strong> ile üretilebilir öner
+              <span style="color:var(--muted)">— ring kesici farkı ≥ Δmin, sun/planet undercut'sız</span></span>
+          </label>
+        </div>
         <div id="wizardOutput" style="font-size:12px; color:var(--muted); margin:10px 0; padding:10px;
              background:var(--panel-2); border-radius:7px; min-height:28px;">
           ↑ Değerleri girin ve <em>Tasarım Üret</em>'e tıklayın.
@@ -1563,6 +1570,58 @@ function getMat() {
 // =============================================================================
 //                                  PRESETLER
 // =============================================================================
+// =============================================================================
+//        FELLOWS (DİŞ AÇMA / GEAR SHAPING) — UYGUNLUK & KESİCİ ÖNERİSİ
+// =============================================================================
+// Planet sette ring İÇ dişlidir → yalnız shaping (Fellows) ile açılır; hobbing
+// iç dişli açamaz. Pinyon-tipi kesici (cutter, z0 diş) iç dişliyi generate eder.
+// Kritik kısıt: (z_ring − z0) yeterince büyük olmalı — aksi halde trimming /
+// ikincil girişim olur. Harici dişlilerde (sun, planet) undercut limiti (z≥z_min)
+// geçerli; bunlar hobbing veya shaping ile açılabilir.
+function fellowsZmin(alphaDeg, ha) {
+  const s = Math.sin(alphaDeg * DEG);
+  return 2 * ha / (s * s);                       // undercut: z_min = 2·ha*/sin²α
+}
+function fellowsDeltaMin(alphaDeg, ha) {
+  // İç dişli ⇄ kesici min diş farkı (trimming girişimi pratik kılavuzu):
+  // ≈ 0.7·z_min, taban 8. Düşük α → büyük fark gerekir (literatürle uyumlu).
+  return Math.max(8, Math.round(0.7 * fellowsZmin(alphaDeg, ha)));
+}
+const FELLOWS_STD_CUTTERS = [12,14,16,18,20,24,25,30,36,40,48,50,60,72];
+function recommendCutter(zRing, alphaDeg, ha) {
+  const dMin  = fellowsDeltaMin(alphaDeg, ha);
+  const z0min = Math.ceil(fellowsZmin(alphaDeg, ha));   // kesici undercut limiti
+  // (z_ring − z0) ≥ dMin ve z0 ≥ z0min sağlayan EN BÜYÜK standart kesici (verimli).
+  const valid = FELLOWS_STD_CUTTERS.filter(z => z <= zRing - dMin && z >= z0min);
+  const z0std = valid.length ? valid[valid.length - 1] : null;
+  const z0 = z0std != null ? z0std : Math.max(z0min, zRing - dMin);
+  return { z0, dMin, z0min, isStd: z0std != null, feasible: (zRing - z0min) >= dMin };
+}
+function evaluateFellows(r) {
+  const a = r.alpha, ha = r.ha;
+  const zminF = fellowsZmin(a, ha);
+  const ext = (name, z, x) => {
+    const xMin = z < zminF ? (zminF - z) / zminF : 0;
+    return { name, z, x, undercut: !(z >= zminF || x >= xMin - 1e-6), xMin };
+  };
+  const sun = ext("Güneş", r.zs, r.xs);
+  const planet = ext("Planet", r.zp, r.xp);
+  const cut = recommendCutter(r.zr, a, ha);
+  const diff = r.zr - cut.z0;
+  const ringOk = diff >= cut.dMin && cut.z0 >= cut.z0min && cut.z0 < r.zr;
+  const issues = [];
+  if (sun.undercut)    issues.push({ sev: "warn", msg: `Güneş undercut riski (z=${r.zs} < z_min=${Math.ceil(zminF)}) → x ≥ ${sun.xMin.toFixed(2)} uygula.` });
+  if (planet.undercut) issues.push({ sev: "warn", msg: `Planet undercut riski (z=${r.zp} < z_min=${Math.ceil(zminF)}) → x ≥ ${planet.xMin.toFixed(2)} uygula.` });
+  if (!ringOk)         issues.push({ sev: "err",  msg: `Ring shaping kesici farkı yetersiz: z_ring−z0=${diff} < Δmin=${cut.dMin}. Daha küçük kesici (z0 ≤ ${r.zr - cut.dMin}) veya daha büyük Zr seçin.` });
+  return {
+    zmin: Math.ceil(zminF), dMin: cut.dMin,
+    sun, planet,
+    ring: { z: r.zr, cutter: cut.z0, diff, dMin: cut.dMin, ok: ringOk, isStd: cut.isStd, z0min: cut.z0min },
+    issues,
+    overall: issues.some(i => i.sev === "err") ? "err" : (issues.length ? "warn" : "ok"),
+  };
+}
+
 const PRESETS = [
   { name: "Otomotiv Otomatik Şanzıman", desc: "Zs=24, Zp=18, Zr=60, N=3, m=2",
     values: { zs: 24, zp: 18, zr: 60, np: 3, m: 2, b: 25, T: 80 } },
@@ -1580,6 +1639,15 @@ const PRESETS = [
     values: { zs: 15, zp: 15, zr: 45, np: 3, m: 1, b: 10, T: 8 } },
   { name: "Ağır Endüstri (5 Planet)", desc: "Zs=20, Zp=30, Zr=80, N=5, m=6",
     values: { zs: 20, zp: 30, zr: 80, np: 5, m: 6, b: 80, T: 1500 } },
+  // ── Fellows (shaping) uyumlu: ring kesici farkı ≥ Δmin, undercut yok (z≥z_min) ──
+  { name: "[Fellows] 1:4 Kompakt", desc: "Zs=18, Zp=18, Zr=54, N=3, m=2 · kesici z0=40",
+    values: { zs: 18, zp: 18, zr: 54, np: 3, m: 2, b: 20, T: 60 } },
+  { name: "[Fellows] 1:4 Dengeli (4P)", desc: "Zs=24, Zp=24, Zr=72, N=4, m=2 · kesici z0=60",
+    values: { zs: 24, zp: 24, zr: 72, np: 4, m: 2, b: 24, T: 120 } },
+  { name: "[Fellows] 1:4.8 Redüktör", desc: "Zs=20, Zp=28, Zr=76, N=3, m=3 · kesici z0=60",
+    values: { zs: 20, zp: 28, zr: 76, np: 3, m: 3, b: 30, T: 220 } },
+  { name: "[Fellows] 1:4 Ağır", desc: "Zs=30, Zp=30, Zr=90, N=3, m=3 · kesici z0=72",
+    values: { zs: 30, zp: 30, zr: 90, np: 3, m: 3, b: 36, T: 400 } },
 ];
 
 // =============================================================================
@@ -1624,6 +1692,10 @@ function runDesignWizard() {
 
   // 2) Aday taraması: Zs ∈ [17, 60], her Zs için en yakın geçerli Zr+Zp+N
   const N_options = N_pref === "auto" ? [6, 5, 4, 3] : [parseInt(N_pref)];
+  const fellowsOnly = $("wizFellows") && $("wizFellows").checked;
+  const alphaWiz = parseFloat($("alpha").value) || 20;
+  const haWiz = parseFloat($("haCoef").value) || 1;
+  const zminWiz = Math.ceil(fellowsZmin(alphaWiz, haWiz));
   const candidates = [];
   for (let zs = 17; zs <= 60; zs++) {
     // Tam Zr bul: zr ≈ zs · zrOverZs, ama Zp=(Zr-Zs)/2 tam ve çift olmalı
@@ -1648,6 +1720,11 @@ function runDesignWizard() {
       // Geçerli N (gerçek neighbor formülüyle: 2·a·sin(π/N) > m·(Zp+2) + minGap;
       // boyutsuz forma sokulursa  (Zs+Zp)·sin(π/N) > Zp + 2 + minGap/m. minGap=0.5m
       // varsayımıyla eşik = Zp + 2.5. Buffer 0.5 ekleyerek mesh hata payı bırakırız.)
+      // Fellows kısıtı: ring kesici-farkı yeterli + sun/planet undercut'sız (x=0)
+      if (fellowsOnly) {
+        if (zs < zminWiz || zp < zminWiz) continue;           // undercut'sız
+        if (!recommendCutter(zr, alphaWiz, haWiz).feasible) continue; // ring shapelenebilir
+      }
       for (const N of N_options) {
         if ((zs + zr) % N !== 0) continue;
         const neighbor = (zs + zp) * Math.sin(Math.PI / N);
@@ -1658,7 +1735,7 @@ function runDesignWizard() {
     }
   }
   if (candidates.length === 0) {
-    return { ok: false, reason: `i ≈ ${i_target}±%10 için geçerli Zs/Zp/Zr/N bulunamadı. Modu veya oranı değiştirin.` };
+    return { ok: false, reason: `i ≈ ${i_target}±%10 için geçerli Zs/Zp/Zr/N bulunamadı. Modu/oranı değiştirin${fellowsOnly ? ' veya "Fellows uyumlu" kısıtını kaldırın' : ''}.` };
   }
 
   // 3) En iyi aday: %2 iErr toleransı içinde kompaktlık (küçük Zs+Zr), sonra yüksek N
@@ -2626,6 +2703,37 @@ function renderResults(r) {
         Toleranslar ISO 286 IT esaslı. Eksenel kesit (A–A) çizim altında gösterilir.
       </div>`;
     $("results-geometri").innerHTML += tbl2;
+  }
+
+  // ----- FELLOWS (DİŞ AÇMA / SHAPING) UYGUNLUĞU -----
+  {
+    const f = evaluateFellows(r);
+    const badge = (ok, txt) => `<span style="color:${ok ? 'var(--ok)' : 'var(--err)'}; font-weight:600;">${ok ? '✓' : '✗'} ${txt}</span>`;
+    const extRow = (g) => `<tr><td>${g.name} (harici)</td>
+      <td>z=${g.z}</td>
+      <td>${g.undercut ? badge(false, `undercut (x≥${g.xMin.toFixed(2)})`) : badge(true, 'undercut yok')}</td>
+      <td>hobbing / shaping</td></tr>`;
+    const headColor = f.overall === "err" ? "var(--err)" : f.overall === "warn" ? "var(--warn)" : "var(--ok)";
+    let html = `
+      <table class="geo-table" style="margin-top:14px;">
+        <thead><tr><th style="color:${headColor}">Fellows (Diş Açma / Shaping)</th><th>Diş</th><th>Durum</th><th>Yöntem</th></tr></thead>
+        <tbody>
+          ${extRow(f.sun)}
+          ${extRow(f.planet)}
+          <tr><td><strong>Ring (iç dişli)</strong></td>
+            <td>z=${f.ring.z}</td>
+            <td>${f.ring.ok ? badge(true, `kesici z0=${f.ring.cutter}, fark=${f.ring.diff} ≥ ${f.ring.dMin}`) : badge(false, `fark=${f.ring.diff} < Δmin=${f.ring.dMin}`)}</td>
+            <td><strong>yalnız shaping</strong></td></tr>
+        </tbody>
+      </table>
+      <div class="help" style="border-left-color:${headColor};">
+        <strong>İç dişli (ring) yalnız Fellows (pinyon-tipi kesici ile shaping) açılır</strong> — hobbing iç dişli açamaz.
+        Önerilen kesici: <strong>z0 = ${f.ring.cutter}</strong>${f.ring.isStd ? ' (standart)' : ' (özel)'} ·
+        gerekli min diş farkı Δmin = ${f.dMin} (z_ring − z0 ≥ Δmin → trimming girişimi yok) ·
+        undercut limiti z_min = ${f.zmin} (α=${r.alpha}°, ha*=${r.ha}).
+        ${f.issues.length ? '<br>' + f.issues.map(i => `<span style="color:${i.sev === 'err' ? 'var(--err)' : 'var(--warn)'}">⚠ ${i.msg}</span>`).join('<br>') : '<br><span style="color:var(--ok)">✓ Konfigürasyon Fellows shaping ile üretilebilir.</span>'}
+      </div>`;
+    $("results-geometri").innerHTML += html;
   }
 
   // ----- MUKAVEMET -----
