@@ -40,7 +40,7 @@
 )
 
 ;;; ===========================================================================
-(defun c:TCL ( / *error* tEnt cEnt cData rows txt cen pt
+(defun c:TCL ( / *error* tEnt cEnt cData rows txt cen pt usez ans
                  doc acsp tbl nrows ncols rowh colw th i r c )
 
   (defun *error* (msg)
@@ -52,6 +52,11 @@
   (vl-load-com)
   (setq rows '())
   (princ "\n=== TEXT + CIRCLE Koordinat Listesi ===")
+
+  ;; ------------------------ Z kolonu secimi ---------------------------------
+  (initget "Evet Hayir")
+  (setq ans  (getkword "\nZ koordinati dahil edilsin mi? [Evet/Hayir] <Evet>: ")
+        usez (not (= ans "Hayir")))   ; varsayilan: Z dahil
 
   ;; ------------------------ Secim dongusu -----------------------------------
   (while
@@ -109,7 +114,7 @@
           (setq th (getvar "TEXTSIZE"))
           (if (or (null th) (<= th 0.0)) (setq th 2.5))
 
-          (setq ncols 4
+          (setq ncols (if usez 4 3)
                 nrows (+ (length rows) 2)   ; baslik satiri + kolon basliklari + veriler
                 rowh  (* th 2.0)
                 colw  (* th 14.0)
@@ -126,7 +131,7 @@
           (vla-SetText tbl 1 0 "BASLIK")
           (vla-SetText tbl 1 1 "X")
           (vla-SetText tbl 1 2 "Y")
-          (vla-SetText tbl 1 3 "Z")
+          (if usez (vla-SetText tbl 1 3 "Z"))
 
           ;; Veri satirlari
           (setq i 0)
@@ -135,7 +140,7 @@
             (vla-SetText tbl (+ i 2) 0 (car row))
             (vla-SetText tbl (+ i 2) 1 (rtos (car  cen) 2 3))
             (vla-SetText tbl (+ i 2) 2 (rtos (cadr cen) 2 3))
-            (vla-SetText tbl (+ i 2) 3 (rtos (caddr cen) 2 3))
+            (if usez (vla-SetText tbl (+ i 2) 3 (rtos (caddr cen) 2 3)))
             (setq i (1+ i))
           )
 
