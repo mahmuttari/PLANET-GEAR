@@ -39,8 +39,45 @@
   )
 )
 
+;;; --- grread tabanli secim: gecerli nesne ya da 'ENTER doner ----------------
+;;; Bos alana / yanlis nesneye tiklayinca IPTAL ETMEZ, tekrar sorar.
+;;; Sadece ENTER (veya Space) basilinca 'ENTER doner -> komut biter.
+(defun tcl:pick (msg types errmsg / data code pt ss ent etype res)
+  (setq res nil)
+  (princ msg)
+  (while (null res)
+    (setq data (grread nil 4 2)
+          code (car data))
+    (cond
+      ;; --- klavye ---
+      ((= code 2)
+       (cond
+         ((member (cadr data) '(13 32)) (setq res 'ENTER))  ; Enter / Space -> bitir
+         (T (princ "\n  (Bitirmek icin ENTER, secmek icin nesneye tiklayin)")
+            (princ msg))))
+      ;; --- sol tik (nokta) ---
+      ((= code 3)
+       (setq pt (cadr data)
+             ss (ssget pt))
+       (if ss
+         (progn
+           (setq ent   (ssname ss 0)
+                 etype (cdr (assoc 0 (entget ent))))
+           (if (member etype types)
+             (setq res ent)
+             (progn (princ errmsg) (princ msg))))
+         (progn
+           (princ "\n  >> Bos alana tiklandi, tekrar deneyin.")
+           (princ msg))))
+      ;; --- diger girdileri yoksay (komut iptal olmaz) ---
+      (T nil)
+    )
+  )
+  res
+)
+
 ;;; ===========================================================================
-(defun c:TCL ( / *error* tEnt cEnt cData rows txt cen pt usez ans
+(defun c:TCL ( / *error* tEnt cEnt rows txt cen pt usez ans looping
                  doc acsp tbl nrows ncols rowh colw th i r c )
 
   (defun *error* (msg)
@@ -59,44 +96,34 @@
         usez (not (= ans "Hayir")))   ; varsayilan: Z dahil
 
   ;; ------------------------ Secim dongusu -----------------------------------
-  (while
-    (progn
-      (setq tEnt (car (entsel "\nBaslik icin TEXT/MTEXT secin (bitirmek icin ENTER): ")))
-      (if tEnt
-        (progn
-          (setq txt (tcl:gettext tEnt))
-          (cond
-            ((null txt)
-             (princ "\n  >> Secilen nesne TEXT/MTEXT degil. Tekrar deneyin.")
-             T)
-            (T
-             ;; --- Circle secimi ---
-             (setq cEnt (car (entsel "\nKoordinati alinacak CIRCLE secin: ")))
-             (cond
-               ((null cEnt)
-                (princ "\n  >> Circle secilmedi, bu kayit atlandi.")
-                T)
-               (T
-                (setq cData (entget cEnt))
-                (if (= (cdr (assoc 0 cData)) "CIRCLE")
-                  (progn
-                    (setq cen  (cdr (assoc 10 cData))
-                          rows (cons (list txt cen) rows))
-                    (princ (strcat "\n  + Eklendi: \"" txt "\"  ("
-                                   (rtos (car cen) 2 3) ", "
-                                   (rtos (cadr cen) 2 3) ", "
-                                   (rtos (caddr cen) 2 3) ")"))
-                    T)
-                  (progn
-                    (princ "\n  >> Secilen nesne CIRCLE degil, bu kayit atlandi.")
-                    T)
-                )
-               )
-             )
-            )
+  ;; Bos/yanlis tiklama IPTAL ETMEZ; sadece ENTER komutu bitirir.
+  (setq looping T)
+  (while looping
+    ;; 1) Baslik (TEXT/MTEXT) sec
+    (setq tEnt (tcl:pick "\nBaslik icin TEXT/MTEXT secin (bitirmek icin ENTER): "
+                         '("TEXT" "MTEXT")
+                         "\n  >> Bu nesne TEXT/MTEXT degil, tekrar deneyin."))
+    (if (eq tEnt 'ENTER)
+      (setq looping nil)                       ; ENTER -> komutu bitir
+      (progn
+        (setq txt (tcl:gettext tEnt))
+        ;; 2) Circle sec
+        (setq cEnt (tcl:pick "\nKoordinati alinacak CIRCLE secin (bitirmek icin ENTER): "
+                             '("CIRCLE")
+                             "\n  >> Bu nesne CIRCLE degil, tekrar deneyin."))
+        (if (eq cEnt 'ENTER)
+          (progn                               ; ENTER -> son baslik iptal, komutu bitir
+            (princ "\n  Circle secilmedi; son baslik iptal edildi.")
+            (setq looping nil))
+          (progn
+            (setq cen  (cdr (assoc 10 (entget cEnt)))
+                  rows (cons (list txt cen) rows))
+            (princ (strcat "\n  + Eklendi: \"" txt "\"  ("
+                           (rtos (car cen) 2 3) ", "
+                           (rtos (cadr cen) 2 3) ", "
+                           (rtos (caddr cen) 2 3) ")"))
           )
         )
-        nil ; ENTER -> donguyu bitir
       )
     )
   )
