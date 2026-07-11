@@ -12,6 +12,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import readline from 'node:readline';
+import { exec } from 'node:child_process';
 import { createClient, findGroup, listGroups, fetchMessages } from './whatsapp.js';
 import { annotateImage } from './annotate.js';
 
@@ -104,6 +106,18 @@ async function downloadWithRetry(msg, tries = 3) {
   return null;
 }
 
+/** readline sorusu -> Promise<cevap> */
+function ask(rl, question) {
+  return new Promise((resolve) => rl.question(question, (a) => resolve(a)));
+}
+
+/** Dosyayı işletim sisteminin varsayılan görüntüleyicisinde açar (sessiz başarısız). */
+function openInViewer(p) {
+  const plt = process.platform;
+  const cmd = plt === 'win32' ? `start "" "${p}"` : plt === 'darwin' ? `open "${p}"` : `xdg-open "${p}"`;
+  try { exec(cmd, () => {}); } catch (e) { /* önemsiz */ }
+}
+
 /**
  * Bir fotoğraf mesajı için "baca aralığı adı"nı belirler:
  *  1) Fotoğrafın kendi caption'ı (msg.body) — örn. "A20-A19"
@@ -174,14 +188,14 @@ async function run() {
     let skipped = 0;
     const rows = [];   // CSV özeti için
     const failed = []; // medyasına erişilemeyenler
+    const noName = []; // baca aralığı adı olmayanlar (sonda elle sorulur)
     for (let i = 0; i < images.length; i++) {
       const msg = images[i];
       const globalIndex = all.indexOf(msg);
       const caption = resolveCaption(msg, globalIndex, all);
 
       if (!caption) {
-        skipped++;
-        console.log(`   ⏭️  [${i + 1}/${images.length}] ${stamp(msg.timestamp)} — baca aralığı adı yok, atlandı.`);
+        noName.push(msg); // adı yok -> en sonda tek tek soracağız
         continue;
       }
 
@@ -227,6 +241,81 @@ async function run() {
       }
     }
 
+    // --- Adı olmayan fotoğrafları en sonda tek tek elle isimlendir ---
+    if (noName.length) {
+      if (!process.stdin.isTTY) {
+        console.log(`\n📝 Baca aralığı adı olmayan ${noName.length} fotoğraf var; elle isim vermek`);
+        console.log('   için botu normal (etkileşimli) bir komut satırında çalıştırın.');
+        skipped += noName.length;
+      } else {
+        console.log(`\n📝 Baca aralığı adı OLMAYAN ${noName.length} fotoğraf var. Şimdi sırayla soracağım.`);
+        console.log('   Her biri için: adı yaz + Enter  |  boş + Enter = atla  |  q + Enter = kalanları bırak');
+        const isimsizDir = path.join(opt.out, 'isimsiz');
+        fs.mkdirSync(isimsizDir, { recursive: true });
+        const existingFiles = new Set(fs.readdirSync(opt.out));
+        const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+        let quit = false;
+        for (let k = 0; k < noName.length; k++) {
+          if (quit) { skipped++; continue; }
+          const msg = noName[k];
+          const who = safeName((msg.author || '').split('@')[0]);
+          const st = stamp(msg.timestamp);
+
+          // Daha önce elle isimlendirilmişse tekrar sorma (idempotent)
+          const zaten = [...existingFiles].some(
+            (f) => f.includes(st) && (!who || f.includes(who)) && f.endsWith('.jpg')
+          );
+          if (zaten) {
+            existed++;
+            console.log(`   ⏭️  [${k + 1}/${noName.length}] ${st} zaten kayıtlı, atlandı.`);
+            continue;
+          }
+
+          const media = await downloadWithRetry(msg, 3);
+          if (!media || !media.data) {
+            failed.push({ ts: msg.timestamp, ad: '(adı yok)', reason: 'medya indirilemedi' });
+            console.log(`   ⚠️  [${k + 1}/${noName.length}] ${st} — medya indirilemedi, atlandı.`);
+            continue;
+          }
+          const buffer = Buffer.from(media.data, 'base64');
+          const previewPath = path.join(isimsizDir, `${st}${who ? '_' + who : ''}.jpg`);
+          fs.writeFileSync(previewPath, buffer);
+          openInViewer(previewPath); // fotoğrafı görüp adına karar verebilmen için açar
+
+          console.log(`\n   [${k + 1}/${noName.length}] Tarih: ${st}   Gönderen: ${who || '-'}`);
+          console.log(`   Önizleme açıldı: ${previewPath}`);
+          const ans = (await ask(rl, '   Baca aralığı adı: ')).trim();
+
+          if (ans.toLowerCase() === 'q') {
+            quit = true; skipped++;
+            console.log('   → Kalanlar atlanıyor.');
+            continue;
+          }
+          if (!ans) {
+            skipped++;
+            console.log('   → Boş girildi, atlandı (önizleme "isimsiz" klasöründe kaldı).');
+            continue;
+          }
+
+          const ad = ans.replace(/\s+/g, ' ').trim();
+          const nameParts = [];
+          const adSafe = safeName(ad);
+          if (adSafe) nameParts.push(adSafe);
+          nameParts.push(st);
+          if (who) nameParts.push(who);
+          const fname = nameParts.join('_') + '.jpg';
+          const outPath = path.join(opt.out, fname);
+          await annotateImage(buffer, ad, outPath);
+          saved++;
+          rows.push([st, who, ad, fname]);
+          existingFiles.add(fname);
+          fs.rmSync(previewPath, { force: true }); // isimli kaydedildi, önizlemeyi sil
+          console.log(`   ✅ Kaydedildi: ${fname}  («${ad}»)`);
+        }
+        rl.close();
+      }
+    }
+
     // Excel uyumlu CSV özeti (UTF-8 BOM + noktalı virgül ayraç)
     if (rows.length) {
       const BOM = String.fromCharCode(0xfeff);
@@ -255,7 +344,7 @@ async function run() {
 
     console.log(
       `\n🏁 Bitti. Kaydedilen: ${saved}, zaten vardı: ${existed}, ` +
-      `erişilemeyen: ${failed.length}, adı yok: ${skipped}. Klasör: ${path.resolve(opt.out)}`
+      `erişilemeyen: ${failed.length}, atlanan: ${skipped}. Klasör: ${path.resolve(opt.out)}`
     );
   } finally {
     await client.destroy();

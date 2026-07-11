@@ -20,6 +20,8 @@ Belirttiğin tarihten **bugüne** kadar olan mesajlar taranır.
 - Her fotoğraf için baca aralığı adı önceliği:
   1. Fotoğrafın kendi açıklaması (caption) — örn. `A20-A19`,
   2. Yoksa, aynı kişiden **90 saniye** içinde gönderilmiş en yakın metin mesajı.
+  3. Hiçbiri yoksa fotoğraf **en sonda elle isimlendirme** için biriktirilir
+     (aşağıya bakın).
 - Bu adı, resmin alt kısmına yarı saydam bant üzerine kalın beyaz yazıyla
   (siyah kenarlıklı, Türkçe karakter destekli) basar.
 - Görseli, adı dosya adına da ekleyerek kaydeder ve bir CSV özeti üretir.
@@ -98,6 +100,24 @@ nedeni vardır ve bot ikisini de ele alır:
 fotoğraflara kadar **yukarı kaydır** (telefon o medyayı yeniden indirir), sonra
 botu **tekrar çalıştır**. Bot zaten kaydedilmiş görselleri atlar (idempotent),
 yalnızca eksik olanları yeniden dener — baştan taramaz.
+
+---
+
+## Adı olmayan fotoğraflara elle isim verme
+
+Bazı fotoğrafların altında baca aralığı adı yazmamış olabilir. Bot bunları
+otomatik atlamaz; **en sonda tek tek** karşına getirir:
+
+1. Fotoğrafın bir önizlemesini `output/isimsiz/` klasörüne kaydeder ve
+   bilgisayarının **varsayılan görüntüleyicisinde açar** (sen ne olduğunu gör).
+2. Komut satırında **baca aralığı adını yazmanı** ister:
+   - Adı yaz + Enter → fotoğraf o adla işlenip normal görsellerle birlikte kaydedilir.
+   - Boş bırak + Enter → o fotoğrafı atlar (önizleme `isimsiz` klasöründe kalır).
+   - `q` + Enter → kalan hepsini bırakır.
+3. Daha önce elle isim verdiğin fotoğraflar tekrar sorulmaz (idempotent).
+
+> Bu adım için botu **normal bir komut satırında** (etkileşimli) çalıştırmalısın;
+> girdi verilemeyen bir ortamda bot sormayı atlar ve sadece kaç tane olduğunu bildirir.
 
 ---
 
