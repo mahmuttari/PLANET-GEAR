@@ -23,6 +23,9 @@ Belirttiğin tarihten **bugüne** kadar olan mesajlar taranır.
 - Metni, resmin alt kısmına yarı saydam bant üzerine kalın beyaz yazıyla
   (siyah kenarlıklı, Türkçe karakter destekli) basar; uzun metinler otomatik
   satırlara bölünür.
+- Metinden **hat numarasını** ve **baca aralığı** değerini otomatik ayrıştırır
+  (örn. `Hat: 3 Baca Aralığı: 45 cm` → hat=3, baca=45cm); bunları hem dosya
+  adına ekler hem de bir **CSV özetine** yazar.
 
 > ⚠️ **Not:** Resmi WhatsApp Cloud API geçmiş mesajları okuyamaz (yalnızca
 > kurulumdan sonra geleni görür). Geriye dönük tarama için WhatsApp Web
@@ -56,8 +59,15 @@ Ardından taramayı başlat:
 node src/index.js --group "Saha Ekibi" --since 2026-06-01
 ```
 
-Sonuçlar varsayılan olarak `./output/` klasörüne
-`YYYY-MM-DD_HH-MM-SS_gonderen.jpg` biçiminde kaydedilir.
+### Çıktılar
+
+Sonuçlar varsayılan olarak `./output/` klasörüne kaydedilir:
+
+- **Görseller:** dosya adı ayrıştırılan bilgiyi içerir, örn.
+  `2026-06-01_10-30-15_hat3_baca45cm_905xx.jpg`
+  (bulunamayan alanlar dosya adından çıkarılır).
+- **Özet tablosu:** `output/ozet.csv` — Excel uyumlu (UTF-8 BOM, `;` ayraç).
+  Sütunlar: `tarih; gonderen; hat; baca_araligi; aciklama; dosya`.
 
 ### Argümanlar
 
@@ -82,10 +92,11 @@ Sonuçlar varsayılan olarak `./output/` klasörüne
 whatsapp-bot/
 ├── package.json
 ├── src/
-│   ├── index.js       # CLI + ana akış (tara → bilgi bul → bas → kaydet)
+│   ├── index.js       # CLI + ana akış (tara → bilgi bul → ayrıştır → bas → kaydet)
 │   ├── whatsapp.js    # WhatsApp Web bağlantısı, grup bulma, mesaj çekme
-│   └── annotate.js    # sharp ile görüntü üzerine yazı basma
-└── output/            # üretilen görseller (git'e dahil edilmez)
+│   ├── annotate.js    # sharp ile görüntü üzerine yazı basma
+│   └── parse.js       # metinden hat + baca aralığı ayrıştırma
+└── output/            # üretilen görseller + ozet.csv (git'e dahil edilmez)
 ```
 
 ## Güvenlik
