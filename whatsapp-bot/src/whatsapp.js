@@ -15,6 +15,9 @@ export function createClient() {
     authStrategy: new LocalAuth({ dataPath: './.wwebjs_auth' }),
     puppeteer: {
       headless: true,
+      // Çok sayıda geçmiş mesaj yüklenirken/medya indirilirken tek bir Puppeteer
+      // komutu uzun sürebilir; varsayılan 180 sn sınırını 10 dakikaya çıkarıyoruz.
+      protocolTimeout: 600000,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
