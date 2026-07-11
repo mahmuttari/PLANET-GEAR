@@ -64,6 +64,8 @@ Sonuçlar varsayılan olarak `./output/` klasörüne kaydedilir:
   `A20-A19_2026-06-27_12-00-00_905xx.jpg`.
 - **Özet tablosu:** `output/ozet.csv` — Excel uyumlu (UTF-8 BOM, `;` ayraç).
   Sütunlar: `tarih; gonderen; baca_araligi_adi; dosya`.
+- **Erişilemeyenler:** medyası indirilemeyen fotoğraflar varsa
+  `output/erisilemeyen.csv` oluşturulur (`tarih; baca_araligi_adi; sebep`).
 
 ### Argümanlar
 
@@ -72,13 +74,30 @@ Sonuçlar varsayılan olarak `./output/` klasörüne kaydedilir:
 | `--group` | ✅ | Grup adı (kısmi eşleşme yeterli, büyük/küçük harf duyarsız) |
 | `--since` | ✅ | Başlangıç tarihi, `YYYY-MM-DD`. Bu tarihten bugüne taranır |
 | `--out` | ➖ | Çıktı klasörü (varsayılan `./output`) |
-| `--limit` | ➖ | Taranacak en fazla mesaj sayısı (varsayılan `5000`) |
+| `--limit` | ➖ | Taranacak en fazla mesaj sayısı (varsayılan `20000`) |
 | `--list-groups` | ➖ | Sadece grupları listeler |
 | `--help`, `-h` | ➖ | Yardım |
 
 > Çok eski tarihli mesajları tarıyorsan `--limit` değerini artır (örn.
-> `--limit 15000`). WhatsApp Web eski mesajları kademeli yüklediği için ilk
+> `--limit 40000`). WhatsApp Web eski mesajları kademeli yüklediği için ilk
 > çalıştırma biraz uzun sürebilir.
+
+---
+
+## Bazı fotoğraflara erişilemezse
+
+Geçmişe gidildikçe bazı fotoğrafların medyası indirilemeyebilir. Bunun iki
+nedeni vardır ve bot ikisini de ele alır:
+
+1. **Yeterince eski mesaj yüklenmemiş olması** → `--limit` değerini artır
+   (varsayılan artık `20000`).
+2. **Çok eski medyanın telefonda/sunucuda önbellekte olmaması** → bot her
+   indirmeyi **3 kez** dener; yine de olmazsa `erisilemeyen.csv`'ye yazar.
+
+**En etkili çözüm:** Telefonunda WhatsApp grubunu açıp erişilemeyen eski
+fotoğraflara kadar **yukarı kaydır** (telefon o medyayı yeniden indirir), sonra
+botu **tekrar çalıştır**. Bot zaten kaydedilmiş görselleri atlar (idempotent),
+yalnızca eksik olanları yeniden dener — baştan taramaz.
 
 ---
 

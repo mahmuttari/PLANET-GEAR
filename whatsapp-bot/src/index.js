@@ -23,14 +23,14 @@ function printHelp() {
 WhatsApp baca aralığı botu
 
 Kullanım:
-  node src/index.js --group "Grup Adı" --since YYYY-MM-DD [--out ./output] [--limit 5000]
+  node src/index.js --group "Grup Adı" --since YYYY-MM-DD [--out ./output] [--limit 20000]
   node src/index.js --list-groups
 
 Argümanlar:
   --group        Taranacak WhatsApp grubunun adı (kısmi eşleşme yeterli)
   --since        Bu tarihten (dahil) bugüne kadar taranır. Biçim: YYYY-MM-DD
   --out          Çıktı klasörü (varsayılan: ./output)
-  --limit        Taranacak en fazla mesaj sayısı (varsayılan: 5000)
+  --limit        Taranacak en fazla mesaj sayısı (varsayılan: 20000)
   --list-groups  Sadece grupları listeler ve çıkar
   --help, -h     Bu yardımı gösterir
 `);
@@ -38,7 +38,7 @@ Argümanlar:
 
 function parseArgs() {
   const args = process.argv.slice(2);
-  const opt = { group: null, since: null, out: './output', limit: 5000, listGroups: false };
+  const opt = { group: null, since: null, out: './output', limit: 20000, listGroups: false };
   for (let i = 0; i < args.length; i++) {
     const a = args[i];
     if (a === '--group') opt.group = args[++i];
@@ -79,6 +79,29 @@ function stamp(tsSec) {
   const p = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}_` +
     `${p(d.getHours())}-${p(d.getMinutes())}-${p(d.getSeconds())}`;
+}
+
+/** Basit bekleme (ms). */
+function sleep(ms) {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+/**
+ * Medyayı birkaç kez deneyerek indirir. Özellikle eski fotoğraflarda ilk
+ * deneme başarısız olabildiği için varsayılan 3 kez, artan beklemeyle dener.
+ * Başarısız olursa null döner (mesaj çok eski veya telefonda/sunucuda yok).
+ */
+async function downloadWithRetry(msg, tries = 3) {
+  for (let k = 1; k <= tries; k++) {
+    try {
+      const media = await msg.downloadMedia();
+      if (media && media.data) return media;
+    } catch (e) {
+      // yut ve tekrar dene
+    }
+    if (k < tries) await sleep(1500 * k);
+  }
+  return null;
 }
 
 /**
@@ -147,8 +170,10 @@ async function run() {
     console.log(`🖼️  ${opt.since} tarihinden itibaren ${images.length} fotoğraf bulundu.\n`);
 
     let saved = 0;
+    let existed = 0;
     let skipped = 0;
-    const rows = []; // CSV özeti için
+    const rows = [];   // CSV özeti için
+    const failed = []; // medyasına erişilemeyenler
     for (let i = 0; i < images.length; i++) {
       const msg = images[i];
       const globalIndex = all.indexOf(msg);
@@ -160,25 +185,35 @@ async function run() {
         continue;
       }
 
+      const who = safeName((msg.author || '').split('@')[0]);
+      const ad = caption.replace(/\s+/g, ' ').trim(); // baca aralığı adı, örn. "A20-A19"
+
+      // Dosya adı: adı öne al -> A20-A19_2026-06-27_12-00-00[_gonderen].jpg
+      const nameParts = [];
+      const adSafe = safeName(ad);
+      if (adSafe) nameParts.push(adSafe);
+      nameParts.push(stamp(msg.timestamp));
+      if (who) nameParts.push(who);
+      const fname = nameParts.join('_') + '.jpg';
+      const outPath = path.join(opt.out, fname);
+
+      // Tekrar çalıştırmada zaten kaydedilmiş dosyayı yeniden indirme (idempotent).
+      // Böylece botu tekrar çalıştırınca yalnızca eksikler denenir.
+      if (fs.existsSync(outPath)) {
+        existed++;
+        rows.push([stamp(msg.timestamp), who, ad, fname]);
+        console.log(`   ⏭️  [${i + 1}/${images.length}] ${fname} zaten var, atlandı.`);
+        continue;
+      }
+
       try {
-        const media = await msg.downloadMedia();
+        const media = await downloadWithRetry(msg, 3);
         if (!media || !media.data) {
-          skipped++;
-          console.log(`   ⚠️  [${i + 1}/${images.length}] medya indirilemedi, atlandı.`);
+          failed.push({ ts: msg.timestamp, ad, reason: 'medya indirilemedi (çok eski / erişilemiyor)' });
+          console.log(`   ⚠️  [${i + 1}/${images.length}] ${stamp(msg.timestamp)} «${ad}» — medya indirilemedi (3 deneme).`);
           continue;
         }
         const buffer = Buffer.from(media.data, 'base64');
-        const who = safeName((msg.author || '').split('@')[0]);
-        const ad = caption.replace(/\s+/g, ' ').trim(); // baca aralığı adı, örn. "A20-A19"
-
-        // Dosya adı: adı öne al -> A20-A19_2026-06-27_12-00-00[_gonderen].jpg
-        const nameParts = [];
-        const adSafe = safeName(ad);
-        if (adSafe) nameParts.push(adSafe);
-        nameParts.push(stamp(msg.timestamp));
-        if (who) nameParts.push(who);
-        const fname = nameParts.join('_') + '.jpg';
-        const outPath = path.join(opt.out, fname);
 
         // Baca aralığı adını resmin üzerine yaz
         await annotateImage(buffer, ad, outPath);
@@ -187,8 +222,8 @@ async function run() {
         rows.push([stamp(msg.timestamp), who, ad, fname]);
         console.log(`   ✅ [${i + 1}/${images.length}] ${fname}  («${ad}»)`);
       } catch (e) {
-        skipped++;
-        console.log(`   ❌ [${i + 1}/${images.length}] hata: ${e.message}`);
+        failed.push({ ts: msg.timestamp, ad, reason: e.message });
+        console.log(`   ❌ [${i + 1}/${images.length}] ${stamp(msg.timestamp)} «${ad}» — hata: ${e.message}`);
       }
     }
 
@@ -203,7 +238,25 @@ async function run() {
       console.log(`\n📑 Özet CSV: ${csvPath}`);
     }
 
-    console.log(`\n🏁 Bitti. Kaydedilen: ${saved}, atlanan: ${skipped}. Klasör: ${path.resolve(opt.out)}`);
+    // Erişilemeyen fotoğrafların listesi (tekrar denemek için)
+    if (failed.length) {
+      const BOM = String.fromCharCode(0xfeff);
+      const fh = ['tarih', 'baca_araligi_adi', 'sebep'];
+      const fcsv = BOM +
+        [fh, ...failed.map((x) => [stamp(x.ts), x.ad, x.reason])]
+          .map((r) => r.map(csvField).join(';')).join('\r\n') + '\r\n';
+      const fpath = path.join(opt.out, 'erisilemeyen.csv');
+      fs.writeFileSync(fpath, fcsv, 'utf8');
+      console.log(`\n⚠️  ${failed.length} fotoğrafın medyasına erişilemedi. Liste: ${fpath}`);
+      console.log('   İPUCU: Telefonda WhatsApp grubunu açıp o eski fotoğraflara kadar yukarı kaydırın');
+      console.log('   (böylece telefon medyayı yeniden indirir), sonra botu TEKRAR çalıştırın —');
+      console.log('   zaten kaydedilenler atlanır, yalnızca eksikler yeniden denenir.');
+    }
+
+    console.log(
+      `\n🏁 Bitti. Kaydedilen: ${saved}, zaten vardı: ${existed}, ` +
+      `erişilemeyen: ${failed.length}, adı yok: ${skipped}. Klasör: ${path.resolve(opt.out)}`
+    );
   } finally {
     await client.destroy();
   }
