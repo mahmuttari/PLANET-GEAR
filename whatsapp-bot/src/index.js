@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { createClient, findGroup, listGroups, fetchMessages } from './whatsapp.js';
 import { annotateImage } from './annotate.js';
+import { parseInfo } from './parse.js';
 
 // --- Sabitler ---
 const FALLBACK_WINDOW_SEC = 90; // caption yoksa, bu süre içindeki komşu metni bilgi kabul et
@@ -65,6 +66,12 @@ function dateToUnixSeconds(dateStr) {
 /** Dosya adı için güvenli hale getir. */
 function safeName(s) {
   return (s || '').replace(/[^\p{L}\p{N}_-]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+}
+
+/** CSV alanını (noktalı virgül ayraç) güvenli hale getirir. */
+function csvField(v) {
+  const s = v == null ? '' : String(v);
+  return /[";\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
 
 /** timestamp (sn) -> "YYYY-MM-DD_HH-MM-SS" */
@@ -142,6 +149,7 @@ async function run() {
 
     let saved = 0;
     let skipped = 0;
+    const rows = []; // CSV özeti için
     for (let i = 0; i < images.length; i++) {
       const msg = images[i];
       const globalIndex = all.indexOf(msg);
@@ -162,16 +170,46 @@ async function run() {
         }
         const buffer = Buffer.from(media.data, 'base64');
         const who = safeName((msg.author || '').split('@')[0]);
-        const fname = `${stamp(msg.timestamp)}${who ? '_' + who : ''}.jpg`;
+        const info = parseInfo(caption); // { hat, baca, unit }
+
+        // Ayrıştırılan değerleri dosya adına ekle: 2026-06-01_..._hat3_baca45cm_kisi.jpg
+        const nameParts = [stamp(msg.timestamp)];
+        if (info.hat) nameParts.push('hat' + info.hat);
+        if (info.baca) nameParts.push('baca' + info.baca + (info.unit || ''));
+        if (who) nameParts.push(who);
+        const fname = nameParts.join('_') + '.jpg';
         const outPath = path.join(opt.out, fname);
 
+        // Görselin üzerine tam bilgi metni basılır (talep gereği)
         await annotateImage(buffer, caption, outPath);
         saved++;
-        console.log(`   ✅ [${i + 1}/${images.length}] ${fname}  «${caption.replace(/\s+/g, ' ').slice(0, 40)}»`);
+
+        rows.push([
+          stamp(msg.timestamp),
+          who,
+          info.hat || '',
+          info.baca ? info.baca + (info.unit || '') : '',
+          caption.replace(/\s+/g, ' ').trim(),
+          fname,
+        ]);
+
+        const etiket = [info.hat ? 'hat ' + info.hat : null, info.baca ? 'baca ' + info.baca + (info.unit || '') : null]
+          .filter(Boolean).join(', ') || '—';
+        console.log(`   ✅ [${i + 1}/${images.length}] ${fname}  (${etiket})`);
       } catch (e) {
         skipped++;
         console.log(`   ❌ [${i + 1}/${images.length}] hata: ${e.message}`);
       }
+    }
+
+    // Excel uyumlu CSV özeti (UTF-8 BOM + noktalı virgül ayraç)
+    if (rows.length) {
+      const header = ['tarih', 'gonderen', 'hat', 'baca_araligi', 'aciklama', 'dosya'];
+      const csv = '﻿' +
+        [header, ...rows].map((r) => r.map(csvField).join(';')).join('\r\n') + '\r\n';
+      const csvPath = path.join(opt.out, 'ozet.csv');
+      fs.writeFileSync(csvPath, csv, 'utf8');
+      console.log(`\n📑 Özet CSV: ${csvPath}`);
     }
 
     console.log(`\n🏁 Bitti. Kaydedilen: ${saved}, atlanan: ${skipped}. Klasör: ${path.resolve(opt.out)}`);
