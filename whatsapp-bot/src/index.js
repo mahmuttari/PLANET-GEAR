@@ -1,27 +1,26 @@
 #!/usr/bin/env node
-// WhatsApp "hat/baca aralığı" botu — ana akış.
+// WhatsApp "baca aralığı" botu — ana akış.
 //
 // Belirtilen tarihten bugüne kadar bir WhatsApp grubundaki fotoğrafları tarar,
-// her fotoğrafın altına yazılan bilgi metnini (caption) resmin üzerine basar ve
-// bir klasöre kaydeder.
+// her fotoğrafın altına yazılan "baca aralığı adı"nı (örn. A20-A19) resmin
+// üzerine yazar ve bir klasöre kaydeder.
 //
 // Kullanım:
-//   node src/index.js --group "Grup Adı" --since 2026-06-01
-//   node src/index.js --group "Grup Adı" --since 2026-06-01 --out ./output --limit 8000
+//   node src/index.js --group "Grup Adı" --since 2026-06-27
+//   node src/index.js --group "Grup Adı" --since 2026-06-27 --out ./output --limit 8000
 //   node src/index.js --list-groups        (grup adlarını listeler)
 
 import fs from 'node:fs';
 import path from 'node:path';
 import { createClient, findGroup, listGroups, fetchMessages } from './whatsapp.js';
 import { annotateImage } from './annotate.js';
-import { parseInfo } from './parse.js';
 
 // --- Sabitler ---
-const FALLBACK_WINDOW_SEC = 90; // caption yoksa, bu süre içindeki komşu metni bilgi kabul et
+const FALLBACK_WINDOW_SEC = 90; // caption yoksa, bu süre içindeki komşu metni ad kabul et
 
 function printHelp() {
   console.log(`
-WhatsApp hat/baca aralığı botu
+WhatsApp baca aralığı botu
 
 Kullanım:
   node src/index.js --group "Grup Adı" --since YYYY-MM-DD [--out ./output] [--limit 5000]
@@ -63,9 +62,9 @@ function dateToUnixSeconds(dateStr) {
   return Math.floor(d.getTime() / 1000);
 }
 
-/** Dosya adı için güvenli hale getir. */
+/** Dosya adı için güvenli hale getir (harf, rakam, tire, alt çizgi korunur). */
 function safeName(s) {
-  return (s || '').replace(/[^\p{L}\p{N}_-]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 40);
+  return (s || '').replace(/[^\p{L}\p{N}_-]+/gu, '_').replace(/^_+|_+$/g, '').slice(0, 60);
 }
 
 /** CSV alanını (noktalı virgül ayraç) güvenli hale getirir. */
@@ -83,8 +82,8 @@ function stamp(tsSec) {
 }
 
 /**
- * Bir fotoğraf mesajı için bilgi metnini belirler:
- *  1) Fotoğrafın kendi caption'ı (msg.body)
+ * Bir fotoğraf mesajı için "baca aralığı adı"nı belirler:
+ *  1) Fotoğrafın kendi caption'ı (msg.body) — örn. "A20-A19"
  *  2) Yoksa, aynı kişiden ±FALLBACK_WINDOW_SEC içinde gönderilmiş en yakın metin
  */
 function resolveCaption(msg, index, allMessages) {
@@ -157,7 +156,7 @@ async function run() {
 
       if (!caption) {
         skipped++;
-        console.log(`   ⏭️  [${i + 1}/${images.length}] ${stamp(msg.timestamp)} — bilgi metni yok, atlandı.`);
+        console.log(`   ⏭️  [${i + 1}/${images.length}] ${stamp(msg.timestamp)} — baca aralığı adı yok, atlandı.`);
         continue;
       }
 
@@ -170,32 +169,23 @@ async function run() {
         }
         const buffer = Buffer.from(media.data, 'base64');
         const who = safeName((msg.author || '').split('@')[0]);
-        const info = parseInfo(caption); // { hat, baca, unit }
+        const ad = caption.replace(/\s+/g, ' ').trim(); // baca aralığı adı, örn. "A20-A19"
 
-        // Ayrıştırılan değerleri dosya adına ekle: 2026-06-01_..._hat3_baca45cm_kisi.jpg
-        const nameParts = [stamp(msg.timestamp)];
-        if (info.hat) nameParts.push('hat' + info.hat);
-        if (info.baca) nameParts.push('baca' + info.baca + (info.unit || ''));
+        // Dosya adı: adı öne al -> A20-A19_2026-06-27_12-00-00[_gonderen].jpg
+        const nameParts = [];
+        const adSafe = safeName(ad);
+        if (adSafe) nameParts.push(adSafe);
+        nameParts.push(stamp(msg.timestamp));
         if (who) nameParts.push(who);
         const fname = nameParts.join('_') + '.jpg';
         const outPath = path.join(opt.out, fname);
 
-        // Görselin üzerine tam bilgi metni basılır (talep gereği)
-        await annotateImage(buffer, caption, outPath);
+        // Baca aralığı adını resmin üzerine yaz
+        await annotateImage(buffer, ad, outPath);
         saved++;
 
-        rows.push([
-          stamp(msg.timestamp),
-          who,
-          info.hat || '',
-          info.baca ? info.baca + (info.unit || '') : '',
-          caption.replace(/\s+/g, ' ').trim(),
-          fname,
-        ]);
-
-        const etiket = [info.hat ? 'hat ' + info.hat : null, info.baca ? 'baca ' + info.baca + (info.unit || '') : null]
-          .filter(Boolean).join(', ') || '—';
-        console.log(`   ✅ [${i + 1}/${images.length}] ${fname}  (${etiket})`);
+        rows.push([stamp(msg.timestamp), who, ad, fname]);
+        console.log(`   ✅ [${i + 1}/${images.length}] ${fname}  («${ad}»)`);
       } catch (e) {
         skipped++;
         console.log(`   ❌ [${i + 1}/${images.length}] hata: ${e.message}`);
@@ -204,8 +194,9 @@ async function run() {
 
     // Excel uyumlu CSV özeti (UTF-8 BOM + noktalı virgül ayraç)
     if (rows.length) {
-      const header = ['tarih', 'gonderen', 'hat', 'baca_araligi', 'aciklama', 'dosya'];
-      const csv = '﻿' +
+      const BOM = String.fromCharCode(0xfeff);
+      const header = ['tarih', 'gonderen', 'baca_araligi_adi', 'dosya'];
+      const csv = BOM +
         [header, ...rows].map((r) => r.map(csvField).join(';')).join('\r\n') + '\r\n';
       const csvPath = path.join(opt.out, 'ozet.csv');
       fs.writeFileSync(csvPath, csv, 'utf8');
