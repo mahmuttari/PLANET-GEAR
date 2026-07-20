@@ -122,9 +122,11 @@
 
 <main>
   <div class="note">
-    Girdiğiniz tüm bilgiler yalnızca <b>bu tarayıcıda</b> saklanır (sunucuya gönderilmez). Üretilen belgeler
-    <b>taslaktır</b>; imzalatmadan önce bağlı bulunduğunuz belediye/idarenin güncel form ve istekleriyle
-    karşılaştırın.
+    Girdiğiniz tüm bilgiler yalnızca <b>bu tarayıcıda</b> saklanır (sunucuya gönderilmez). Belgeler,
+    ulusal <b>standart form yapısına</b> (Proje Müellifi Taahhütnamesi – Form-1 vb.) göre <b>hazırlık nüshası</b>
+    olarak üretilir. Odaların <b>tescilli–onaylı</b> belgeleri (SİM/SMM, büro tescil, oda onaylı taahhütname)
+    ilgili meslek odasının <b>kendi sisteminden</b> alınır; imzalatmadan önce belediyenizin/şubenizin güncel
+    formuyla karşılaştırın.
   </div>
 
   <!-- ================= BİLGİ GİRİŞİ ================= -->
@@ -193,17 +195,19 @@ const LSKEY = "ruhsat_evrak_v1";
 /* Ortak kişi alanları */
 const PERSON = [
   ["ad","Ad Soyad"],["unvan","Unvan (ör. Y. Mimar, İnş. Müh.)"],["tc","T.C. Kimlik No"],
-  ["oda","Meslek Odası"],["sicil","Oda Sicil No"],["diploma","Diploma No"],
+  ["oda","Meslek Odası"],["sicil","Oda Sicil No"],["tescil","Büro Tescil / SİM-SMM Belge No"],["diploma","Diploma No"],
   ["firma","Büro / Firma"],["adres","Adres","ta"],["tel","Telefon"],["eposta","E-posta"]
 ];
 
 /* Bölümler (form şeması) */
 const SECTIONS = [
   {id:"proje", title:"🏗️ Proje / Yapı Bilgileri", fields:[
-    ["il","İl"],["ilce","İlçe"],["mahalle","Mahalle / Köy"],["ada","Ada"],["parsel","Parsel"],
-    ["pafta","Pafta"],["arsaAlani","Arsa Alanı (m²)"],["insaatAlani","Toplam İnşaat Alanı (m²)"],
+    ["idare","İlgili İdare (Belediye Başkanlığı)"],["il","İl"],["ilce","İlçe"],["mahalle","Mahalle / Köy"],
+    ["pafta","Pafta"],["ada","Ada"],["parsel","Parsel"],
+    ["ruhsatTuru","Ruhsat Türü (Yeni / İlave / Tadilat)"],["yibf","YİBF No (varsa)"],
+    ["arsaAlani","Arsa Alanı (m²)"],["insaatAlani","Toplam İnşaat Alanı (m²)"],
     ["yapiSinifi","Yapı Sınıfı / Grubu"],["katAdedi","Kat Adedi"],["yapiNizami","Yapı Nizamı"],
-    ["adres","Açık Adres","ta"],["tarih","Belge Tarihi","date"]
+    ["adres","Yapının Açık Adresi","ta"],["tarih","Belge Tarihi","date"]
   ]},
   {id:"malik", title:"👤 Yapı Sahibi (Malik)", fields:[
     ["ad","Ad Soyad / Ünvan"],["tc","T.C. Kimlik / Vergi No"],["adres","Adres","ta"],["tel","Telefon"]
@@ -289,18 +293,17 @@ function projeOzet(){
   return `<table class="ozet">
     <tr><td class="k">İl / İlçe</td><td>${fill(v("proje","il"),12)} / ${fill(v("proje","ilce"),12)}</td></tr>
     <tr><td class="k">Mahalle / Köy</td><td>${fill(v("proje","mahalle"),20)}</td></tr>
-    <tr><td class="k">Ada / Parsel / Pafta</td><td>${fill(v("proje","ada"),6)} / ${fill(v("proje","parsel"),6)} / ${fill(v("proje","pafta"),6)}</td></tr>
+    <tr><td class="k">Pafta / Ada / Parsel</td><td>${fill(v("proje","pafta"),6)} / ${fill(v("proje","ada"),6)} / ${fill(v("proje","parsel"),6)}</td></tr>
     <tr><td class="k">Yapı Sahibi</td><td>${fill(v("malik","ad"),24)}</td></tr>
-    <tr><td class="k">Açık Adres</td><td>${fill(v("proje","adres"),40)}</td></tr>
+    <tr><td class="k">Yapının Adresi</td><td>${fill(v("proje","adres"),40)}</td></tr>
   </table>`;
 }
-function kisiBlok(sec, roller){
+function kisiBlok(sec){
   const rows=[];
   const add=(k,lbl)=>{ rows.push(`<tr><td class="k">${lbl}</td><td>${fill(v(sec,k),28)}</td></tr>`); };
-  add("ad","Ad Soyad"); if(v(sec,"unvan")||true) add("unvan","Unvan");
-  add("tc","T.C. Kimlik No");
-  add("oda","Meslek Odası"); add("sicil","Oda Sicil No"); add("diploma","Diploma No");
-  add("adres","Adres");
+  add("ad","Adı Soyadı"); add("unvan","Unvanı"); add("tc","T.C. Kimlik No");
+  add("oda","Meslek Odası"); add("sicil","Oda Sicil No"); add("tescil","Büro Tescil / SİM-SMM No");
+  add("diploma","Diploma No"); add("adres","Adres"); add("tel","Telefon");
   return `<table class="kisi">${rows.join("")}</table>`;
 }
 function imzaBlok(pairs){
@@ -310,21 +313,33 @@ function imzaBlok(pairs){
 }
 function tarihSagi(){ return `<p class="tarih">Tarih: ${bugun()}</p>`; }
 
-/* Taahhütname (müellif/disiplin) */
-function docTaah(sec, baslik, isTanim){
+/* Proje Müellifi Taahhütnamesi — resmi Form-1 (Proje Müellifleri Tarafından
+   İlgili İdareye Verilecek Taahhütname) yapısına göre. */
+function docTaah(sec, projeTuru){
+  const idare = v("proje","idare") || (v("proje","ilce") ? v("proje","ilce")+" Belediye Başkanlığı" : "");
   return `<div class="doc">
-    <h1>${baslik}</h1>
+    <h1>PROJE MÜELLİFİ TAAHHÜTNAMESİ</h1>
+    <p style="text-align:center;font-weight:bold;margin:-8px 0 6px">(${projeTuru})</p>
+    <p style="text-align:center;font-weight:bold">${fill(idare,26)}'NA / İLGİLİ İDAREYE</p>
     ${projeOzet()}
-    <p>Yukarıda tapu ve adres bilgileri belirtilen taşınmaz üzerinde yapılacak yapıya ait
-    <b>${isTanim}</b>; 3194 sayılı İmar Kanunu, Planlı Alanlar İmar Yönetmeliği ve yürürlükteki
-    ilgili tüm mevzuat ile fen, sanat ve sağlık kurallarına uygun olarak tarafımca
-    hazırlanmıştır/yürütülecektir. Sorumluluğu üstlendiğimi, projeye ve mevzuata aykırı
-    uygulama yapmayacağımı, aksi halde doğacak her türlü hukuki, idari ve cezai sorumluluğun
-    tarafıma ait olduğunu kabul, beyan ve taahhüt ederim.</p>
-    <h2>Sorumlu Bilgileri</h2>
+    <p>Yukarıda tapu kaydı ve adresi belirtilen taşınmaz üzerinde yapılacak yapının
+    <b>${projeTuru.toLocaleLowerCase("tr")}</b> müellifiyim. Bu sıfatla;</p>
+    <p><b>1.</b> 6235 sayılı Türk Mühendis ve Mimar Odaları Birliği Kanunu ve ilgili mevzuat
+    uyarınca mesleki faaliyet hakkımı kısıtlayan idari veya hukuki herhangi bir engelimin
+    bulunmadığını, bağlı olduğum meslek odasına kayıtlı olduğumu ve büro tescil belgemin
+    geçerli olduğunu;</p>
+    <p><b>2.</b> Söz konusu projeyi 3194 sayılı İmar Kanunu, Planlı Alanlar İmar Yönetmeliği,
+    yürürlükteki imar planı ile deprem (TBDY), yangın, enerji verimliliği, asansör, otopark ve
+    ilgili tüm yönetmeliklere; fen, sanat ve sağlık kurallarına uygun olarak düzenlediğimi;</p>
+    <p><b>3.</b> Bu taahhütnamede ve proje müelliflik belgelerinde beyan ettiğim bilgilerin doğru
+    olduğunu; aksinin tespiti hâlinde ruhsata esas işlemlerin iptal edileceğini, hakkımda 5237
+    sayılı Türk Ceza Kanunu uyarınca Cumhuriyet Başsavcılığına suç duyurusunda bulunulacağını ve
+    6235 sayılı Kanun gereği bağlı bulunduğum meslek odasına bildirileceğini bildiğimi;</p>
+    <p>kabul, beyan ve taahhüt ederim.</p>
+    <h2>Proje Müellifi Bilgileri</h2>
     ${kisiBlok(sec)}
     ${tarihSagi()}
-    ${imzaBlok([[baslik.replace(" TAAHHÜTNAMESİ",""), v(sec,"ad")]])}
+    ${imzaBlok([["PROJE MÜELLİFİ", v(sec,"ad")]])}
   </div>`;
 }
 
@@ -477,12 +492,12 @@ function docDilekce(){
 
 /* Belge kataloğu */
 const DOCS = [
-  {g:"Taahhütnameler", id:"t_mimar",  t:"Mimari Proje Müellifliği Taahhütnamesi", f:()=>docTaah("mimar","MİMARİ PROJE MÜELLİFLİĞİ TAAHHÜTNAMESİ","mimari projeyi")},
-  {g:"Taahhütnameler", id:"t_statik", t:"İnşaat / Statik Mühendisliği Taahhütnamesi", f:()=>docTaah("statik","İNŞAAT MÜHENDİSLİĞİ TAAHHÜTNAMESİ","statik (betonarme) projeyi")},
-  {g:"Taahhütnameler", id:"t_elektrik",t:"Elektrik Mühendisliği Taahhütnamesi", f:()=>docTaah("elektrik","ELEKTRİK MÜHENDİSLİĞİ TAAHHÜTNAMESİ","elektrik tesisat projesini")},
-  {g:"Taahhütnameler", id:"t_makine", t:"Makine Mühendisliği Taahhütnamesi", f:()=>docTaah("makine","MAKİNE MÜHENDİSLİĞİ TAAHHÜTNAMESİ","mekanik tesisat projesini")},
-  {g:"Taahhütnameler", id:"t_jeoloji",t:"Jeoloji / Jeoteknik Mühendisliği Taahhütnamesi", f:()=>docTaah("jeoloji","JEOLOJİ MÜHENDİSLİĞİ TAAHHÜTNAMESİ","zemin etüt (jeoteknik) raporunu")},
-  {g:"Taahhütnameler", id:"t_harita", t:"Harita Mühendisliği Taahhütnamesi", f:()=>docTaah("harita","HARİTA MÜHENDİSLİĞİ TAAHHÜTNAMESİ","aplikasyon / harita işlerini")},
+  {g:"Taahhütnameler", id:"t_mimar",  t:"Mimari Proje Müellifi Taahhütnamesi", f:()=>docTaah("mimar","MİMARİ PROJE")},
+  {g:"Taahhütnameler", id:"t_statik", t:"İnşaat / Statik Proje Müellifi Taahhütnamesi", f:()=>docTaah("statik","STATİK (BETONARME) PROJE")},
+  {g:"Taahhütnameler", id:"t_elektrik",t:"Elektrik Proje Müellifi Taahhütnamesi", f:()=>docTaah("elektrik","ELEKTRİK TESİSAT PROJESİ")},
+  {g:"Taahhütnameler", id:"t_makine", t:"Makine / Mekanik Proje Müellifi Taahhütnamesi", f:()=>docTaah("makine","MEKANİK TESİSAT PROJESİ")},
+  {g:"Taahhütnameler", id:"t_jeoloji",t:"Jeoloji / Jeoteknik Müellifi Taahhütnamesi", f:()=>docTaah("jeoloji","ZEMİN ETÜT (JEOTEKNİK) RAPORU")},
+  {g:"Taahhütnameler", id:"t_harita", t:"Harita Mühendisi Taahhütnamesi", f:()=>docTaah("harita","HARİTA / APLİKASYON İŞLERİ")},
   {g:"Taahhütnameler", id:"t_santiye",t:"Şantiye Şefi Taahhütnamesi", f:docSantiyeTaah},
   {g:"Taahhütnameler", id:"t_mut",    t:"Müteahhit Taahhütnamesi", f:docMuteahhitTaah},
   {g:"Taahhütnameler", id:"t_kalfa",  t:"Kalfa Taahhütnamesi", f:docKalfaTaah},

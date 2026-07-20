@@ -9,6 +9,12 @@ Kurulum gerekmez — `index.html` dosyasını çift tıklayıp tarayıcıda açm
 - **Kontrol paneli:** Proje/parsel bilgileri ve projede yer alan tüm kişiler
   (mimar, inşaat/statik, elektrik, makine, jeoloji, harita mühendisi, müteahhit,
   şantiye şefi, yapı denetim, kalfa) tek ekrandan girilir.
+- **Resmi form uyumu:** Proje müellifi taahhütnameleri, ulusal standart
+  **Form-1 (Proje Müellifleri Tarafından İlgili İdareye Verilecek Taahhütname)**
+  yapısına göre üretilir — idareye hitap, standart maddeler (6235/3194/5237,
+  TBDY-deprem/yangın/enerji/asansör uyumu) ve Büro Tescil / SİM-SMM No alanı dâhil.
+  Not: Odanın **tescilli-onaylı** belgesi (SİM/SMM, büro tescil) ayrıca ilgili
+  meslek odasının kendi sisteminden alınır; bu araç hazırlık nüshası üretir.
 - **Otomatik belge üretimi:** Girilen bilgilere göre aşağıdaki belgeler doldurulur:
   - Taahhütnameler: mimar, inşaat/statik, elektrik, makine, jeoloji, harita,
     şantiye şefi, müteahhit, kalfa
