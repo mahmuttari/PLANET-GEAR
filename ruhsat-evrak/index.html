@@ -57,34 +57,54 @@
   .btn.ghost:hover{background:var(--bg)}
   .preview-frame{background:#f0f3f7;border:1px solid var(--line);border-radius:14px;padding:20px;max-height:72vh;overflow:auto}
   /* ---- Belge (A4) ---- */
-  #printArea .doc{background:#fff;width:21cm;min-height:29.7cm;margin:0 auto 20px;padding:2.2cm 2cm;box-shadow:0 2px 10px rgba(0,0,0,.12);font-family:"Times New Roman",Georgia,serif;color:#000;font-size:12.5pt;line-height:1.55}
-  #printArea .doc h1{font-size:15pt;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin:0 0 18px;border-bottom:2px solid #000;padding-bottom:8px}
-  #printArea .doc h2{font-size:12.5pt;margin:16px 0 6px}
-  #printArea .doc p{margin:10px 0;text-align:justify}
-  #printArea .doc .ozet{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:11pt}
-  #printArea .doc .ozet td{border:1px solid #999;padding:5px 8px}
-  #printArea .doc .ozet td.k{background:#f2f2f2;font-weight:bold;width:34%;white-space:nowrap}
-  #printArea .doc .kisi{width:100%;border-collapse:collapse;margin:6px 0 8px;font-size:11pt}
-  #printArea .doc .kisi td{border:1px solid #bbb;padding:4px 8px}
-  #printArea .doc .kisi td.k{background:#f7f7f7;font-weight:bold;width:32%}
-  #printArea .doc .imzalar{display:flex;justify-content:space-between;gap:30px;margin-top:40px}
-  #printArea .doc .imza{flex:1;text-align:center;font-size:11.5pt}
-  #printArea .doc .imza .rol{font-weight:bold;margin-bottom:42px}
-  #printArea .doc .imza .ln{border-top:1px solid #000;padding-top:4px}
-  #printArea .doc .tarih{text-align:right;margin:26px 0 0}
-  #printArea .doc .dots{letter-spacing:1px}
+  .doc{background:#fff;width:21cm;min-height:29.7cm;margin:0 auto 20px;padding:2.2cm 2cm;box-shadow:0 2px 10px rgba(0,0,0,.12);font-family:"Times New Roman",Georgia,serif;color:#000;font-size:12.5pt;line-height:1.55}
+  .doc h1{font-size:15pt;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin:0 0 18px;border-bottom:2px solid #000;padding-bottom:8px}
+  .doc h2{font-size:12.5pt;margin:16px 0 6px}
+  .doc p{margin:10px 0;text-align:justify}
+  .doc .ozet{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:11pt}
+  .doc .ozet td{border:1px solid #999;padding:5px 8px}
+  .doc .ozet td.k{background:#f2f2f2;font-weight:bold;width:34%;white-space:nowrap}
+  .doc .kisi{width:100%;border-collapse:collapse;margin:6px 0 8px;font-size:11pt}
+  .doc .kisi td{border:1px solid #bbb;padding:4px 8px;vertical-align:top}
+  .doc .kisi td.k{background:#f7f7f7;font-weight:bold;width:32%}
+  .doc .imzalar{display:flex;justify-content:space-between;gap:30px;margin-top:40px}
+  .doc .imza{flex:1;text-align:center;font-size:11.5pt}
+  .doc .imza .rol{font-weight:bold;margin-bottom:42px}
+  .doc .imza .ln{border-top:1px solid #000;padding-top:4px}
+  .doc .tarih{text-align:right;margin:26px 0 0}
+  .doc .dots{letter-spacing:1px}
   .empty-hint{color:var(--muted);text-align:center;padding:60px 20px}
+  /* ---- Evrak Takip ---- */
+  .ch-overall{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 16px;box-shadow:var(--shadow);margin-bottom:16px}
+  .ch-overall .lbl{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+  .ch-overall .lbl b{font-size:15px}
+  .ch-overall .lbl span{color:var(--muted);font-size:13px;font-variant-numeric:tabular-nums}
+  .ch-card{margin-bottom:16px}
+  .ch-count{margin-left:auto;font-size:12px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+  .ch-bar{height:6px;background:#e6ebf1;border-radius:6px;overflow:hidden}
+  .ch-bar>div{height:100%;background:var(--brand);transition:width .25s}
+  .ch-bar.big{height:10px}
+  .ch-body{display:flex;flex-direction:column;gap:2px;padding:8px 10px}
+  .ch-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:8px}
+  .ch-row:hover{background:var(--bg)}
+  .ch-row.done .ch-t{text-decoration:line-through;color:var(--muted)}
+  .ch-main{display:flex;align-items:center;gap:10px;flex:1;cursor:pointer;min-width:0}
+  .ch-main input{width:17px;height:17px;flex:none;accent-color:var(--brand);cursor:pointer}
+  .ch-no{font-size:11px;color:var(--muted);width:22px;text-align:center;flex:none;font-variant-numeric:tabular-nums}
+  .ch-t{font-size:14px}
+  .ch-note{width:150px;flex:none;font:inherit;font-size:12px;padding:5px 8px;border:1px solid var(--line);border-radius:7px}
+  .mini{font:inherit;font-size:11px;border:1px solid var(--brand);color:var(--brand);background:#fff;border-radius:7px;padding:4px 8px;cursor:pointer;flex:none}
+  .mini:hover{background:#eef6f3}
   /* ---- Baskı ---- */
+  #globalPrint{display:none}
   @media print{
     body{background:#fff}
-    header.app,nav.tabs,.note,#tab-bilgiler,.doc-list,.preview-toolbar,.pane-hidden{display:none !important}
-    main{max-width:none;padding:0;margin:0}
-    .docs-wrap{display:block}
-    .preview-frame{border:0;padding:0;max-height:none;overflow:visible;background:#fff}
-    #printArea .doc{box-shadow:none;margin:0;width:auto;min-height:auto;padding:1.6cm 1.8cm;page-break-after:always}
-    #printArea .doc:last-child{page-break-after:auto}
+    header.app,nav.tabs,main{display:none !important}
+    #globalPrint{display:block !important}
+    .doc{box-shadow:none;margin:0;width:auto;min-height:auto;padding:1.5cm 1.7cm;page-break-after:always}
+    .doc:last-child{page-break-after:auto}
   }
-  @media(max-width:800px){ .docs-wrap{grid-template-columns:1fr} }
+  @media(max-width:800px){ .docs-wrap{grid-template-columns:1fr} .ch-note{width:110px} }
 </style>
 </head>
 <body>
@@ -104,6 +124,7 @@
 <nav class="tabs">
   <button id="tabbtn-bilgiler" class="active" onclick="showTab('bilgiler')">📝 Bilgi Girişi</button>
   <button id="tabbtn-belgeler" onclick="showTab('belgeler')">📄 Belgeler</button>
+  <button id="tabbtn-takip" onclick="showTab('takip')">✅ Evrak Takip</button>
   <button id="tabbtn-yardim" onclick="showTab('yardim')">❔ Yardım</button>
 </nav>
 
@@ -137,6 +158,17 @@
     </div>
   </section>
 
+  <!-- ================= EVRAK TAKİP ================= -->
+  <section id="tab-takip" style="display:none">
+    <div class="preview-toolbar" style="margin-bottom:14px">
+      <button class="btn primary" onclick="printTakip()">🖨️ Kontrol Listesini Yazdır</button>
+      <span style="flex:1"></span>
+      <span style="font-size:12px;color:var(--muted);align-self:center">İşaretler ve notlar otomatik kaydedilir.</span>
+    </div>
+    <div id="takipTop"></div>
+    <div id="takipWrap"></div>
+  </section>
+
   <!-- ================= YARDIM ================= -->
   <section id="tab-yardim" style="display:none">
     <div class="card" style="max-width:760px">
@@ -159,6 +191,9 @@
     </div>
   </section>
 </main>
+
+<!-- Baskı katmanı: sekmelerden bağımsız, yalnızca yazdırırken görünür -->
+<div id="globalPrint"></div>
 
 <script>
 const LSKEY = "ruhsat_evrak_v1";
@@ -495,25 +530,30 @@ function renderPreview(){
   if(!d){ area.innerHTML=`<div class="empty-hint">Soldan bir belge seçin.</div>`; return; }
   area.innerHTML=d.f();
 }
-function printCurrent(){
-  if(!currentDoc){ alert("Önce bir belge seçin."); return; }
+function printDocsHtml(html){
+  document.getElementById("globalPrint").innerHTML=html;
   window.print();
 }
+function printCurrent(){
+  if(!currentDoc){ alert("Önce bir belge seçin."); return; }
+  const d=DOCS.find(x=>x.id===currentDoc);
+  printDocsHtml(d.f());
+}
 function printAll(){
-  const area=document.getElementById("printArea");
-  area.innerHTML=DOCS.map(d=>d.f()).join("");
-  window.print();
-  // baskı sonrası tek belgeye dön
-  setTimeout(renderPreview,300);
+  printDocsHtml(DOCS.map(d=>d.f()).join(""));
+}
+function printTakip(){
+  printDocsHtml(docChecklist());
 }
 
 /* ---- Sekme ---- */
 function showTab(t){
-  for(const x of ["bilgiler","belgeler","yardim"]){
+  for(const x of ["bilgiler","belgeler","takip","yardim"]){
     document.getElementById("tab-"+x).style.display = (x===t)?"":"none";
     document.getElementById("tabbtn-"+x).classList.toggle("active", x===t);
   }
   if(t==="belgeler" && !currentDoc){ currentDoc=DOCS[0].id; buildDocList(); renderPreview(); }
+  if(t==="takip"){ buildTakip(); }
 }
 
 /* ---- JSON dışa/içe ---- */
@@ -530,6 +570,121 @@ function importJSON(inp){
   const r=new FileReader();
   r.onload=()=>{ try{ data=JSON.parse(r.result)||{}; save(); buildForm(); if(currentDoc) renderPreview(); alert("Yedek yüklendi."); }catch(e){ alert("Dosya okunamadı."); } };
   r.readAsText(file);
+}
+
+/* ================= EVRAK TAKİP (Excel çizelgesinden) ================= */
+const CHECK=[
+ {g:"1. Aşama – Vize Evrakları", key:"vize", items:[
+   [1,"Dilekçe","o_dilekce"],
+   [2,"Yapı sahibi kimlik fotokopisi"],
+   [3,"İkametgah"],
+   [4,"Tapu kaydı (hissedar varsa muvafakatname)"],
+   [5,"İmar durumu"],
+   [6,"Parsel aplikasyon krokisi"],
+   [7,"Yapı aplikasyon projesi"],
+   [8,"Plankote"],
+   [9,"Mimari proje (4 takım)"],
+   [10,"Statik proje (4 takım)"],
+   [11,"Gerekliyse ilgili kurumdan kurum görüşü"],
+   [12,"Sıhhi tesisat projesi (gerekliyse yangın tesisat projesi ve raporu)"],
+   [13,"Isı yalıtım projesi"],
+   [14,"Elektrik projesi"],
+   [15,"Vize projesi"],
+   [16,"Zemin etüt raporu"],
+   [17,"Mimari proje müellifliği taahhütnamesi","t_mimar"],
+   [18,"İnşaat mühendisliği taahhütnamesi","t_statik"],
+   [19,"Elektrik mühendisliği taahhütnamesi","t_elektrik"],
+   [20,"Makine mühendisliği taahhütnamesi","t_makine"],
+   [21,"Jeoloji mühendisliği taahhütnamesi","t_jeoloji"],
+   [22,"Harita mühendisliği taahhütnamesi","t_harita"],
+   [23,"Yıkım izni / ÇED raporu / görüş / borcu yoktur / CD"],
+   [24,"Kanal durum belgesi / teminat (%10) / EKB"],
+   [25,"İskele proje ve hesapları"],
+   [26,"Asansör avan projesi"],
+   [27,"Kalfa taahhütnamesi","t_kalfa"],
+   [28,"Kalfa kimlik fotokopisi"],
+   [29,"İnşaat güvenlik önlemleri (inşaatın çevresinin kapatılması)"]
+ ]},
+ {g:"Yapı Denetim Evrakları", key:"denetim", items:[
+   [1,"Banka dekontu"],
+   [2,"Yapı denetim kuruluşunun izin belgesi (Form-13)"],
+   [3,"Yapı denetim imza sirküleri"],
+   [4,"Yapı denetim vergi levhası"],
+   [5,"Yapı denetim faaliyet belgesi (bulunduğu yıla ait)"],
+   [6,"Yapı denetim ticari sicil gazetesi"],
+   [7,"Yapı denetim taahhütnamesi (Form-3)"],
+   [8,"Yapı denetim hizmet sözleşmesi (Form-4)"],
+   [9,"Yardımcı kontrol elemanlarının diplomaları, imza sirküleri ve ikametgahları"],
+   [10,"Proje kontrol formları (Form-1)"]
+ ]},
+ {g:"Müteahhit Evrakları", key:"mut", items:[
+   [1,"Yapı sahibi ile müteahhit arasında yapılan sözleşme","s_mut"],
+   [2,"Müteahhit taahhütnamesi","t_mut"],
+   [3,"Müteahhit YAMBİS sorgulaması"],
+   [4,"Kimlik fotokopisi"],
+   [5,"Müteahhit faaliyet belgesi (bulunduğu yıla ait)"],
+   [6,"Müteahhit vergi levhası"],
+   [7,"İmza sirküleri"],
+   [8,"Ticari sicil gazetesi"]
+ ]},
+ {g:"Şantiye Şefi Evrakları", key:"sef", items:[
+   [1,"Şantiye şefliği hizmet sözleşmesi (Form-10)","s_san"],
+   [2,"Kimlik fotokopisi"],
+   [3,"Diploma fotokopisi"],
+   [4,"Oda kimlik belge fotokopisi"],
+   [5,"Bulunduğu ilde oturduğuna dair ikametgah ilmühaberi"],
+   [6,"Şantiye şefi taahhütnamesi","t_santiye"],
+   [7,"Şantiye şefi sicil durum belgesi"]
+ ]}
+];
+
+function buildTakip(){
+  let total=0,done=0,html="";
+  for(const grp of CHECK){
+    const gt=grp.items.length; let gd=0,items="";
+    for(const it of grp.items){
+      const id=grp.key+"_"+it[0];
+      const st=(data.takip&&data.takip[id])||{};
+      if(st.d){gd++;done++;}
+      total++;
+      const gen=it[2]?`<button class="mini" title="Bu belgeyi üret" onclick="gotoDoc('${it[2]}')">✍️ Üret</button>`:"";
+      items+=`<div class="ch-row${st.d?" done":""}">
+        <label class="ch-main"><input type="checkbox" ${st.d?"checked":""} onchange="toggleCheck('${id}',this.checked)">
+          <span class="ch-no">${it[0]}</span><span class="ch-t">${escHtml(it[1])}</span></label>
+        ${gen}
+        <input class="ch-note" placeholder="not…" value="${escAttr(st.n||"")}" oninput="noteCheck('${id}',this.value)">
+      </div>`;
+    }
+    const pct=gt?Math.round(gd/gt*100):0;
+    html+=`<div class="card ch-card"><h2>${grp.g}<span class="ch-count">${gd}/${gt}</span></h2>
+      <div class="ch-bar"><div style="width:${pct}%"></div></div>
+      <div class="ch-body">${items}</div></div>`;
+  }
+  const pct=total?Math.round(done/total*100):0;
+  document.getElementById("takipTop").innerHTML=
+    `<div class="ch-overall"><div class="lbl"><b>Genel İlerleme</b><span>${done} / ${total} evrak tamam — %${pct}</span></div>
+     <div class="ch-bar big"><div style="width:${pct}%"></div></div></div>`;
+  document.getElementById("takipWrap").innerHTML=html;
+}
+function toggleCheck(id,val){ data.takip=data.takip||{}; data.takip[id]=data.takip[id]||{}; data.takip[id].d=val?1:0; save(); buildTakip(); }
+function noteCheck(id,val){ data.takip=data.takip||{}; data.takip[id]=data.takip[id]||{}; data.takip[id].n=val;
+  document.getElementById("saveState").textContent="✏️ Yazılıyor…"; clearTimeout(saveTimer); saveTimer=setTimeout(save,400); }
+function gotoDoc(id){ currentDoc=id; showTab("belgeler"); buildDocList(); renderPreview(); }
+
+/* Yazdırılabilir takip çizelgesi */
+function docChecklist(){
+  let rows="";
+  for(const grp of CHECK){
+    rows+=`<tr><td colspan="3" style="background:#e8efe9;font-weight:bold">${grp.g}</td></tr>`;
+    for(const it of grp.items){
+      const st=(data.takip&&data.takip[grp.key+"_"+it[0]])||{};
+      rows+=`<tr><td style="text-align:center;width:7%;font-size:13pt">${st.d?"☑":"☐"}</td>
+        <td>${escHtml(it[1])}</td><td style="width:26%">${escHtml(st.n||"")}</td></tr>`;
+    }
+  }
+  return `<div class="doc"><h1>Yapı Ruhsatı Evrak Takip Çizelgesi</h1>${projeOzet()}
+    <table class="kisi"><tr><td class="k" style="width:7%">✔</td><td class="k">Evrak Adı</td><td class="k" style="width:26%">Not / Durum</td></tr>
+    ${rows}</table>${tarihSagi()}</div>`;
 }
 
 /* ---- yardımcılar ---- */

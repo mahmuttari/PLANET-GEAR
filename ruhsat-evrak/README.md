@@ -14,6 +14,11 @@ Kurulum gerekmez — `index.html` dosyasını çift tıklayıp tarayıcıda açm
     şantiye şefi, müteahhit, kalfa
   - Sözleşmeler: Yapı Sahibi–Müteahhit, Şantiye Şefliği Hizmet Sözleşmesi
   - Davetnameler (her kişi için) ve Yapı Ruhsatı Başvuru Dilekçesi
+- **Evrak Takip / Kontrol Listesi:** Excel çizelgesindeki tüm evraklar (Vize,
+  Yapı Denetim, Müteahhit, Şantiye Şefi grupları) işaretlenebilir liste olarak
+  gelir; grup ve genel **ilerleme çubuğu**, her maddeye **not**, ve uygulamanın
+  üretebildiği belgeler için **"✍️ Üret"** kısayolu bulunur. Çizelge PDF olarak
+  da yazdırılabilir.
 - **PDF / Yazdır:** Her belge tek tek veya "Tümünü Yazdır" ile toplu olarak
   PDF'e aktarılır (tarayıcı yazdır penceresinde "PDF olarak kaydet").
 - **Veri güvenliği:** Bilgiler yalnızca tarayıcıda (localStorage) saklanır,
