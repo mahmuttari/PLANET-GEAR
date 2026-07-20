@@ -1,0 +1,534 @@
+<style>
+  :root{
+    --bg:#eef2f7; --card:#ffffff; --ink:#1f2933; --muted:#64748b;
+    --line:#dbe3ec; --brand:#1e6f5c; --brand-d:#155446; --accent:#2563eb;
+    --warn:#b45309; --shadow:0 1px 3px rgba(16,24,40,.08),0 1px 2px rgba(16,24,40,.06);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{font-family:"Segoe UI",Roboto,system-ui,Arial,sans-serif;background:var(--bg);color:var(--ink);font-size:15px;line-height:1.5}
+  a{color:var(--accent)}
+  /* ---- Üst çubuk ---- */
+  header.app{position:sticky;top:0;z-index:20;background:var(--brand);color:#fff;padding:10px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap;box-shadow:var(--shadow)}
+  header.app h1{font-size:17px;margin:0;font-weight:700;letter-spacing:.2px}
+  header.app .sub{font-size:12px;opacity:.85}
+  header.app .spacer{flex:1}
+  header.app button{font:inherit;font-size:13px;border:0;border-radius:8px;padding:7px 12px;cursor:pointer;background:rgba(255,255,255,.16);color:#fff}
+  header.app button:hover{background:rgba(255,255,255,.28)}
+  #saveState{font-size:12px;opacity:.9;min-width:96px}
+  /* ---- Sekmeler ---- */
+  nav.tabs{display:flex;gap:4px;background:var(--card);padding:6px 12px;border-bottom:1px solid var(--line);position:sticky;top:52px;z-index:15;flex-wrap:wrap}
+  nav.tabs button{font:inherit;border:0;background:transparent;padding:9px 16px;border-radius:8px 8px 0 0;cursor:pointer;color:var(--muted);font-weight:600}
+  nav.tabs button.active{color:var(--brand);background:var(--bg);box-shadow:inset 0 -3px 0 var(--brand)}
+  main{max-width:1200px;margin:0 auto;padding:18px}
+  .note{background:#fff8ec;border:1px solid #f2d9a8;color:#8a5a12;padding:10px 14px;border-radius:10px;font-size:13px;margin-bottom:16px}
+  /* ---- Form ---- */
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);overflow:hidden}
+  .card > h2{margin:0;font-size:14.5px;padding:12px 16px;background:#f7fafc;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:8px}
+  .card .body{padding:14px 16px}
+  .field{margin-bottom:11px}
+  .field:last-child{margin-bottom:0}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:4px;font-weight:600}
+  .field input,.field textarea,.field select{width:100%;font:inherit;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:#fff;color:var(--ink)}
+  .field input:focus,.field textarea:focus{outline:2px solid #bfe3d8;border-color:var(--brand)}
+  .field.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+  textarea{resize:vertical;min-height:52px}
+  /* ---- Belgeler ---- */
+  .docs-wrap{display:grid;grid-template-columns:320px 1fr;gap:18px}
+  .doc-list{background:var(--card);border:1px solid var(--line);border-radius:14px;box-shadow:var(--shadow);padding:8px;max-height:74vh;overflow:auto}
+  .doc-group{font-size:11px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);padding:12px 10px 6px}
+  .doc-item{display:flex;align-items:center;gap:8px;padding:9px 10px;border-radius:9px;cursor:pointer;font-size:14px}
+  .doc-item:hover{background:var(--bg)}
+  .doc-item.active{background:#e6f2ee;color:var(--brand-d);font-weight:600}
+  .doc-item .tick{margin-left:auto;font-size:12px;color:var(--brand)}
+  .preview-pane{min-width:0}
+  .preview-toolbar{display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap}
+  .btn{font:inherit;font-size:14px;border:0;border-radius:9px;padding:9px 16px;cursor:pointer;font-weight:600}
+  .btn.primary{background:var(--brand);color:#fff}
+  .btn.primary:hover{background:var(--brand-d)}
+  .btn.ghost{background:#fff;border:1px solid var(--line);color:var(--ink)}
+  .btn.ghost:hover{background:var(--bg)}
+  .preview-frame{background:#f0f3f7;border:1px solid var(--line);border-radius:14px;padding:20px;max-height:72vh;overflow:auto}
+  /* ---- Belge (A4) ---- */
+  #printArea .doc{background:#fff;width:21cm;min-height:29.7cm;margin:0 auto 20px;padding:2.2cm 2cm;box-shadow:0 2px 10px rgba(0,0,0,.12);font-family:"Times New Roman",Georgia,serif;color:#000;font-size:12.5pt;line-height:1.55}
+  #printArea .doc h1{font-size:15pt;text-align:center;text-transform:uppercase;letter-spacing:.5px;margin:0 0 18px;border-bottom:2px solid #000;padding-bottom:8px}
+  #printArea .doc h2{font-size:12.5pt;margin:16px 0 6px}
+  #printArea .doc p{margin:10px 0;text-align:justify}
+  #printArea .doc .ozet{width:100%;border-collapse:collapse;margin:10px 0 16px;font-size:11pt}
+  #printArea .doc .ozet td{border:1px solid #999;padding:5px 8px}
+  #printArea .doc .ozet td.k{background:#f2f2f2;font-weight:bold;width:34%;white-space:nowrap}
+  #printArea .doc .kisi{width:100%;border-collapse:collapse;margin:6px 0 8px;font-size:11pt}
+  #printArea .doc .kisi td{border:1px solid #bbb;padding:4px 8px}
+  #printArea .doc .kisi td.k{background:#f7f7f7;font-weight:bold;width:32%}
+  #printArea .doc .imzalar{display:flex;justify-content:space-between;gap:30px;margin-top:40px}
+  #printArea .doc .imza{flex:1;text-align:center;font-size:11.5pt}
+  #printArea .doc .imza .rol{font-weight:bold;margin-bottom:42px}
+  #printArea .doc .imza .ln{border-top:1px solid #000;padding-top:4px}
+  #printArea .doc .tarih{text-align:right;margin:26px 0 0}
+  #printArea .doc .dots{letter-spacing:1px}
+  .empty-hint{color:var(--muted);text-align:center;padding:60px 20px}
+  /* ---- Baskı ---- */
+  @media print{
+    body{background:#fff}
+    header.app,nav.tabs,.note,#tab-bilgiler,.doc-list,.preview-toolbar,.pane-hidden{display:none !important}
+    main{max-width:none;padding:0;margin:0}
+    .docs-wrap{display:block}
+    .preview-frame{border:0;padding:0;max-height:none;overflow:visible;background:#fff}
+    #printArea .doc{box-shadow:none;margin:0;width:auto;min-height:auto;padding:1.6cm 1.8cm;page-break-after:always}
+    #printArea .doc:last-child{page-break-after:auto}
+  }
+  @media(max-width:800px){ .docs-wrap{grid-template-columns:1fr} }
+</style>
+<header class="app">
+  <div>
+    <h1>🏗️ Ruhsat Evrak Hazırlama Paneli</h1>
+    <div class="sub">İnşaat ruhsatı taahhütname · sözleşme · davetname · dilekçe üreticisi</div>
+  </div>
+  <div class="spacer"></div>
+  <span id="saveState">💾 Kaydedildi</span>
+  <button onclick="exportJSON()">Yedek Al (JSON)</button>
+  <button onclick="document.getElementById('imp').click()">Yedek Yükle</button>
+  <input id="imp" type="file" accept="application/json" style="display:none" onchange="importJSON(this)">
+  <button onclick="if(confirm('Tüm girilen bilgiler silinsin mi?')){localStorage.removeItem(LSKEY);location.reload();}">Temizle</button>
+</header>
+
+<nav class="tabs">
+  <button id="tabbtn-bilgiler" class="active" onclick="showTab('bilgiler')">📝 Bilgi Girişi</button>
+  <button id="tabbtn-belgeler" onclick="showTab('belgeler')">📄 Belgeler</button>
+  <button id="tabbtn-yardim" onclick="showTab('yardim')">❔ Yardım</button>
+</nav>
+
+<main>
+  <div class="note">
+    Girdiğiniz tüm bilgiler yalnızca <b>bu tarayıcıda</b> saklanır (sunucuya gönderilmez). Üretilen belgeler
+    <b>taslaktır</b>; imzalatmadan önce bağlı bulunduğunuz belediye/idarenin güncel form ve istekleriyle
+    karşılaştırın.
+  </div>
+
+  <!-- ================= BİLGİ GİRİŞİ ================= -->
+  <section id="tab-bilgiler">
+    <div class="grid" id="formGrid"></div>
+  </section>
+
+  <!-- ================= BELGELER ================= -->
+  <section id="tab-belgeler" style="display:none">
+    <div class="docs-wrap">
+      <div class="doc-list" id="docList"></div>
+      <div class="preview-pane">
+        <div class="preview-toolbar">
+          <button class="btn primary" onclick="printCurrent()">🖨️ PDF / Yazdır</button>
+          <button class="btn ghost" onclick="printAll()">🖨️ Tümünü Yazdır</button>
+          <span style="flex:1"></span>
+          <span style="font-size:12px;color:var(--muted);align-self:center">Yazdır penceresinde "Hedef: PDF olarak kaydet"i seçin.</span>
+        </div>
+        <div class="preview-frame">
+          <div id="printArea"><div class="empty-hint">Soldan bir belge seçin; önizlemesi burada görünür.</div></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================= YARDIM ================= -->
+  <section id="tab-yardim" style="display:none">
+    <div class="card" style="max-width:760px">
+      <h2>❔ Nasıl kullanılır?</h2>
+      <div class="body">
+        <ol style="padding-left:18px;line-height:1.7">
+          <li><b>Bilgi Girişi</b> sekmesinde proje/parsel bilgilerini ve projede yer alan tüm
+            kişileri (mimar, statik/inşaat, elektrik, makine, jeoloji, harita mühendisi,
+            müteahhit, şantiye şefi, yapı denetim, kalfa) doldurun.</li>
+          <li>Bilgiler otomatik kaydedilir. İstediğinizde <b>Yedek Al</b> ile JSON dosyası indirip
+            başka bilgisayarda <b>Yedek Yükle</b> ile geri yükleyebilirsiniz.</li>
+          <li><b>Belgeler</b> sekmesinde bir belge seçin; girdiğiniz bilgilerle otomatik dolar.
+            Boş kalan alanlar belgede noktalı satır olarak çıkar (elle doldurabilirsiniz).</li>
+          <li><b>PDF / Yazdır</b> ile o belgeyi, <b>Tümünü Yazdır</b> ile bütün belgeleri tek seferde
+            PDF olarak kaydedin (tarayıcının yazdır penceresinde "PDF olarak kaydet").</li>
+        </ol>
+        <p style="color:var(--muted);font-size:13px">Bu araç bir kolaylık aracıdır; hukuki/idari
+          sorumluluk kullanıcıya aittir. Belge metinleri genel niteliktedir.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const LSKEY = "ruhsat_evrak_v1";
+
+/* Ortak kişi alanları */
+const PERSON = [
+  ["ad","Ad Soyad"],["unvan","Unvan (ör. Y. Mimar, İnş. Müh.)"],["tc","T.C. Kimlik No"],
+  ["oda","Meslek Odası"],["sicil","Oda Sicil No"],["diploma","Diploma No"],
+  ["firma","Büro / Firma"],["adres","Adres","ta"],["tel","Telefon"],["eposta","E-posta"]
+];
+
+/* Bölümler (form şeması) */
+const SECTIONS = [
+  {id:"proje", title:"🏗️ Proje / Yapı Bilgileri", fields:[
+    ["il","İl"],["ilce","İlçe"],["mahalle","Mahalle / Köy"],["ada","Ada"],["parsel","Parsel"],
+    ["pafta","Pafta"],["arsaAlani","Arsa Alanı (m²)"],["insaatAlani","Toplam İnşaat Alanı (m²)"],
+    ["yapiSinifi","Yapı Sınıfı / Grubu"],["katAdedi","Kat Adedi"],["yapiNizami","Yapı Nizamı"],
+    ["adres","Açık Adres","ta"],["tarih","Belge Tarihi","date"]
+  ]},
+  {id:"malik", title:"👤 Yapı Sahibi (Malik)", fields:[
+    ["ad","Ad Soyad / Ünvan"],["tc","T.C. Kimlik / Vergi No"],["adres","Adres","ta"],["tel","Telefon"]
+  ]},
+  {id:"mimar",   title:"📐 Mimar (Mimari Proje Müellifi)", person:true},
+  {id:"statik",  title:"🧱 İnşaat / Statik Mühendisi", person:true},
+  {id:"elektrik",title:"⚡ Elektrik Mühendisi", person:true},
+  {id:"makine",  title:"🔧 Makine (Mekanik) Mühendisi", person:true},
+  {id:"jeoloji", title:"⛰️ Jeoloji / Jeoteknik Mühendisi", person:true},
+  {id:"harita",  title:"🗺️ Harita Mühendisi", person:true},
+  {id:"muteahhit", title:"🏢 Müteahhit (Yüklenici)", fields:[
+    ["firma","Firma Ünvanı"],["yetkili","Yetkili Ad Soyad"],["tc","T.C. Kimlik / Vergi No"],
+    ["yambis","YAMBİS / Yetki Belge No"],["ticaret","Ticaret Sicil No"],["adres","Adres","ta"],["tel","Telefon"]
+  ]},
+  {id:"santiye", title:"👷 Şantiye Şefi", fields:[
+    ["ad","Ad Soyad"],["unvan","Unvan"],["tc","T.C. Kimlik No"],["oda","Meslek Odası"],
+    ["sicil","Oda Sicil No"],["diploma","Diploma No"],["adres","Adres","ta"],["tel","Telefon"]
+  ]},
+  {id:"denetim", title:"🛡️ Yapı Denetim Kuruluşu", fields:[
+    ["unvan","Kuruluş Ünvanı"],["izin","İzin Belge No (Form-13)"],["yetkili","Yetkili Ad Soyad"],
+    ["adres","Adres","ta"],["tel","Telefon"]
+  ]},
+  {id:"kalfa", title:"🧰 Kalfa", fields:[
+    ["ad","Ad Soyad"],["tc","T.C. Kimlik No"],["adres","Adres","ta"],["tel","Telefon"]
+  ]}
+];
+
+let data = load();
+
+function load(){
+  try{ return JSON.parse(localStorage.getItem(LSKEY)) || {}; }catch(e){ return {}; }
+}
+let saveTimer=null;
+function save(){
+  localStorage.setItem(LSKEY, JSON.stringify(data));
+  const s=document.getElementById("saveState");
+  s.textContent="💾 Kaydedildi";
+  clearTimeout(saveTimer);
+}
+function onInput(sec,key,el){
+  data[sec]=data[sec]||{};
+  data[sec][key]=el.value;
+  document.getElementById("saveState").textContent="✏️ Yazılıyor…";
+  clearTimeout(saveTimer);
+  saveTimer=setTimeout(save,400);
+  if(currentDoc) renderPreview(); // önizleme açıksa canlı güncelle
+}
+
+/* ---- Form oluştur ---- */
+function buildForm(){
+  const g=document.getElementById("formGrid");
+  g.innerHTML="";
+  for(const sec of SECTIONS){
+    const fields = sec.person ? PERSON : sec.fields;
+    const card=document.createElement("div");
+    card.className="card";
+    let html=`<h2>${sec.title}</h2><div class="body">`;
+    for(const f of fields){
+      const [key,label,type]=f;
+      const val = (data[sec.id]&&data[sec.id][key]!=null)? String(data[sec.id][key]) : "";
+      const esc=escAttr(val);
+      if(type==="ta"){
+        html+=`<div class="field"><label>${label}</label><textarea oninput="onInput('${sec.id}','${key}',this)">${escHtml(val)}</textarea></div>`;
+      }else if(type==="date"){
+        html+=`<div class="field"><label>${label}</label><input type="date" value="${esc}" oninput="onInput('${sec.id}','${key}',this)"></div>`;
+      }else{
+        html+=`<div class="field"><label>${label}</label><input type="text" value="${esc}" oninput="onInput('${sec.id}','${key}',this)"></div>`;
+      }
+    }
+    html+=`</div>`;
+    card.innerHTML=html;
+    g.appendChild(card);
+  }
+}
+
+/* ================= BELGE ŞABLONLARI ================= */
+function v(sec,key){ return (data[sec]&&data[sec][key])? String(data[sec][key]).trim() : ""; }
+function dots(n){ return `<span class="dots">${"·".repeat(n)}</span>`; }
+function fill(val,n=26){ return val? escHtml(val) : dots(n); }
+function bugun(){ const t=v("proje","tarih"); if(t){const[a,b,c]=t.split("-");return `${c}.${b}.${a}`;} return "____ / ____ / 20____"; }
+
+function projeOzet(){
+  return `<table class="ozet">
+    <tr><td class="k">İl / İlçe</td><td>${fill(v("proje","il"),12)} / ${fill(v("proje","ilce"),12)}</td></tr>
+    <tr><td class="k">Mahalle / Köy</td><td>${fill(v("proje","mahalle"),20)}</td></tr>
+    <tr><td class="k">Ada / Parsel / Pafta</td><td>${fill(v("proje","ada"),6)} / ${fill(v("proje","parsel"),6)} / ${fill(v("proje","pafta"),6)}</td></tr>
+    <tr><td class="k">Yapı Sahibi</td><td>${fill(v("malik","ad"),24)}</td></tr>
+    <tr><td class="k">Açık Adres</td><td>${fill(v("proje","adres"),40)}</td></tr>
+  </table>`;
+}
+function kisiBlok(sec, roller){
+  const rows=[];
+  const add=(k,lbl)=>{ rows.push(`<tr><td class="k">${lbl}</td><td>${fill(v(sec,k),28)}</td></tr>`); };
+  add("ad","Ad Soyad"); if(v(sec,"unvan")||true) add("unvan","Unvan");
+  add("tc","T.C. Kimlik No");
+  add("oda","Meslek Odası"); add("sicil","Oda Sicil No"); add("diploma","Diploma No");
+  add("adres","Adres");
+  return `<table class="kisi">${rows.join("")}</table>`;
+}
+function imzaBlok(pairs){
+  return `<div class="imzalar">`+pairs.map(p=>
+    `<div class="imza"><div class="rol">${p[0]}</div><div class="ln">${fill(p[1],22)}<br>(İmza)</div></div>`
+  ).join("")+`</div>`;
+}
+function tarihSagi(){ return `<p class="tarih">Tarih: ${bugun()}</p>`; }
+
+/* Taahhütname (müellif/disiplin) */
+function docTaah(sec, baslik, isTanim){
+  return `<div class="doc">
+    <h1>${baslik}</h1>
+    ${projeOzet()}
+    <p>Yukarıda tapu ve adres bilgileri belirtilen taşınmaz üzerinde yapılacak yapıya ait
+    <b>${isTanim}</b>; 3194 sayılı İmar Kanunu, Planlı Alanlar İmar Yönetmeliği ve yürürlükteki
+    ilgili tüm mevzuat ile fen, sanat ve sağlık kurallarına uygun olarak tarafımca
+    hazırlanmıştır/yürütülecektir. Sorumluluğu üstlendiğimi, projeye ve mevzuata aykırı
+    uygulama yapmayacağımı, aksi halde doğacak her türlü hukuki, idari ve cezai sorumluluğun
+    tarafıma ait olduğunu kabul, beyan ve taahhüt ederim.</p>
+    <h2>Sorumlu Bilgileri</h2>
+    ${kisiBlok(sec)}
+    ${tarihSagi()}
+    ${imzaBlok([[baslik.replace(" TAAHHÜTNAMESİ",""), v(sec,"ad")]])}
+  </div>`;
+}
+
+/* Müteahhit taahhütnamesi */
+function docMuteahhitTaah(){
+  const isim = v("muteahhit","yetkili")||v("muteahhit","firma");
+  return `<div class="doc">
+    <h1>MÜTEAHHİT (YÜKLENİCİ) TAAHHÜTNAMESİ</h1>
+    ${projeOzet()}
+    <p>Yukarıda bilgileri verilen taşınmaz üzerindeki yapının müteahhitliğini üstlendiğimi;
+    inşaatı onaylı projelerine, 3194 sayılı İmar Kanunu, 4708 sayılı Yapı Denetimi Hakkında
+    Kanun ve ilgili tüm mevzuata, fen ve sağlık kurallarına uygun olarak yapacağımı/yaptıracağımı,
+    yapı müteahhitliği yetki belgesi (YAMBİS) kaydımın geçerli olduğunu, aksi durumda doğacak her
+    türlü sorumluluğun tarafıma ait olduğunu kabul ve taahhüt ederim.</p>
+    <table class="kisi">
+      <tr><td class="k">Firma Ünvanı</td><td>${fill(v("muteahhit","firma"),30)}</td></tr>
+      <tr><td class="k">Yetkili</td><td>${fill(v("muteahhit","yetkili"),26)}</td></tr>
+      <tr><td class="k">T.C. / Vergi No</td><td>${fill(v("muteahhit","tc"),20)}</td></tr>
+      <tr><td class="k">YAMBİS / Yetki Belge No</td><td>${fill(v("muteahhit","yambis"),20)}</td></tr>
+      <tr><td class="k">Ticaret Sicil No</td><td>${fill(v("muteahhit","ticaret"),20)}</td></tr>
+      <tr><td class="k">Adres</td><td>${fill(v("muteahhit","adres"),40)}</td></tr>
+    </table>
+    ${tarihSagi()}
+    ${imzaBlok([["MÜTEAHHİT", isim]])}
+  </div>`;
+}
+
+/* Şantiye şefi taahhütnamesi */
+function docSantiyeTaah(){
+  return `<div class="doc">
+    <h1>ŞANTİYE ŞEFİ TAAHHÜTNAMESİ</h1>
+    ${projeOzet()}
+    <p>Yukarıda bilgileri belirtilen yapının şantiye şefliğini üstlendiğimi; 4708 sayılı Kanun,
+    3194 sayılı İmar Kanunu ve ilgili mevzuat ile Şantiye Şefleri Hakkında Yönetmelik hükümleri
+    çerçevesinde görevimi yürüteceğimi, üstlenebileceğim iş sayısı/alanı sınırlarına uyacağımı,
+    aksi halde doğacak sorumluluğun tarafıma ait olduğunu kabul ve taahhüt ederim.</p>
+    <h2>Şantiye Şefi Bilgileri</h2>
+    ${kisiBlok("santiye")}
+    ${tarihSagi()}
+    ${imzaBlok([["ŞANTİYE ŞEFİ", v("santiye","ad")]])}
+  </div>`;
+}
+
+/* Kalfa taahhütnamesi */
+function docKalfaTaah(){
+  return `<div class="doc">
+    <h1>KALFA TAAHHÜTNAMESİ</h1>
+    ${projeOzet()}
+    <p>Yukarıda belirtilen yapıda kalfa olarak görev alacağımı, işi fen ve sağlık kurallarına
+    uygun yürüteceğimi, ilgili mevzuata aykırı davranmayacağımı kabul ve taahhüt ederim.</p>
+    <table class="kisi">
+      <tr><td class="k">Ad Soyad</td><td>${fill(v("kalfa","ad"),26)}</td></tr>
+      <tr><td class="k">T.C. Kimlik No</td><td>${fill(v("kalfa","tc"),18)}</td></tr>
+      <tr><td class="k">Adres</td><td>${fill(v("kalfa","adres"),40)}</td></tr>
+    </table>
+    ${tarihSagi()}
+    ${imzaBlok([["KALFA", v("kalfa","ad")]])}
+  </div>`;
+}
+
+/* Yapı sahibi - müteahhit sözleşmesi */
+function docSozMuteahhit(){
+  return `<div class="doc">
+    <h1>YAPI SAHİBİ İLE MÜTEAHHİT ARASINDA İNŞAAT SÖZLEŞMESİ</h1>
+    <p><b>Madde 1 – Taraflar.</b> İşbu sözleşme, bir tarafta <b>Yapı Sahibi (İşveren)</b>
+    ${fill(v("malik","ad"),24)} (T.C./Vergi No: ${fill(v("malik","tc"),14)}, Adres:
+    ${fill(v("malik","adres"),30)}) ile diğer tarafta <b>Müteahhit (Yüklenici)</b>
+    ${fill(v("muteahhit","firma")||v("muteahhit","yetkili"),24)} (YAMBİS: ${fill(v("muteahhit","yambis"),12)},
+    Adres: ${fill(v("muteahhit","adres"),28)}) arasında aşağıdaki şartlarla akdedilmiştir.</p>
+    <p><b>Madde 2 – Konu ve Yer.</b> Sözleşmenin konusu, ${fill(v("proje","il"),10)} ili
+    ${fill(v("proje","ilce"),10)} ilçesi ${fill(v("proje","mahalle"),14)} mahallesi/köyü
+    ${fill(v("proje","ada"),5)} ada ${fill(v("proje","parsel"),5)} parsel sayılı taşınmaz üzerinde,
+    onaylı projelerine uygun olarak yapının inşa edilmesidir. Toplam inşaat alanı yaklaşık
+    ${fill(v("proje","insaatAlani"),8)} m²'dir.</p>
+    <p><b>Madde 3 – Bedel ve Ödeme.</b> İşin bedeli ve ödeme koşulları taraflarca
+    ${dots(30)} olarak belirlenmiştir.</p>
+    <p><b>Madde 4 – Süre.</b> İşe başlama tarihi ${dots(14)}, işin teslim süresi ${dots(14)}'dir.</p>
+    <p><b>Madde 5 – Genel Hükümler.</b> Yüklenici; işi onaylı projelere, 3194 ve 4708 sayılı
+    Kanunlar ile ilgili mevzuata, fen ve iş sağlığı-güvenliği kurallarına uygun yürütmekle
+    yükümlüdür. İşbu sözleşmede hüküm bulunmayan hallerde genel hükümler uygulanır. Uyuşmazlıklarda
+    ${fill(v("proje","il"),10)} mahkeme ve icra daireleri yetkilidir. İşbu sözleşme ${bugun()}
+    tarihinde iki nüsha olarak düzenlenmiş ve taraflarca imzalanmıştır.</p>
+    ${imzaBlok([["YAPI SAHİBİ", v("malik","ad")],["MÜTEAHHİT", v("muteahhit","yetkili")||v("muteahhit","firma")]])}
+  </div>`;
+}
+
+/* Şantiye şefliği hizmet sözleşmesi */
+function docSozSantiye(){
+  return `<div class="doc">
+    <h1>ŞANTİYE ŞEFLİĞİ HİZMET SÖZLEŞMESİ</h1>
+    <p><b>Madde 1 – Taraflar.</b> Bir tarafta <b>İşveren (Müteahhit)</b>
+    ${fill(v("muteahhit","firma")||v("muteahhit","yetkili"),24)} ile diğer tarafta
+    <b>Şantiye Şefi</b> ${fill(v("santiye","ad"),22)} (Oda Sicil No: ${fill(v("santiye","sicil"),10)})
+    arasında işbu hizmet sözleşmesi akdedilmiştir.</p>
+    <p><b>Madde 2 – Konu.</b> ${fill(v("proje","il"),10)} ili ${fill(v("proje","ilce"),10)} ilçesi
+    ${fill(v("proje","mahalle"),14)} ${fill(v("proje","ada"),5)} ada ${fill(v("proje","parsel"),5)}
+    parseldeki yapının şantiye şefliği hizmetinin, Şantiye Şefleri Hakkında Yönetmelik ve ilgili
+    mevzuata uygun olarak yürütülmesidir.</p>
+    <p><b>Madde 3 – Yükümlülükler.</b> Şantiye şefi; işin projesine ve mevzuata uygun yürütülmesini
+    sağlamak, iş sağlığı ve güvenliği tedbirlerini gözetmekle yükümlüdür. Üstlenebileceği iş
+    sayısı/toplam alan sınırlarına uyar.</p>
+    <p><b>Madde 4 – Süre ve Ücret.</b> Sözleşme süresi ${dots(14)}, ücret ${dots(18)} olarak
+    belirlenmiştir. İşbu sözleşme ${bugun()} tarihinde iki nüsha düzenlenmiştir.</p>
+    ${imzaBlok([["İŞVEREN (MÜTEAHHİT)", v("muteahhit","yetkili")||v("muteahhit","firma")],["ŞANTİYE ŞEFİ", v("santiye","ad")]])}
+  </div>`;
+}
+
+/* Davetname (kişiye) */
+function docDavet(sec, rol){
+  const ad = v(sec,"ad")||v(sec,"yetkili")||v(sec,"firma");
+  return `<div class="doc">
+    <h1>DAVETNAME</h1>
+    <p style="text-align:right">Tarih: ${bugun()}</p>
+    <p><b>Sayın ${fill(ad,24)}</b></p>
+    <p>${fill(v("proje","il"),10)} ili ${fill(v("proje","ilce"),10)} ilçesi ${fill(v("proje","mahalle"),14)}
+    mahallesi/köyü ${fill(v("proje","ada"),5)} ada ${fill(v("proje","parsel"),5)} parsel sayılı taşınmaz
+    üzerinde yapılacak yapıya ilişkin yapı ruhsatı işlemleri kapsamında, <b>${rol}</b> sıfatıyla
+    imzalamanız ve/veya teslim etmeniz gereken taahhütname, sözleşme ve sair belgelerin tamamlanması
+    gerekmektedir.</p>
+    <p>Bu nedenle, aşağıda belirtilen gün ve adreste hazır bulunmanızı önemle rica ederiz.</p>
+    <table class="kisi">
+      <tr><td class="k">Toplantı / İmza Tarihi</td><td>${dots(24)}</td></tr>
+      <tr><td class="k">Adres</td><td>${fill(v("proje","adres"),40)}</td></tr>
+    </table>
+    ${imzaBlok([["DAVET EDEN (YAPI SAHİBİ)", v("malik","ad")]])}
+  </div>`;
+}
+
+/* Ruhsat başvuru dilekçesi */
+function docDilekce(){
+  return `<div class="doc">
+    <h1>${fill(v("proje","ilce"),14)} BELEDİYE BAŞKANLIĞINA</h1>
+    <p style="margin-top:24px">${fill(v("proje","il"),10)} ili ${fill(v("proje","ilce"),10)} ilçesi
+    ${fill(v("proje","mahalle"),14)} mahallesi/köyü ${fill(v("proje","ada"),5)} ada
+    ${fill(v("proje","parsel"),5)} parsel sayılı taşınmazın maliki/müteahhidiyim.</p>
+    <p>Söz konusu taşınmaz üzerinde, onaylı projelerine uygun olarak yapı yapmak istiyorum. İlgili
+    mevzuat gereği hazırlanan taahhütname, sözleşme, proje ve diğer evraklar ekte/başvuru dosyasında
+    sunulmuştur.</p>
+    <p>Gerekli incelemenin yapılarak tarafıma <b>yapı ruhsatı</b> düzenlenmesi hususunda gereğini
+    saygılarımla arz ederim.</p>
+    ${tarihSagi()}
+    <div style="margin-top:20px;text-align:right">
+      <b>${fill(v("malik","ad"),24)}</b><br>
+      T.C./Vergi No: ${fill(v("malik","tc"),16)}<br>
+      Adres: ${fill(v("malik","adres"),30)}<br>
+      Telefon: ${fill(v("malik","tel"),16)}<br>(İmza)
+    </div>
+  </div>`;
+}
+
+/* Belge kataloğu */
+const DOCS = [
+  {g:"Taahhütnameler", id:"t_mimar",  t:"Mimari Proje Müellifliği Taahhütnamesi", f:()=>docTaah("mimar","MİMARİ PROJE MÜELLİFLİĞİ TAAHHÜTNAMESİ","mimari projeyi")},
+  {g:"Taahhütnameler", id:"t_statik", t:"İnşaat / Statik Mühendisliği Taahhütnamesi", f:()=>docTaah("statik","İNŞAAT MÜHENDİSLİĞİ TAAHHÜTNAMESİ","statik (betonarme) projeyi")},
+  {g:"Taahhütnameler", id:"t_elektrik",t:"Elektrik Mühendisliği Taahhütnamesi", f:()=>docTaah("elektrik","ELEKTRİK MÜHENDİSLİĞİ TAAHHÜTNAMESİ","elektrik tesisat projesini")},
+  {g:"Taahhütnameler", id:"t_makine", t:"Makine Mühendisliği Taahhütnamesi", f:()=>docTaah("makine","MAKİNE MÜHENDİSLİĞİ TAAHHÜTNAMESİ","mekanik tesisat projesini")},
+  {g:"Taahhütnameler", id:"t_jeoloji",t:"Jeoloji / Jeoteknik Mühendisliği Taahhütnamesi", f:()=>docTaah("jeoloji","JEOLOJİ MÜHENDİSLİĞİ TAAHHÜTNAMESİ","zemin etüt (jeoteknik) raporunu")},
+  {g:"Taahhütnameler", id:"t_harita", t:"Harita Mühendisliği Taahhütnamesi", f:()=>docTaah("harita","HARİTA MÜHENDİSLİĞİ TAAHHÜTNAMESİ","aplikasyon / harita işlerini")},
+  {g:"Taahhütnameler", id:"t_santiye",t:"Şantiye Şefi Taahhütnamesi", f:docSantiyeTaah},
+  {g:"Taahhütnameler", id:"t_mut",    t:"Müteahhit Taahhütnamesi", f:docMuteahhitTaah},
+  {g:"Taahhütnameler", id:"t_kalfa",  t:"Kalfa Taahhütnamesi", f:docKalfaTaah},
+
+  {g:"Sözleşmeler", id:"s_mut", t:"Yapı Sahibi – Müteahhit Sözleşmesi", f:docSozMuteahhit},
+  {g:"Sözleşmeler", id:"s_san", t:"Şantiye Şefliği Hizmet Sözleşmesi", f:docSozSantiye},
+
+  {g:"Davetnameler", id:"d_mimar", t:"Davetname – Mimar", f:()=>docDavet("mimar","mimari proje müellifi")},
+  {g:"Davetnameler", id:"d_statik",t:"Davetname – İnşaat/Statik Müh.", f:()=>docDavet("statik","statik proje müellifi")},
+  {g:"Davetnameler", id:"d_elektrik",t:"Davetname – Elektrik Müh.", f:()=>docDavet("elektrik","elektrik proje müellifi")},
+  {g:"Davetnameler", id:"d_makine",t:"Davetname – Makine Müh.", f:()=>docDavet("makine","makine proje müellifi")},
+  {g:"Davetnameler", id:"d_harita",t:"Davetname – Harita Müh.", f:()=>docDavet("harita","harita mühendisi")},
+  {g:"Davetnameler", id:"d_mut",   t:"Davetname – Müteahhit", f:()=>docDavet("muteahhit","müteahhit")},
+  {g:"Davetnameler", id:"d_san",   t:"Davetname – Şantiye Şefi", f:()=>docDavet("santiye","şantiye şefi")},
+
+  {g:"Diğer", id:"o_dilekce", t:"Yapı Ruhsatı Başvuru Dilekçesi", f:docDilekce}
+];
+
+let currentDoc = null;
+
+function buildDocList(){
+  const list=document.getElementById("docList");
+  list.innerHTML="";
+  let lastG=null;
+  for(const d of DOCS){
+    if(d.g!==lastG){ const h=document.createElement("div"); h.className="doc-group"; h.textContent=d.g; list.appendChild(h); lastG=d.g; }
+    const it=document.createElement("div");
+    it.className="doc-item"+(currentDoc===d.id?" active":"");
+    it.innerHTML=`<span>📄</span><span>${d.t}</span>`;
+    it.onclick=()=>{ currentDoc=d.id; buildDocList(); renderPreview(); };
+    list.appendChild(it);
+  }
+}
+function renderPreview(){
+  const d=DOCS.find(x=>x.id===currentDoc);
+  const area=document.getElementById("printArea");
+  if(!d){ area.innerHTML=`<div class="empty-hint">Soldan bir belge seçin.</div>`; return; }
+  area.innerHTML=d.f();
+}
+function printCurrent(){
+  if(!currentDoc){ alert("Önce bir belge seçin."); return; }
+  window.print();
+}
+function printAll(){
+  const area=document.getElementById("printArea");
+  area.innerHTML=DOCS.map(d=>d.f()).join("");
+  window.print();
+  // baskı sonrası tek belgeye dön
+  setTimeout(renderPreview,300);
+}
+
+/* ---- Sekme ---- */
+function showTab(t){
+  for(const x of ["bilgiler","belgeler","yardim"]){
+    document.getElementById("tab-"+x).style.display = (x===t)?"":"none";
+    document.getElementById("tabbtn-"+x).classList.toggle("active", x===t);
+  }
+  if(t==="belgeler" && !currentDoc){ currentDoc=DOCS[0].id; buildDocList(); renderPreview(); }
+}
+
+/* ---- JSON dışa/içe ---- */
+function exportJSON(){
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:"application/json"});
+  const a=document.createElement("a");
+  const ad=(v("proje","ada")||"proje"), pr=(v("proje","parsel")||"");
+  a.href=URL.createObjectURL(blob);
+  a.download=`ruhsat_${ad}_${pr}.json`.replace(/\s+/g,"_");
+  a.click();
+}
+function importJSON(inp){
+  const file=inp.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=()=>{ try{ data=JSON.parse(r.result)||{}; save(); buildForm(); if(currentDoc) renderPreview(); alert("Yedek yüklendi."); }catch(e){ alert("Dosya okunamadı."); } };
+  r.readAsText(file);
+}
+
+/* ---- yardımcılar ---- */
+function escHtml(s){ return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;"); }
+function escAttr(s){ return escHtml(s).replace(/"/g,"&quot;"); }
+
+/* başlat */
+buildForm();
+buildDocList();
+</script>
