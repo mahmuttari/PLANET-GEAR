@@ -434,24 +434,58 @@ function docSozMuteahhit(){
   </div>`;
 }
 
-/* Şantiye şefliği hizmet sözleşmesi */
+/* Şantiye şefliği hizmet sözleşmesi — resmi standart metin (8 madde) */
 function docSozSantiye(){
+  const mut = v("muteahhit","firma")||v("muteahhit","yetkili");
+  const L = (t)=>`<p style="margin:12px 0 2px;font-weight:bold">${t}</p>`;
   return `<div class="doc">
     <h1>ŞANTİYE ŞEFLİĞİ HİZMET SÖZLEŞMESİ</h1>
-    <p><b>Madde 1 – Taraflar.</b> Bir tarafta <b>İşveren (Müteahhit)</b>
-    ${fill(v("muteahhit","firma")||v("muteahhit","yetkili"),24)} ile diğer tarafta
-    <b>Şantiye Şefi</b> ${fill(v("santiye","ad"),22)} (Oda Sicil No: ${fill(v("santiye","sicil"),10)})
-    arasında işbu hizmet sözleşmesi akdedilmiştir.</p>
-    <p><b>Madde 2 – Konu.</b> ${fill(v("proje","il"),10)} ili ${fill(v("proje","ilce"),10)} ilçesi
-    ${fill(v("proje","mahalle"),14)} ${fill(v("proje","ada"),5)} ada ${fill(v("proje","parsel"),5)}
-    parseldeki yapının şantiye şefliği hizmetinin, Şantiye Şefleri Hakkında Yönetmelik ve ilgili
-    mevzuata uygun olarak yürütülmesidir.</p>
-    <p><b>Madde 3 – Yükümlülükler.</b> Şantiye şefi; işin projesine ve mevzuata uygun yürütülmesini
-    sağlamak, iş sağlığı ve güvenliği tedbirlerini gözetmekle yükümlüdür. Üstlenebileceği iş
-    sayısı/toplam alan sınırlarına uyar.</p>
-    <p><b>Madde 4 – Süre ve Ücret.</b> Sözleşme süresi ${dots(14)}, ücret ${dots(18)} olarak
-    belirlenmiştir. İşbu sözleşme ${bugun()} tarihinde iki nüsha düzenlenmiştir.</p>
-    ${imzaBlok([["İŞVEREN (MÜTEAHHİT)", v("muteahhit","yetkili")||v("muteahhit","firma")],["ŞANTİYE ŞEFİ", v("santiye","ad")]])}
+    ${L("Taraflar")}
+    <p><b>MADDE 1 -</b> ${fill(mut,30)} isimli/unvanlı Yapı Müteahhidi ile Şantiye Şefi olarak
+    ${fill(v("santiye","ad"),26)} arasında aşağıdaki şartlarla bir sözleşme düzenlenmiştir. Bu
+    sözleşmede taraflar Yapı Müteahhidi ile Şantiye Şefi olarak anılacaktır.</p>
+    ${L("İşyeri")}
+    <p><b>MADDE 2 -</b> Şantiye şefinin işyeri ${fill(v("proje","il"),12)} ili,
+    ${fill(v("proje","ilce"),12)} ilçesi, ${fill(v("proje","adres"),30)} adresindeki,
+    ${fill(v("proje","yibf"),8)} YİBF nolu, tapunun ${fill(v("proje","pafta"),6)} pafta,
+    ${fill(v("proje","ada"),5)} ada, ${fill(v("proje","parsel"),5)} parsel numarasıyla kayıtlı olan ve
+    ilgili idareden alınan yapı ruhsatı ve eklerine göre inşa edilecek yapıdır.</p>
+    ${L("Görev ve Yükümlülükleri")}
+    <p><b>MADDE 3 -</b> Şantiye şefi; yapıyı yapı denetim kuruluşunun teknik konulardaki talimatlarına
+    uygun olarak yönetmek ve inşa ettirmekle yükümlüdür. Şantiye şefi, yapılacak denetimler için
+    hazırlık yaparak yapı denetim kuruluşuna bildirmek, yapı denetiminde bizzat bulunarak denetime
+    ilişkin tutanak ve belgeleri imzalamak, yapı denetimine mani olanlar varsa bunları öncelikle yapı
+    denetim kuruluşuna, yapı denetim kuruluşunca denetimin sağlanamaması halinde Yapı Denetim
+    Komisyonuna bildirmek zorundadır.</p>
+    <p>Bunun yanında şantiye şefi; görevinin gerektirdiği işler ile verilecek diğer görevleri, öncelik
+    sırası ile yürürlükteki Yapı Denetimi Hakkında Kanuna, İmar Kanunu, imar planı, yönetmelik, ruhsat
+    ve ekleri, standart, şartname, fen ve sanat kuralları ile ilgili idare, yapı denetim kuruluşu ve
+    yapı müteahhidinin talimatlarına uygun olarak yapmayı taahhüt eder ve bu hizmetleri karşılığında
+    5 inci maddede belirtilen aylık sözleşme ücretini alır.</p>
+    ${L("Sözleşme Süresi")}
+    <p><b>MADDE 4 -</b> Sözleşme süresi, inşa edilecek yapının ruhsat tarihi ile yapı kullanma izni
+    tarihi arasında geçen süredir.</p>
+    ${L("Ücret")}
+    <p><b>MADDE 5 -</b> Şantiye şefine yapacağı işe karşılık, sözleşme süresince iş gerekleri, işyeri ve
+    çalışma şartlarına göre birinci yıl için brüt ${dots(10)} TL. aylık sözleşme ücreti ödenir. Aylık
+    sözleşme ücreti ilgili ayın son iş günü nakden ödenir.</p>
+    <p>Ertesi yıllarda, enflasyon oranı dikkate alınarak beher yıl için brüt ücret yeniden belirlenir.
+    Belirlenen bu ücret aylık sözleşme ücreti kabul edilir.</p>
+    <p>Şantiye şefine sözleşme ücreti dışında, görevi ile bu görevin iş gereklerine uygun olarak
+    verilen diğer görevler için, bu sözleşmede belirtilenlerin (yabancı dil tazminatı, ödül, fazla
+    çalışma ücreti, harcırah) dışında herhangi bir ad altında başka bir ödeme yapılmayacaktır.</p>
+    ${L("Çalışma Saat ve Süreleri")}
+    <p><b>MADDE 6 -</b> Şantiye şefi haftalık ve günlük çalışmanın şekli ve saatleri bakımından görevin
+    ifa edildiği işyeri için tespit edilen esas, usul, saat ve sürelere ve kendisine verilen görevleri
+    çalışma saat ve sürelerine bağlı kalmaksızın sonuçlandırmak zorundadır.</p>
+    ${L("Sosyal Güvenlik")}
+    <p><b>MADDE 7 -</b> Şantiye şefi sosyal güvenlik bakımından 506 sayılı Sosyal Sigortalar Kanununa
+    tabidir.</p>
+    ${L("Çeşitli Hükümler")}
+    <p><b>MADDE 8 -</b> Bu Sözleşmede yer almayan hususlarda, öncelik sırası ile Sosyal Sigortalar
+    Kanunu, İş Kanunu, Borçlar Kanunu ve ilgili mevzuat hükümleri uygulanır.</p>
+    <p>İş bu sözleşme ${bugun()} tarihinde, ${dots(3)} nüsha olarak düzenlenmiştir.</p>
+    ${imzaBlok([["Şantiye Şefi (işçi)", v("santiye","ad")],["Yapı Müteahhidi (işveren)", mut]])}
   </div>`;
 }
 
