@@ -207,6 +207,7 @@ const SECTIONS = [
     ["ruhsatTuru","Ruhsat Türü (Yeni / İlave / Tadilat)"],["yibf","YİBF No (varsa)"],
     ["arsaAlani","Arsa Alanı (m²)"],["insaatAlani","Toplam İnşaat Alanı (m²)"],
     ["yapiSinifi","Yapı Sınıfı / Grubu"],["katAdedi","Kat Adedi"],["yapiNizami","Yapı Nizamı"],
+    ["binaAdedi","Bina / Blok Adedi (küme yapı)"],
     ["adres","Yapının Açık Adresi","ta"],["tarih","Belge Tarihi","date"]
   ]},
   {id:"malik", title:"👤 Yapı Sahibi (Malik)", fields:[
@@ -524,6 +525,34 @@ function docDilekce(){
   </div>`;
 }
 
+/* Çevre, Şehircilik ve İklim Değişikliği İl Müdürlüğü'ne küme yapı başvuru dilekçesi */
+function docKumeYapiBasvuru(){
+  return `<div class="doc">
+    <h1>ÇEVRE, ŞEHİRCİLİK VE İKLİM DEĞİŞİKLİĞİ<br>İL MÜDÜRLÜĞÜNE</h1>
+    <p style="text-align:center;font-weight:bold;margin:-8px 0 14px">${fill(v("proje","il"),16)}</p>
+    <p><b>KONU:</b> Küme yapı başvurusu hakkında.</p>
+    ${projeOzet()}
+    <p>Yukarıda tapu kaydı ve adresi belirtilen taşınmazın maliki/müteahhidiyim. Söz konusu taşınmaz
+    üzerinde, ortak altyapı (yol, otopark, teknik altyapı vb.) ile birbirine bağlı
+    <b>${fill(v("proje","binaAdedi"),4)}</b> adet binadan (bloktan) oluşan <b>küme yapı</b> inşa
+    edilecektir. Toplam inşaat alanı ${fill(v("proje","insaatAlani"),8)} m²'dir.</p>
+    <p>4708 sayılı Yapı Denetimi Hakkında Kanun ve ilgili yönetmelik hükümleri kapsamında, söz konusu
+    küme yapıya ilişkin yapı denetim işlemlerinin başlatılması ve gerekli görevlendirmelerin yapılması
+    hususunda gereğini bilgilerinize arz ederim.</p>
+    <h2>EKLER</h2>
+    <p style="margin-top:4px">1) Tapu kaydı / aplikasyon krokisi &nbsp;&nbsp; 2) İmar durumu belgesi
+    &nbsp;&nbsp; 3) Onaylı mimari ve mühendislik projeleri &nbsp;&nbsp; 4) Yapı ruhsatı ve eki belgeler
+    &nbsp;&nbsp; 5) İdarece istenen diğer belgeler</p>
+    ${tarihSagi()}
+    <div style="margin-top:16px;text-align:right">
+      <b>${fill(v("malik","ad"),24)}</b><br>
+      T.C./Vergi No: ${fill(v("malik","tc"),16)}<br>
+      Adres: ${fill(v("malik","adres"),30)}<br>
+      Telefon: ${fill(v("malik","tel"),16)}<br>(İmza)
+    </div>
+  </div>`;
+}
+
 /* Belge kataloğu */
 const DOCS = [
   {g:"Taahhütnameler", id:"t_mimar",  t:"Mimari Proje Müellifi Taahhütnamesi", f:()=>docTaah("mimar","MİMARİ PROJE")},
@@ -547,7 +576,8 @@ const DOCS = [
   {g:"Davetnameler", id:"d_mut",   t:"Davetname – Müteahhit", f:()=>docDavet("muteahhit","müteahhit")},
   {g:"Davetnameler", id:"d_san",   t:"Davetname – Şantiye Şefi", f:()=>docDavet("santiye","şantiye şefi")},
 
-  {g:"Diğer", id:"o_dilekce", t:"Yapı Ruhsatı Başvuru Dilekçesi", f:docDilekce}
+  {g:"Diğer", id:"o_dilekce", t:"Yapı Ruhsatı Başvuru Dilekçesi", f:docDilekce},
+  {g:"Diğer", id:"o_kume", t:"Küme Yapı Başvuru Dilekçesi (Çevre ve Şehircilik İl Müd.)", f:docKumeYapiBasvuru}
 ];
 
 let currentDoc = null;
