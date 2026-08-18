@@ -1,0 +1,14 @@
+# Bağımlılıklar
+node_modules/
+
+# WhatsApp oturum verisi (telefon bağlantısı) — ASLA paylaşma
+.wwebjs_auth/
+.wwebjs_cache/
+
+# Botun ürettiği çıktı görselleri
+output/
+
+# Ortam & log
+.env
+*.log
+npm-debug.log*
