@@ -322,33 +322,63 @@ function imzaBlok(pairs){
 }
 function tarihSagi(){ return `<p class="tarih">Tarih: ${bugun()}</p>`; }
 
-/* Proje Müellifi Taahhütnamesi — resmi Form-1 (Proje Müellifleri Tarafından
-   İlgili İdareye Verilecek Taahhütname) yapısına göre. */
-function docTaah(sec, projeTuru){
+/* Her disiplinin KENDİ mevzuatına göre iş tanımı ve atıflar.
+   (Örn. deprem yönetmeliği yalnızca statik ve jeolojiyi ilgilendirir; harita
+   mühendisi BÖHHBÜY'e, elektrik kendi tesisat yönetmeliklerine tabidir.) */
+const DISIPLIN = {
+  mimar: {
+    tur:"MİMARİ PROJE", rol:"PROJE MÜELLİFİ", is:"mimari projesini",
+    mevzuat:"3194 sayılı İmar Kanunu, Planlı Alanlar İmar Yönetmeliği, yürürlükteki imar planı ve plan notları, Binaların Yangından Korunması Hakkında Yönetmelik, Binalarda Enerji Performansı Yönetmeliği, Otopark Yönetmeliği, Erişilebilirlik (TS 9111 / TS 12576) ve Sığınak Yönetmeliği"
+  },
+  statik: {
+    tur:"STATİK (TAŞIYICI SİSTEM) PROJESİ", rol:"PROJE MÜELLİFİ", is:"statik (betonarme/çelik taşıyıcı sistem) projesini",
+    mevzuat:"3194 sayılı İmar Kanunu, Türkiye Bina Deprem Yönetmeliği (TBDY-2018), TS 500 (betonarme), TS 498 (yükler), ilgili çelik/yapı standartları ve zemin ve temel etüdü raporu esasları"
+  },
+  elektrik: {
+    tur:"ELEKTRİK TESİSAT PROJESİ", rol:"PROJE MÜELLİFİ", is:"elektrik (kuvvetli/zayıf akım) tesisat projesini",
+    mevzuat:"Elektrik İç Tesisleri Yönetmeliği, Elektrik Kuvvetli Akım Tesisleri Yönetmeliği, Elektrik Tesislerinde Topraklamalar Yönetmeliği, Yıldırımdan Korunma esasları ve ilgili dağıtım şirketi (TEDAŞ) şartnameleri"
+  },
+  makine: {
+    tur:"MEKANİK TESİSAT PROJESİ", rol:"PROJE MÜELLİFİ", is:"mekanik (sıhhi, ısıtma-soğutma-havalandırma) tesisat projesini",
+    mevzuat:"ilgili mekanik tesisat şartnameleri, TS 825 Isı Yalıtımı Standardı, Binalarda Enerji Performansı Yönetmeliği, Binaların Yangından Korunması Hakkında Yönetmelik (yangın tesisatı) ve doğal gaz iç tesisat teknik esasları"
+  },
+  jeoloji: {
+    tur:"ZEMİN VE TEMEL ETÜDÜ (JEOTEKNİK) RAPORU", rol:"RAPOR MÜELLİFİ", is:"zemin ve temel etüdü (jeolojik-jeoteknik) raporunu",
+    mevzuat:"Bina ve Bina Türü Yapılar İçin Zemin ve Temel Etüdü Raporu Genel Formatına, Türkiye Bina Deprem Yönetmeliği (TBDY-2018) yerel zemin koşulları esaslarına ve ilgili standartlara"
+  },
+  harita: {
+    tur:"HARİTA / APLİKASYON İŞLERİ", rol:"HARİTA MÜHENDİSİ", is:"aplikasyon, plankote ve röperli kroki (harita) işlerini",
+    mevzuat:"3194 sayılı İmar Kanunu, Büyük Ölçekli Harita ve Harita Bilgileri Üretim Yönetmeliği (BÖHHBÜY) ve ilgili imar mevzuatı"
+  }
+};
+
+/* Proje Müellifi Taahhütnamesi — resmi Form-1 yapısı; her disiplin kendi
+   mevzuatına atıf yapar. */
+function docTaah(sec){
+  const d = DISIPLIN[sec];
   const idare = v("proje","idare") || (v("proje","ilce") ? v("proje","ilce")+" Belediye Başkanlığı" : "");
   return `<div class="doc">
-    <h1>PROJE MÜELLİFİ TAAHHÜTNAMESİ</h1>
-    <p style="text-align:center;font-weight:bold;margin:-8px 0 6px">(${projeTuru})</p>
+    <h1>${d.rol==="RAPOR MÜELLİFİ" ? "RAPOR MÜELLİFİ TAAHHÜTNAMESİ" : d.rol==="HARİTA MÜHENDİSİ" ? "HARİTA MÜHENDİSİ TAAHHÜTNAMESİ" : "PROJE MÜELLİFİ TAAHHÜTNAMESİ"}</h1>
+    <p style="text-align:center;font-weight:bold;margin:-8px 0 6px">(${d.tur})</p>
     <p style="text-align:center;font-weight:bold">${fill(idare,26)}'NA / İLGİLİ İDAREYE</p>
     ${projeOzet()}
     <p>Yukarıda tapu kaydı ve adresi belirtilen taşınmaz üzerinde yapılacak yapının
-    <b>${projeTuru.toLocaleLowerCase("tr")}</b> müellifiyim. Bu sıfatla;</p>
+    <b>${d.is}</b> düzenleyen müellifiyim. Bu sıfatla;</p>
     <p><b>1.</b> 6235 sayılı Türk Mühendis ve Mimar Odaları Birliği Kanunu ve ilgili mevzuat
     uyarınca mesleki faaliyet hakkımı kısıtlayan idari veya hukuki herhangi bir engelimin
     bulunmadığını, bağlı olduğum meslek odasına kayıtlı olduğumu ve büro tescil belgemin
     geçerli olduğunu;</p>
-    <p><b>2.</b> Söz konusu projeyi 3194 sayılı İmar Kanunu, Planlı Alanlar İmar Yönetmeliği,
-    yürürlükteki imar planı ile deprem (TBDY), yangın, enerji verimliliği, asansör, otopark ve
-    ilgili tüm yönetmeliklere; fen, sanat ve sağlık kurallarına uygun olarak düzenlediğimi;</p>
-    <p><b>3.</b> Bu taahhütnamede ve proje müelliflik belgelerinde beyan ettiğim bilgilerin doğru
+    <p><b>2.</b> Söz konusu işi; ${d.mevzuat} ile yürürlükteki ilgili diğer mevzuata; fen, sanat
+    ve sağlık kurallarına uygun olarak düzenlediğimi/hazırladığımı;</p>
+    <p><b>3.</b> Bu taahhütnamede ve müelliflik belgelerinde beyan ettiğim bilgilerin doğru
     olduğunu; aksinin tespiti hâlinde ruhsata esas işlemlerin iptal edileceğini, hakkımda 5237
     sayılı Türk Ceza Kanunu uyarınca Cumhuriyet Başsavcılığına suç duyurusunda bulunulacağını ve
     6235 sayılı Kanun gereği bağlı bulunduğum meslek odasına bildirileceğini bildiğimi;</p>
     <p>kabul, beyan ve taahhüt ederim.</p>
-    <h2>Proje Müellifi Bilgileri</h2>
+    <h2>Müellif Bilgileri</h2>
     ${kisiBlok(sec)}
     ${tarihSagi()}
-    ${imzaBlok([["PROJE MÜELLİFİ", v(sec,"ad")]])}
+    ${imzaBlok([[d.rol, v(sec,"ad")]])}
   </div>`;
 }
 
@@ -563,12 +593,12 @@ function docKumeYapiBasvuru(){
 
 /* Belge kataloğu */
 const DOCS = [
-  {g:"Taahhütnameler", id:"t_mimar",  t:"Mimari Proje Müellifi Taahhütnamesi", f:()=>docTaah("mimar","MİMARİ PROJE")},
-  {g:"Taahhütnameler", id:"t_statik", t:"İnşaat / Statik Proje Müellifi Taahhütnamesi", f:()=>docTaah("statik","STATİK (BETONARME) PROJE")},
-  {g:"Taahhütnameler", id:"t_elektrik",t:"Elektrik Proje Müellifi Taahhütnamesi", f:()=>docTaah("elektrik","ELEKTRİK TESİSAT PROJESİ")},
-  {g:"Taahhütnameler", id:"t_makine", t:"Makine / Mekanik Proje Müellifi Taahhütnamesi", f:()=>docTaah("makine","MEKANİK TESİSAT PROJESİ")},
-  {g:"Taahhütnameler", id:"t_jeoloji",t:"Jeoloji / Jeoteknik Müellifi Taahhütnamesi", f:()=>docTaah("jeoloji","ZEMİN ETÜT (JEOTEKNİK) RAPORU")},
-  {g:"Taahhütnameler", id:"t_harita", t:"Harita Mühendisi Taahhütnamesi", f:()=>docTaah("harita","HARİTA / APLİKASYON İŞLERİ")},
+  {g:"Taahhütnameler", id:"t_mimar",  t:"Mimari Proje Müellifi Taahhütnamesi", f:()=>docTaah("mimar")},
+  {g:"Taahhütnameler", id:"t_statik", t:"İnşaat / Statik Proje Müellifi Taahhütnamesi", f:()=>docTaah("statik")},
+  {g:"Taahhütnameler", id:"t_elektrik",t:"Elektrik Proje Müellifi Taahhütnamesi", f:()=>docTaah("elektrik")},
+  {g:"Taahhütnameler", id:"t_makine", t:"Makine / Mekanik Proje Müellifi Taahhütnamesi", f:()=>docTaah("makine")},
+  {g:"Taahhütnameler", id:"t_jeoloji",t:"Jeoloji / Jeoteknik Müellifi Taahhütnamesi", f:()=>docTaah("jeoloji")},
+  {g:"Taahhütnameler", id:"t_harita", t:"Harita Mühendisi Taahhütnamesi", f:()=>docTaah("harita")},
   {g:"Taahhütnameler", id:"t_santiye",t:"Şantiye Şefi Taahhütnamesi", f:docSantiyeTaah},
   {g:"Taahhütnameler", id:"t_mut",    t:"Müteahhit Taahhütnamesi", f:docMuteahhitTaah},
   {g:"Taahhütnameler", id:"t_kalfa",  t:"Kalfa Taahhütnamesi", f:docKalfaTaah},
