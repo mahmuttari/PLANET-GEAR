@@ -45,6 +45,10 @@ module.exports = {
     // Sabitlemeyi kapatıp güncel sürümü kullanmak için: WEB_SURUMU=guncel
     WEB_SURUMU: process.env.WEB_SURUMU || '2.3000.1043250633-alpha',
 
+    // GORUNUR=1 yapılırsa tarayıcı penceresi görünür şekilde açılır;
+    // WhatsApp Web'in hangi ekranda takıldığını görmek için kullanışlıdır.
+    GORUNUR: process.env.GORUNUR === '1',
+
     // Kabul edilen MIME türleri (resimler + PDF)
     KABUL_EDILEN_MIME_ONEKLERI: ['image/'],
     KABUL_EDILEN_MIME_TURLERI: ['application/pdf'],

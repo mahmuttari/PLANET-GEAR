@@ -126,7 +126,7 @@ async function main() {
     fs.mkdirSync(ayarlar.INDIRME_KLASORU, { recursive: true });
 
     const puppeteerAyarlari = {
-        headless: true,
+        headless: !ayarlar.GORUNUR,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
     };
     if (ayarlar.CHROME_YOLU) {
@@ -159,7 +159,28 @@ async function main() {
         process.exit(1);
     });
 
+    // Teşhis: hazır olana kadar geçen aşamaları görünür kıl
+    istemci.on('loading_screen', (yuzde, mesaj) => {
+        console.log(`  ... yükleniyor: %${yuzde} ${mesaj || ''}`);
+    });
+    istemci.on('change_state', (durum) => console.log(`  ... bağlantı durumu: ${durum}`));
+    istemci.on('disconnected', (neden) => console.log(`✖ Bağlantı koptu: ${neden}`));
+
+    // "ready" 10 dakika içinde gelmezse kullanıcıyı bilgilendir
+    let hazirOldu = false;
+    setTimeout(() => {
+        if (!hazirOldu) {
+            console.log('\nUYARI: 10 dakikadır "hazır" sinyali gelmedi. Programı Ctrl+C ile');
+            console.log('durdurup şu şekilde görünür tarayıcı ile yeniden başlatın ve');
+            console.log('WhatsApp Web ekranında ne yazdığına bakın:');
+            console.log('  $env:GORUNUR = "1"');
+            console.log('  npm start');
+        }
+    }, 10 * 60 * 1000).unref();
+
     istemci.on('ready', async () => {
+        hazirOldu = true;
+        console.log('✔ WhatsApp Web hazır.');
         try {
             await grubuIsleyip_indir(istemci);
         } catch (hata) {
