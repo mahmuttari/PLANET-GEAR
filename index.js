@@ -125,6 +125,14 @@ async function main() {
 
     fs.mkdirSync(ayarlar.INDIRME_KLASORU, { recursive: true });
 
+    // WhatsApp Web sayfası çalışma sırasında kendini yenilerse kütüphanenin
+    // arka plan işleyicileri yakalanmamış hata fırlatabilir; bu, programı
+    // öldürmesin, yalnızca günlüklensin (indirme döngüsü yeniden dener).
+    process.on('unhandledRejection', (neden) => {
+        const ilkSatir = String((neden && neden.message) || neden).split('\n')[0];
+        console.log(`  (arka plan uyarısı: ${ilkSatir})`);
+    });
+
     const puppeteerAyarlari = {
         headless: !ayarlar.GORUNUR,
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'],
@@ -136,6 +144,11 @@ async function main() {
     const istemciAyarlari = {
         authStrategy: new LocalAuth({ dataPath: ayarlar.OTURUM_KLASORU }),
         puppeteer: puppeteerAyarlari,
+        // Yerel HTML önbelleği KAPALI: kütüphane aksi hâlde ilk çalıştırmadaki
+        // WhatsApp Web sayfasını .wwebjs_cache'e kaydedip sonraki her açılışta
+        // o eski kopyayı sunar; WhatsApp bunu eski sürüm sayıp sayfayı zorla
+        // yeniler ve "Execution context was destroyed" hataları oluşur.
+        webVersionCache: { type: 'none' },
     };
     if (ayarlar.WEB_SURUMU && ayarlar.WEB_SURUMU !== 'guncel') {
         console.log(`WhatsApp Web sürümü sabitlendi: ${ayarlar.WEB_SURUMU}\n`);
@@ -537,7 +550,14 @@ async function grubuIsleyip_indir(istemci) {
             }
             medya = null;
             if (deneme < ayarlar.YENIDEN_DENEME_SAYISI) {
-                await bekle(ayarlar.YENIDEN_DENEME_BEKLEME_MS);
+                // Sayfa yenilenmişse WhatsApp Web'in kendine gelmesi için daha uzun bekle
+                const sayfaYenilendi = /Execution context|navigation|getChat|WWebJS|Mesaj bulunamadı|detached/i.test(sonHata);
+                if (sayfaYenilendi) {
+                    console.log(`${ilerleme}   ... WhatsApp Web yenilendi, 15 sn beklenip yeniden denenecek`);
+                    await bekle(15000);
+                } else {
+                    await bekle(ayarlar.YENIDEN_DENEME_BEKLEME_MS);
+                }
             }
         }
 
