@@ -34,16 +34,13 @@ module.exports = {
     // Örn: /usr/bin/google-chrome-stable veya /opt/pw-browsers/chromium
     CHROME_YOLU: process.env.CHROME_YOLU || '',
 
-    // WhatsApp Web sürüm sabitleme.
-    // WhatsApp Web'in en yeni sürümü, whatsapp-web.js ile zaman zaman uyumsuz
-    // kalabildiğinden ("Beklenmeyen hata: r" vb.), varsayılan olarak arşivde
-    // (wppconnect-team/wa-version) mevcut, bilinen bir sürüme sabitlenir.
-    // Not: WhatsApp Web sürümleri yayından ~2 ay sonra sunucuda geçersiz
-    // kılınır; sabitlenen sürümün süresi dolarsa buradaki değeri arşivdeki
-    // daha yeni bir sürümle güncelleyin:
+    // WhatsApp Web sürüm sabitleme (isteğe bağlı, varsayılan: kapalı).
+    // Boş bırakılırsa WhatsApp'ın sunduğu güncel sürüm kullanılır (önerilen).
+    // Eski bir sürüme sabitlemek WhatsApp'ın sayfayı zorla yeniden yüklemesine
+    // ve "Execution context was destroyed" hatasına yol açabilir. Yine de
+    // gerekirse arşivdeki bir sürüm yazılabilir (örn. '2.3000.1043250633-alpha'):
     //   https://github.com/wppconnect-team/wa-version/tree/main/html
-    // Sabitlemeyi kapatıp güncel sürümü kullanmak için: WEB_SURUMU=guncel
-    WEB_SURUMU: process.env.WEB_SURUMU || '2.3000.1043250633-alpha',
+    WEB_SURUMU: process.env.WEB_SURUMU || '',
 
     // GORUNUR=1 yapılırsa tarayıcı penceresi görünür şekilde açılır;
     // WhatsApp Web'in hangi ekranda takıldığını görmek için kullanışlıdır.
