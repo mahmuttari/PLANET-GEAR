@@ -109,11 +109,19 @@ function durumYaz(durum) {
 // ---------------------------------------------------------------------------
 
 async function main() {
+    const kutuphaneSurumu = require('whatsapp-web.js/package.json').version;
     console.log('==========================================================');
     console.log('  WhatsApp Masraf Fiş/Dekont İndirici');
     console.log(`  Hedef grup : "${ayarlar.GRUP_ADI}"`);
     console.log(`  Kayıt yeri : ${ayarlar.INDIRME_KLASORU}`);
+    console.log(`  Kütüphane  : whatsapp-web.js ${kutuphaneSurumu}`);
     console.log('==========================================================\n');
+
+    if (kutuphaneSurumu.startsWith('1.2')) {
+        console.log('UYARI: whatsapp-web.js sürümünüz eski. Güncel WhatsApp Web ile');
+        console.log('uyumsuzluk yaşarsanız şu komutla güncelleyin:');
+        console.log('  npm install whatsapp-web.js@latest\n');
+    }
 
     fs.mkdirSync(ayarlar.INDIRME_KLASORU, { recursive: true });
 
@@ -125,10 +133,19 @@ async function main() {
         puppeteerAyarlari.executablePath = ayarlar.CHROME_YOLU;
     }
 
-    const istemci = new Client({
+    const istemciAyarlari = {
         authStrategy: new LocalAuth({ dataPath: ayarlar.OTURUM_KLASORU }),
         puppeteer: puppeteerAyarlari,
-    });
+    };
+    if (ayarlar.WEB_SURUMU) {
+        console.log(`WhatsApp Web sürümü sabitlendi: ${ayarlar.WEB_SURUMU}\n`);
+        istemciAyarlari.webVersion = ayarlar.WEB_SURUMU;
+        istemciAyarlari.webVersionCache = {
+            type: 'remote',
+            remotePath: `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${ayarlar.WEB_SURUMU}.html`,
+        };
+    }
+    const istemci = new Client(istemciAyarlari);
 
     istemci.on('qr', (qr) => {
         console.log('Telefonunuzdaki WhatsApp > Bağlı Cihazlar > Cihaz Bağla');

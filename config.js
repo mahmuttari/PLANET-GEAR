@@ -34,6 +34,12 @@ module.exports = {
     // Örn: /usr/bin/google-chrome-stable veya /opt/pw-browsers/chromium
     CHROME_YOLU: process.env.CHROME_YOLU || '',
 
+    // İsteğe bağlı: Belirli bir WhatsApp Web sürümünü sabitle.
+    // Kütüphane ile WhatsApp Web arasında uyumsuzluk yaşanırsa,
+    // bilinen uyumlu bir sürüm yazılabilir (örn. '2.3000.1027934701').
+    // Boş bırakılırsa güncel sürüm kullanılır.
+    WEB_SURUMU: process.env.WEB_SURUMU || '',
+
     // Kabul edilen MIME türleri (resimler + PDF)
     KABUL_EDILEN_MIME_ONEKLERI: ['image/'],
     KABUL_EDILEN_MIME_TURLERI: ['application/pdf'],
