@@ -145,6 +145,31 @@ async function main() {
             remotePath: `https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/${ayarlar.WEB_SURUMU}.html`,
         };
     }
+    // Başlatma sırasında sayfa yönlendirmesinden kaynaklanan geçici hatalar
+    // ("Execution context was destroyed" vb.) olabilir; birkaç kez denenir.
+    const AZAMI_BASLATMA = 3;
+    for (let deneme = 1; deneme <= AZAMI_BASLATMA; deneme++) {
+        const istemci = istemciOlustur(istemciAyarlari);
+        try {
+            await istemci.initialize();
+            return;
+        } catch (h) {
+            const ilkSatir = String((h && h.message) || h).split('\n')[0];
+            const gecici = /Execution context was destroyed|navigation|Target closed|Protocol error|detached/i.test(ilkSatir);
+            if (!gecici || deneme === AZAMI_BASLATMA) throw h;
+            console.log(`\nBaşlatma sırasında geçici hata: ${ilkSatir}`);
+            console.log(`Yeniden deneniyor (${deneme}/${AZAMI_BASLATMA})...\n`);
+            try {
+                await istemci.destroy();
+            } catch {
+                /* kapatma hatası önemsiz */
+            }
+            await bekle(3000);
+        }
+    }
+}
+
+function istemciOlustur(istemciAyarlari) {
     const istemci = new Client(istemciAyarlari);
 
     istemci.on('qr', (qr) => {
@@ -191,7 +216,7 @@ async function main() {
         }
     });
 
-    await istemci.initialize();
+    return istemci;
 }
 
 /**
