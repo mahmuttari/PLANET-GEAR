@@ -1,0 +1,12 @@
+# Bağımlılıklar
+node_modules/
+
+# WhatsApp oturum verileri (kişisel — asla paylaşmayın)
+.wwebjs_auth/
+.wwebjs_cache/
+
+# İndirilen dosyalar ve durum
+indirilenler/
+
+# Günlükler
+*.log
