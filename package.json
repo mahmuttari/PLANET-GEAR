@@ -1,0 +1,25 @@
+{
+  "name": "whatsapp-masraf-indirici",
+  "version": "1.0.0",
+  "description": "WhatsApp grubundaki (Dsi TBMM Masraf) tüm PDF ve resim formatındaki masraf fiş/dekontlarını indiren araç",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "export": "node export-ayikla.js"
+  },
+  "keywords": [
+    "whatsapp",
+    "masraf",
+    "fis",
+    "dekont",
+    "indirici"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "qrcode-terminal": "^0.12.0",
+    "whatsapp-web.js": "^1.26.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
