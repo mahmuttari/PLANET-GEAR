@@ -34,11 +34,16 @@ module.exports = {
     // Örn: /usr/bin/google-chrome-stable veya /opt/pw-browsers/chromium
     CHROME_YOLU: process.env.CHROME_YOLU || '',
 
-    // İsteğe bağlı: Belirli bir WhatsApp Web sürümünü sabitle.
-    // Kütüphane ile WhatsApp Web arasında uyumsuzluk yaşanırsa,
-    // bilinen uyumlu bir sürüm yazılabilir (örn. '2.3000.1027934701').
-    // Boş bırakılırsa güncel sürüm kullanılır.
-    WEB_SURUMU: process.env.WEB_SURUMU || '',
+    // WhatsApp Web sürüm sabitleme.
+    // WhatsApp Web'in en yeni sürümü, whatsapp-web.js ile zaman zaman uyumsuz
+    // kalabildiğinden ("Beklenmeyen hata: r" vb.), varsayılan olarak arşivde
+    // (wppconnect-team/wa-version) mevcut, bilinen bir sürüme sabitlenir.
+    // Not: WhatsApp Web sürümleri yayından ~2 ay sonra sunucuda geçersiz
+    // kılınır; sabitlenen sürümün süresi dolarsa buradaki değeri arşivdeki
+    // daha yeni bir sürümle güncelleyin:
+    //   https://github.com/wppconnect-team/wa-version/tree/main/html
+    // Sabitlemeyi kapatıp güncel sürümü kullanmak için: WEB_SURUMU=guncel
+    WEB_SURUMU: process.env.WEB_SURUMU || '2.3000.1043250633-alpha',
 
     // Kabul edilen MIME türleri (resimler + PDF)
     KABUL_EDILEN_MIME_ONEKLERI: ['image/'],

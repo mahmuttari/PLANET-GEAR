@@ -137,7 +137,7 @@ async function main() {
         authStrategy: new LocalAuth({ dataPath: ayarlar.OTURUM_KLASORU }),
         puppeteer: puppeteerAyarlari,
     };
-    if (ayarlar.WEB_SURUMU) {
+    if (ayarlar.WEB_SURUMU && ayarlar.WEB_SURUMU !== 'guncel') {
         console.log(`WhatsApp Web sürümü sabitlendi: ${ayarlar.WEB_SURUMU}\n`);
         istemciAyarlari.webVersion = ayarlar.WEB_SURUMU;
         istemciAyarlari.webVersionCache = {
