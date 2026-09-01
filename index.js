@@ -276,34 +276,77 @@ async function medyaMesajlariniTopla(istemci, grupId) {
     let toplam = await sayiAl();
     console.log(`  Bellekte ${toplam} mesaj var; daha eski mesajlar yükleniyor...`);
 
+    // Daha eski mesajları yükle. Yükleme çağrısının dönüş değerine güvenmek
+    // yerine mesaj sayısındaki artışa bakılır; art arda 3 denemede artış
+    // olmazsa geçmişin sonuna (ya da telefondan alınabilecek sınıra) gelinmiştir.
     let sonRapor = Date.now();
-    while (toplam < ayarlar.AZAMI_MESAJ_SAYISI) {
-        const sonuc = await istemci.pupPage.evaluate(async (id) => {
+    let artissizDeneme = 0;
+    while (toplam < ayarlar.AZAMI_MESAJ_SAYISI && artissizDeneme < 3) {
+        const hata = await istemci.pupPage.evaluate(async (id) => {
             const chat = await window.WWebJS.getChat(id, { getAsModel: false });
-            const yukleyici = window.require('WAWebChatLoadMessages');
-            for (let i = 0; i < 5; i++) {
-                let parti = null;
-                try {
-                    parti = await yukleyici.loadEarlierMsgs({ chat });
-                } catch (e) {
-                    return { bitti: true, hata: String((e && e.message) || e) };
+            try {
+                const yukleyici = window.require('WAWebChatLoadMessages');
+                if (yukleyici && typeof yukleyici.loadEarlierMsgs === 'function') {
+                    await yukleyici.loadEarlierMsgs({ chat });
+                } else if (typeof chat.loadEarlierMsgs === 'function') {
+                    await chat.loadEarlierMsgs();
+                } else {
+                    return 'Eski mesaj yükleme işlevi bulunamadı';
                 }
-                if (!parti || !parti.length) return { bitti: true };
+                return null;
+            } catch (e) {
+                return String((e && e.message) || e);
             }
-            return { bitti: false };
         }, grupId);
 
-        toplam = await sayiAl();
+        await bekle(1500); // yükleme arka planda tamamlansın
+        const yeniToplam = await sayiAl();
+        if (yeniToplam > toplam) {
+            artissizDeneme = 0;
+            toplam = yeniToplam;
+        } else {
+            artissizDeneme++;
+        }
+        if (hata) {
+            console.log(`  (daha eski mesaj yüklenemedi: ${hata})`);
+            break;
+        }
         if (Date.now() - sonRapor > 4000) {
             console.log(`  ... ${toplam} mesaj yüklendi`);
             sonRapor = Date.now();
         }
-        if (sonuc.bitti) {
-            if (sonuc.hata) console.log(`  (daha eski mesaj yüklenemedi: ${sonuc.hata})`);
-            break;
-        }
     }
     console.log(`✔ Toplam ${toplam} mesaj yüklendi (ulaşılabilen en eski mesaja kadar).`);
+
+    // Grubun "oluşturuldu" sistem mesajına ulaşıldı mı? Ulaşıldıysa geçmişin
+    // tamamı elimizde demektir; ulaşılamadıysa daha eski mesajlar yalnızca
+    // telefonda olabilir.
+    const baslangic = await istemci.pupPage.evaluate(async (id) => {
+        const chat = await window.WWebJS.getChat(id, { getAsModel: false });
+        const msgs = chat.msgs.getModelsArray();
+        let enEski = null;
+        let olusturma = null;
+        for (const m of msgs) {
+            try {
+                if (!enEski || m.t < enEski) enEski = m.t;
+                if (m.type === 'gp2' && (m.subtype === 'create' || m.subtype === 'created')) {
+                    olusturma = m.t;
+                }
+            } catch (e) {
+                /* yoksay */
+            }
+        }
+        return { enEski, olusturma };
+    }, grupId);
+
+    if (baslangic.olusturma) {
+        console.log(`✔ Grubun oluşturulma mesajına ulaşıldı (${tarihBilgisi(baslangic.olusturma).okunur}); geçmişin TAMAMI yüklendi.`);
+    } else if (baslangic.enEski) {
+        console.log(`  Ulaşılan en eski mesaj: ${tarihBilgisi(baslangic.enEski).okunur}`);
+        console.log('  UYARI: Grubun oluşturulma mesajına ulaşılamadı. Daha eski mesajlar');
+        console.log('  yalnızca telefonda olabilir; eksiksiz arşiv için README\'deki');
+        console.log('  "Sohbeti dışa aktar" + export-ayikla.js yöntemini de kullanın.');
+    }
 
     const ozetler = await istemci.pupPage.evaluate(async (id) => {
         const chat = await window.WWebJS.getChat(id, { getAsModel: false });
@@ -344,6 +387,78 @@ async function medyaMesajlariniTopla(istemci, grupId) {
         console.log(`  En yeni medya : ${tarihBilgisi(ozetler[ozetler.length - 1].t).okunur}`);
     }
     return ozetler;
+}
+
+/**
+ * Bir mesajın medyasını doğrudan WhatsApp Web içinde indirir.
+ * Mesaj, grubun kendi mesaj koleksiyonundan kimliğiyle bulunur (kütüphanenin
+ * getMessageById'si bazı kimlik biçimlerini reddettiği için kullanılmaz).
+ * Dönüş: { data(base64), mimetype, filename } veya { hata }.
+ */
+async function medyaIndir(istemci, grupId, mesajId) {
+    return await istemci.pupPage.evaluate(async (grupId, mesajId) => {
+        try {
+            const chat = await window.WWebJS.getChat(grupId, { getAsModel: false });
+            let msg = null;
+            try {
+                msg = chat.msgs.get(mesajId) || null;
+            } catch (e) {
+                msg = null;
+            }
+            if (!msg) {
+                msg = chat.msgs.getModelsArray().find((m) => m.id && m.id._serialized === mesajId) || null;
+            }
+            if (!msg) {
+                try {
+                    msg = window.require('WAWebCollections').Msg.get(mesajId) || null;
+                } catch (e) {
+                    msg = null;
+                }
+            }
+            if (!msg) return { hata: 'Mesaj bulunamadı' };
+            if (!msg.mediaData) return { hata: 'Mesajda medya verisi yok' };
+            if (msg.mediaData.mediaStage === 'REUPLOADING') {
+                return { hata: 'Medyanın süresi dolmuş; telefondan yeniden yükleme bekleniyor' };
+            }
+            if (msg.mediaData.mediaStage !== 'RESOLVED') {
+                try {
+                    await msg.downloadMedia({ downloadEvenIfExpensive: true, rmrReason: 1 });
+                } catch (e) {
+                    /* aşağıda aşama kontrolü yapılır */
+                }
+            }
+            const asama = String(msg.mediaData.mediaStage || '');
+            if (asama.includes('ERROR') || asama === 'FETCHING') {
+                return { hata: `Medya indirilemedi (aşama: ${asama}; süresi dolmuş olabilir)` };
+            }
+
+            const sahteQpl = {
+                addAnnotations() {
+                    return this;
+                },
+                addPoint() {
+                    return this;
+                },
+            };
+            const sifresiz = await window
+                .require('WAWebDownloadManager')
+                .downloadManager.downloadAndMaybeDecrypt({
+                    directPath: msg.directPath,
+                    encFilehash: msg.encFilehash,
+                    filehash: msg.filehash,
+                    mediaKey: msg.mediaKey,
+                    mediaKeyTimestamp: msg.mediaKeyTimestamp,
+                    type: msg.type,
+                    signal: new AbortController().signal,
+                    downloadQpl: sahteQpl,
+                });
+            const data = await window.WWebJS.arrayBufferToBase64Async(sifresiz);
+            return { data, mimetype: msg.mimetype || '', filename: msg.filename || '' };
+        } catch (e) {
+            if (e && e.status === 404) return { hata: 'Medya sunucuda bulunamadı (404, süresi dolmuş)' };
+            return { hata: String((e && e.message) || e) };
+        }
+    }, grupId, mesajId);
 }
 
 async function grubuIsleyip_indir(istemci) {
@@ -406,16 +521,17 @@ async function grubuIsleyip_indir(istemci) {
             (ozet.gonderen ? ozet.gonderen.replace(/@.*$/, '') : '') ||
             'Bilinmeyen';
 
-        // Mesaj nesnesini tek başına al ve medyayı indir (başarısız olursa yeniden dene)
+        // Medyayı doğrudan indir (başarısız olursa yeniden dene)
         let medya = null;
         let sonHata = '';
         for (let deneme = 1; deneme <= ayarlar.YENIDEN_DENEME_SAYISI; deneme++) {
             try {
-                const mesaj = await istemci.getMessageById(mesajId);
-                if (!mesaj) throw new Error('Mesaj nesnesi alınamadı');
-                medya = await mesaj.downloadMedia();
-                if (medya && medya.data) break;
-                sonHata = 'Medya sunucudan boş döndü (süresi dolmuş olabilir)';
+                const sonuc = await medyaIndir(istemci, hedef.id, mesajId);
+                if (sonuc && sonuc.data) {
+                    medya = sonuc;
+                    break;
+                }
+                sonHata = (sonuc && sonuc.hata) || 'Medya sunucudan boş döndü (süresi dolmuş olabilir)';
             } catch (h) {
                 sonHata = h.message || String(h);
             }
