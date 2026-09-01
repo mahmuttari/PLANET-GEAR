@@ -194,64 +194,166 @@ async function main() {
     await istemci.initialize();
 }
 
-async function grubuIsleyip_indir(istemci) {
-    console.log('\nSohbet listesi alınıyor...');
-
-    // WhatsApp Web bazen "ready" olayından hemen sonra sohbet deposunu tam
-    // yüklememiş olur; bu yüzden birkaç kez, aralıklı olarak deneriz.
-    let sohbetler = null;
-    let sonHata = null;
-    for (let deneme = 1; deneme <= 5; deneme++) {
+/**
+ * Sohbet listesini WhatsApp Web'in iç deposundan HAM olarak okur.
+ * Kütüphanenin getChats() işlevi, hesaptaki tek bir sorunlu sohbet (kanal,
+ * topluluk, bozuk kayıt vb.) yüzünden tümden çökebildiğinden, burada her
+ * sohbet tek tek ve hata korumalı işlenir; yalnızca grup adı + kimliği alınır.
+ */
+async function gruplariHamListele(istemci) {
+    return await istemci.pupPage.evaluate(() => {
+        const sonuc = [];
         try {
-            sohbetler = await istemci.getChats();
+            // whatsapp-web.js 1.34+ : window.require('WAWebCollections').Chat
+            // daha eski sürümler    : window.Store.Chat
+            let koleksiyon = null;
+            try {
+                koleksiyon = window.require && window.require('WAWebCollections').Chat;
+            } catch (e) {
+                /* aşağıdaki yedek yola düş */
+            }
+            if (!koleksiyon && window.Store && window.Store.Chat) koleksiyon = window.Store.Chat;
+            const modeller = koleksiyon && koleksiyon.getModelsArray ? koleksiyon.getModelsArray() : [];
+            for (const c of modeller) {
+                try {
+                    const id = c.id && (c.id._serialized || String(c.id));
+                    if (!id || !id.endsWith('@g.us')) continue; // yalnızca gruplar
+                    const ad =
+                        c.formattedTitle ||
+                        c.name ||
+                        (c.contact && (c.contact.name || c.contact.pushname)) ||
+                        '';
+                    sonuc.push({ id, ad: String(ad) });
+                } catch (e) {
+                    /* tek sohbetteki hata tüm listeyi bozmasın */
+                }
+            }
+        } catch (e) {
+            /* depo hazır değilse boş liste döner */
+        }
+        return sonuc;
+    });
+}
+
+/**
+ * Grubun tüm mesaj geçmişini WhatsApp Web içinde parça parça (en eskiye
+ * doğru) yükler ve yalnızca resim/belge mesajlarının özetini döndürür.
+ * Kütüphanenin fetchMessages'ı tek bozuk mesajda tüm listeyi kaybettirdiği
+ * için burada her mesaj tek tek, hata korumalı işlenir.
+ */
+async function medyaMesajlariniTopla(istemci, grupId) {
+    const sayiAl = () =>
+        istemci.pupPage.evaluate(async (id) => {
+            const chat = await window.WWebJS.getChat(id, { getAsModel: false });
+            return chat.msgs.getModelsArray().length;
+        }, grupId);
+
+    let toplam = await sayiAl();
+    console.log(`  Bellekte ${toplam} mesaj var; daha eski mesajlar yükleniyor...`);
+
+    let sonRapor = Date.now();
+    while (toplam < ayarlar.AZAMI_MESAJ_SAYISI) {
+        const sonuc = await istemci.pupPage.evaluate(async (id) => {
+            const chat = await window.WWebJS.getChat(id, { getAsModel: false });
+            const yukleyici = window.require('WAWebChatLoadMessages');
+            for (let i = 0; i < 5; i++) {
+                let parti = null;
+                try {
+                    parti = await yukleyici.loadEarlierMsgs({ chat });
+                } catch (e) {
+                    return { bitti: true, hata: String((e && e.message) || e) };
+                }
+                if (!parti || !parti.length) return { bitti: true };
+            }
+            return { bitti: false };
+        }, grupId);
+
+        toplam = await sayiAl();
+        if (Date.now() - sonRapor > 4000) {
+            console.log(`  ... ${toplam} mesaj yüklendi`);
+            sonRapor = Date.now();
+        }
+        if (sonuc.bitti) {
+            if (sonuc.hata) console.log(`  (daha eski mesaj yüklenemedi: ${sonuc.hata})`);
             break;
-        } catch (h) {
-            sonHata = h;
-            console.log(`  ... sohbet listesi henüz hazır değil (deneme ${deneme}/5), 5 sn bekleniyor`);
-            await bekle(5000);
         }
     }
-    if (!sohbetler) {
-        console.error('✖ Sohbet listesi alınamadı:', sonHata && sonHata.message);
-        console.error('  Bu hata genellikle whatsapp-web.js kütüphanesinin WhatsApp Web\'in');
-        console.error('  güncel sürümüyle uyumsuz kalmasından kaynaklanır. Proje klasöründe');
-        console.error('  şu komutu çalıştırıp tekrar deneyin: npm install whatsapp-web.js@latest');
+    console.log(`✔ Toplam ${toplam} mesaj yüklendi (ulaşılabilen en eski mesaja kadar).`);
+
+    const ozetler = await istemci.pupPage.evaluate(async (id) => {
+        const chat = await window.WWebJS.getChat(id, { getAsModel: false });
+        const sonuc = [];
+        for (const m of chat.msgs.getModelsArray()) {
+            try {
+                if (m.isNotification) continue;
+                const tur = m.type;
+                if (tur !== 'image' && tur !== 'document') continue;
+                const gonderen =
+                    (m.author && m.author._serialized) || (m.from && m.from._serialized) || '';
+                let gonderenAd = '';
+                try {
+                    const s = m.senderObj;
+                    gonderenAd = (s && (s.pushname || s.name || s.formattedName)) || m.notifyName || '';
+                } catch (e) {
+                    /* ad alınamazsa boş kalır */
+                }
+                sonuc.push({
+                    id: m.id._serialized,
+                    t: m.t,
+                    tur,
+                    mimetype: m.mimetype || '',
+                    dosyaAdi: m.filename || '',
+                    gonderen,
+                    gonderenAd: String(gonderenAd || ''),
+                });
+            } catch (e) {
+                /* tek mesajdaki hata tüm listeyi bozmasın */
+            }
+        }
+        sonuc.sort((a, b) => a.t - b.t);
+        return sonuc;
+    }, grupId);
+
+    if (ozetler.length > 0) {
+        console.log(`  En eski medya : ${tarihBilgisi(ozetler[0].t).okunur}`);
+        console.log(`  En yeni medya : ${tarihBilgisi(ozetler[ozetler.length - 1].t).okunur}`);
+    }
+    return ozetler;
+}
+
+async function grubuIsleyip_indir(istemci) {
+    console.log('\nGrup listesi alınıyor...');
+
+    // Depo bazen "hazır" sinyalinden hemen sonra dolu olmaz; birkaç kez dene.
+    let gruplar = [];
+    for (let deneme = 1; deneme <= 6; deneme++) {
+        gruplar = await gruplariHamListele(istemci);
+        if (gruplar.length > 0) break;
+        console.log(`  ... grup listesi henüz boş (deneme ${deneme}/6), 5 sn bekleniyor`);
+        await bekle(5000);
+    }
+    if (gruplar.length === 0) {
+        console.error('✖ Hiç grup bulunamadı. WhatsApp Web eşitlemesi tamamlanmamış olabilir;');
+        console.error('  birkaç dakika sonra programı yeniden çalıştırın.');
         return;
     }
+    console.log(`✔ ${gruplar.length} grup bulundu.`);
 
     const hedefAd = ayarlar.GRUP_ADI.trim().toLocaleLowerCase('tr-TR');
-    const grup = sohbetler.find(
-        (s) => s.isGroup && s.name && s.name.trim().toLocaleLowerCase('tr-TR') === hedefAd
-    );
+    const hedef = gruplar.find((g) => g.ad.trim().toLocaleLowerCase('tr-TR') === hedefAd);
 
-    if (!grup) {
+    if (!hedef) {
         console.error(`✖ "${ayarlar.GRUP_ADI}" adında bir grup bulunamadı.`);
         console.error('  Üyesi olduğunuz gruplar:');
-        sohbetler.filter((s) => s.isGroup).forEach((s) => console.error(`   - ${s.name}`));
+        gruplar.forEach((g) => console.error(`   - ${g.ad}`));
         return;
     }
 
-    console.log(`✔ Grup bulundu: "${grup.name}"`);
+    console.log(`✔ Grup bulundu: "${hedef.ad}" (${hedef.id})`);
     console.log('\nGrubun kurulduğu ilk günden itibaren TÜM mesaj geçmişi yükleniyor.');
     console.log('(Mesaj sayısına göre bu işlem uzun sürebilir, lütfen bekleyin...)\n');
 
-    // fetchMessages, verilen limite ulaşana ya da daha eski mesaj kalmayana
-    // kadar geçmişi parça parça yükler. Limiti grubun toplam mesaj sayısından
-    // büyük tuttuğumuz için ulaşılabilen en eski mesaja kadar gidilir.
-    const mesajlar = await grup.fetchMessages({ limit: ayarlar.AZAMI_MESAJ_SAYISI });
-    console.log(`✔ Toplam ${mesajlar.length} mesaj yüklendi.`);
-
-    // En eskiden en yeniye sırala
-    mesajlar.sort((a, b) => a.timestamp - b.timestamp);
-    if (mesajlar.length > 0) {
-        console.log(`  En eski mesaj  : ${tarihBilgisi(mesajlar[0].timestamp).okunur}`);
-        console.log(`  En yeni mesaj  : ${tarihBilgisi(mesajlar[mesajlar.length - 1].timestamp).okunur}\n`);
-    }
-
-    // Yalnızca resim ve belge (PDF vb.) içeren mesajlar
-    const medyaliMesajlar = mesajlar.filter(
-        (m) => m.hasMedia && (m.type === 'image' || m.type === 'document')
-    );
+    const medyaliMesajlar = await medyaMesajlariniTopla(istemci, hedef.id);
     console.log(`✔ ${medyaliMesajlar.length} adet resim/belge içeren mesaj tespit edildi.\n`);
 
     const durum = durumOku();
@@ -262,9 +364,9 @@ async function grubuIsleyip_indir(istemci) {
     let kapsamDisi = 0;
 
     for (let i = 0; i < medyaliMesajlar.length; i++) {
-        const mesaj = medyaliMesajlar[i];
-        const mesajId = mesaj.id ? mesaj.id._serialized : `bilinmeyen_${i}`;
-        const tarih = tarihBilgisi(mesaj.timestamp);
+        const ozet = medyaliMesajlar[i];
+        const mesajId = ozet.id || `bilinmeyen_${i}`;
+        const tarih = tarihBilgisi(ozet.t);
         const ilerleme = `[${i + 1}/${medyaliMesajlar.length}]`;
 
         // Daha önce indirilmişse atla
@@ -273,20 +375,19 @@ async function grubuIsleyip_indir(istemci) {
             continue;
         }
 
-        // Gönderen bilgisi
-        let gonderen = 'Bilinmeyen';
-        try {
-            const kisi = await mesaj.getContact();
-            gonderen = kisi.pushname || kisi.name || kisi.number || 'Bilinmeyen';
-        } catch {
-            /* gönderen alınamazsa varsayılan kalır */
-        }
+        // Gönderen bilgisi (ham özetten; yoksa telefon numarası)
+        const gonderen =
+            ozet.gonderenAd ||
+            (ozet.gonderen ? ozet.gonderen.replace(/@.*$/, '') : '') ||
+            'Bilinmeyen';
 
-        // Medyayı indir (başarısız olursa yeniden dene)
+        // Mesaj nesnesini tek başına al ve medyayı indir (başarısız olursa yeniden dene)
         let medya = null;
         let sonHata = '';
         for (let deneme = 1; deneme <= ayarlar.YENIDEN_DENEME_SAYISI; deneme++) {
             try {
+                const mesaj = await istemci.getMessageById(mesajId);
+                if (!mesaj) throw new Error('Mesaj nesnesi alınamadı');
                 medya = await mesaj.downloadMedia();
                 if (medya && medya.data) break;
                 sonHata = 'Medya sunucudan boş döndü (süresi dolmuş olabilir)';
@@ -304,11 +405,11 @@ async function grubuIsleyip_indir(istemci) {
             durum.basarisizlar[mesajId] = {
                 tarih: tarih.okunur,
                 gonderen,
-                tur: mesaj.type,
+                tur: ozet.tur,
                 hata: sonHata,
             };
             console.log(`${ilerleme} ✖ İNDİRİLEMEDİ | ${tarih.okunur} | ${gonderen} | ${sonHata}`);
-            raporSatirlari.push([tarih.okunur, gonderen, mesaj.type, '', 'BAŞARISIZ', sonHata]);
+            raporSatirlari.push([tarih.okunur, gonderen, ozet.tur, '', 'BAŞARISIZ', sonHata]);
             durumYaz(durum);
             continue;
         }
@@ -317,7 +418,7 @@ async function grubuIsleyip_indir(istemci) {
         if (!mimeKabulEdiliyorMu(medya.mimetype)) {
             kapsamDisi++;
             console.log(`${ilerleme} – Kapsam dışı tür atlandı (${medya.mimetype}) | ${tarih.okunur}`);
-            raporSatirlari.push([tarih.okunur, gonderen, mesaj.type, medya.filename || '', 'KAPSAM DIŞI', medya.mimetype]);
+            raporSatirlari.push([tarih.okunur, gonderen, ozet.tur, medya.filename || '', 'KAPSAM DIŞI', medya.mimetype]);
             continue;
         }
 
@@ -350,7 +451,7 @@ async function grubuIsleyip_indir(istemci) {
         durumYaz(durum);
 
         console.log(`${ilerleme} ✔ ${path.basename(hedefYol)}`);
-        raporSatirlari.push([tarih.okunur, gonderen, mesaj.type, path.relative(ayarlar.INDIRME_KLASORU, hedefYol), 'İNDİRİLDİ', '']);
+        raporSatirlari.push([tarih.okunur, gonderen, ozet.tur, path.relative(ayarlar.INDIRME_KLASORU, hedefYol), 'İNDİRİLDİ', '']);
 
         await bekle(ayarlar.INDIRMELER_ARASI_BEKLEME_MS);
     }
