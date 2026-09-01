@@ -158,7 +158,28 @@ async function main() {
 
 async function grubuIsleyip_indir(istemci) {
     console.log('\nSohbet listesi alınıyor...');
-    const sohbetler = await istemci.getChats();
+
+    // WhatsApp Web bazen "ready" olayından hemen sonra sohbet deposunu tam
+    // yüklememiş olur; bu yüzden birkaç kez, aralıklı olarak deneriz.
+    let sohbetler = null;
+    let sonHata = null;
+    for (let deneme = 1; deneme <= 5; deneme++) {
+        try {
+            sohbetler = await istemci.getChats();
+            break;
+        } catch (h) {
+            sonHata = h;
+            console.log(`  ... sohbet listesi henüz hazır değil (deneme ${deneme}/5), 5 sn bekleniyor`);
+            await bekle(5000);
+        }
+    }
+    if (!sohbetler) {
+        console.error('✖ Sohbet listesi alınamadı:', sonHata && sonHata.message);
+        console.error('  Bu hata genellikle whatsapp-web.js kütüphanesinin WhatsApp Web\'in');
+        console.error('  güncel sürümüyle uyumsuz kalmasından kaynaklanır. Proje klasöründe');
+        console.error('  şu komutu çalıştırıp tekrar deneyin: npm install whatsapp-web.js@latest');
+        return;
+    }
 
     const hedefAd = ayarlar.GRUP_ADI.trim().toLocaleLowerCase('tr-TR');
     const grup = sohbetler.find(
