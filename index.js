@@ -1,7 +1,7 @@
 /**
  * WhatsApp Masraf Fiş/Dekont İndirici
  * ------------------------------------
- * "Dsi TBMM Masraf" grubunda, grubun kurulduğu ilk günden bu yana paylaşılmış
+ * "Dsi TBMM Termal Masraf" grubunda, grubun kurulduğu ilk günden bu yana paylaşılmış
  * TÜM PDF ve resim (fotoğraf) formatındaki masraf fişi/dekontlarını bulur ve
  * bilgisayara indirir.
  *

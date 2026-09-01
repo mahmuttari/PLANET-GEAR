@@ -1,6 +1,6 @@
 # WhatsApp Masraf Fiş/Dekont İndirici
 
-**"Dsi TBMM Masraf"** WhatsApp grubunda, grubun kurulduğu ilk günden bu yana
+**"Dsi TBMM Termal Masraf"** WhatsApp grubunda, grubun kurulduğu ilk günden bu yana
 paylaşılmış **tüm PDF ve resim (fotoğraf) formatındaki masraf fişi ve
 dekontları** bulup bilgisayarınıza indiren araç.
 
@@ -64,7 +64,7 @@ Ayarlar `config.js` dosyasından veya ortam değişkenleriyle değiştirilebilir
 
 | Ayar | Varsayılan | Açıklama |
 |------|-----------|----------|
-| `GRUP_ADI` | `Dsi TBMM Masraf` | Taranacak grubun tam adı |
+| `GRUP_ADI` | `Dsi TBMM Termal Masraf` | Taranacak grubun tam adı |
 | `INDIRME_KLASORU` | `./indirilenler` | Dosyaların kaydedileceği yer |
 | `AZAMI_MESAJ_SAYISI` | `1000000` | Yüklenecek azami mesaj sayısı (grubun toplamından büyük olduğu sürece tüm geçmiş taranır) |
 | `YENIDEN_DENEME_SAYISI` | `3` | Başarısız indirme için tekrar sayısı |

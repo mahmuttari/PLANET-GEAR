@@ -1,7 +1,7 @@
 {
   "name": "whatsapp-masraf-indirici",
   "version": "1.0.0",
-  "description": "WhatsApp grubundaki (Dsi TBMM Masraf) tüm PDF ve resim formatındaki masraf fiş/dekontlarını indiren araç",
+  "description": "WhatsApp grubundaki (Dsi TBMM Termal Masraf) tüm PDF ve resim formatındaki masraf fiş/dekontlarını indiren araç",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",

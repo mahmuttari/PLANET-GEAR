@@ -6,7 +6,7 @@ const path = require('path');
 
 module.exports = {
     // İndirilecek WhatsApp grubunun tam adı
-    GRUP_ADI: process.env.GRUP_ADI || 'Dsi TBMM Masraf',
+    GRUP_ADI: process.env.GRUP_ADI || 'Dsi TBMM Termal Masraf',
 
     // İndirilen dosyaların kaydedileceği klasör
     INDIRME_KLASORU: process.env.INDIRME_KLASORU || path.join(__dirname, 'indirilenler'),
