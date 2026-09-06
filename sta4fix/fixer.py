@@ -174,15 +174,31 @@ def _entity_box(e) -> Rect | None:
     return Rect(box.extmin.x, box.extmin.y, box.extmax.x, box.extmax.y)
 
 
-def _text_height(e) -> float:
+def _text_height(e, box: Rect | None = None) -> float:
+    """Etkin yazı yüksekliği.
+
+    Sta4CAD gibi programlar TEXT yüksekliğini 0 bırakıp değeri yazı
+    stilinin (STYLE) sabit yüksekliğinden alır; o da yoksa sınır
+    kutusunun yüksekliğine düşülür.
+    """
     if e.dxftype() == "TEXT":
-        return float(e.dxf.height)
-    return float(e.dxf.char_height)
+        h = float(e.dxf.height)
+    else:
+        h = float(e.dxf.char_height)
+    if h <= 1e-9:
+        try:
+            style = e.doc.styles.get(e.dxf.style)
+            h = float(style.dxf.height)
+        except Exception:
+            h = 0.0
+    if h <= 1e-9 and box is not None:
+        h = box.y1 - box.y0
+    return h if h > 1e-9 else 2.5
 
 
 def fix_dxf(
     doc,
-    margin: float = 1.0,
+    margin: float | None = None,
     scale: float = 1.0,
     max_shift_factor: float = 12.0,
     add_leader: bool = True,
@@ -191,11 +207,18 @@ def fix_dxf(
 ) -> FixReport:
     """Bir ezdxf belgesindeki çakışan yazıları düzeltir.
 
-    margin           : yazı kutusuna eklenen pay (çizim birimi)
+    margin           : yazı kutusuna eklenen pay, çizim birimi.
+                       None = otomatik (medyan yazı yüksekliğinin 0.3'ü) —
+                       böylece mm, cm veya m ölçekli çizimlerde aynı davranır.
     scale            : yazı yüksekliği çarpanı (ör. 0.8 → %20 küçült)
     max_shift_factor : arama yarıçapı üst sınırı = faktör × yazı yüksekliği
     add_leader       : yazı yüksekliğinden fazla kayan yazıya kılavuz çizgisi
     layers           : yalnızca bu katmanlardaki yazıları düzelt (None = hepsi)
+
+    Kapalı şekiller (aks balonu, kolon dış hattı gibi) yalnızca yazının
+    ÇEKİRDEK kutusunu keserse çakışma sayılır; margin payı açık geometriye
+    (çizgi, donatı, etriye) uygulanır. Böylece balon içindeki aks harfleri
+    yerinden oynatılmaz.
     """
     msp = doc.modelspace()
     report = FixReport()
@@ -214,11 +237,21 @@ def fix_dxf(
             else:
                 t.dxf.char_height = t.dxf.char_height * scale
 
-    heights = [_text_height(t) for t in texts]
+    # yazı kutuları (yükseklik geri dönüşü için engellerden önce hesaplanır);
+    # dejenere (sıfır boyutlu) kutular güvenilir test edilemez, atlanır
+    boxes: dict = {}
+    for t in texts:
+        b = _entity_box(t)
+        if b is not None and (b.x1 - b.x0) > 1e-9 and (b.y1 - b.y0) > 1e-9:
+            boxes[id(t)] = b
+
+    heights = [_text_height(t, boxes[id(t)]) for t in texts if id(t) in boxes]
     med_h = sorted(heights)[len(heights) // 2] if heights else 2.5
+    if margin is None:
+        margin = 0.3 * med_h
 
     # --- engel indeksini kur: yazı OLMAYAN her şey, bloklar açılarak ---
-    grid = Grid(cell=max(med_h * 4.0, 1.0))
+    grid = Grid(cell=med_h * 4.0)
     text_ids = {id(t) for t in texts}
     for e in disassemble.recursive_decompose(msp):
         if e.dxftype() in TEXT_TYPES and id(e) in text_ids:
@@ -240,40 +273,35 @@ def fix_dxf(
         ) < 1e-9
         grid.add(Obstacle(pts, box, closed), box)
 
-    # --- yazı kutuları; yazılar birbirinin de engeli ---
-    boxes: dict = {}
-    for t in texts:
-        b = _entity_box(t)
-        if b is not None:
-            boxes[id(t)] = b
-
-    def collides(rect: Rect, skip_text_id=None) -> bool:
-        for ob in grid.query(rect):
-            if ob.collides(rect):
+    def collides(core: Rect, skip_text_id=None) -> bool:
+        """core: yazının gerçek kutusu; açık geometriye margin payı eklenir."""
+        padded = core.inflate(margin)
+        for ob in grid.query(padded):
+            if ob.collides(core if ob.closed else padded):
                 return True
         for tid, tb in boxes.items():
-            if tid != skip_text_id and tb.intersects(rect):
+            if tid != skip_text_id and tb.intersects(padded):
                 return True
         return False
 
     # büyük yazılar önce yer bulsun
     order = sorted(
         (t for t in texts if id(t) in boxes),
-        key=lambda t: -_text_height(t),
+        key=lambda t: -_text_height(t, boxes.get(id(t))),
     )
 
     for t in order:
         if layers and t.dxf.layer not in layers:
             continue
-        h = _text_height(t)
-        box = boxes[id(t)].inflate(margin)
+        h = _text_height(t, boxes.get(id(t)))
+        box = boxes[id(t)]
         if not collides(box, skip_text_id=id(t)):
             continue
         report.overlapping += 1
 
         # halka taraması: artan yarıçap, 16 yön
         best = None
-        step = max(h * 0.6, 0.5)
+        step = h * 0.6
         max_r = max_shift_factor * h
         r = step
         while r <= max_r and best is None:
@@ -300,9 +328,11 @@ def fix_dxf(
         t.translate(dx, dy, 0)
         boxes[id(t)] = boxes[id(t)].translated(dx, dy)
 
-        if add_leader and math.hypot(dx, dy) > h:
+        # kısa kaymalar için kılavuz gereksiz; 2 yazı yüksekliğinden uzun
+        # taşımalarda çiz (magenta — betonarme paftalarında kullanılmayan renk)
+        if add_leader and math.hypot(dx, dy) > 2.0 * h:
             if LEADER_LAYER not in doc.layers:
-                doc.layers.add(LEADER_LAYER, color=1)
+                doc.layers.add(LEADER_LAYER, color=6)
             nb = boxes[id(t)]
             # kutunun eski konuma bakan kenar orta noktasından çizgi çek
             sx = nb.x0 if old_cx < nb.x0 else (nb.x1 if old_cx > nb.x1 else nb.cx)

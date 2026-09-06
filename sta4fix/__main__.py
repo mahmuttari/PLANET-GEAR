@@ -102,8 +102,9 @@ def main() -> None:
     ap.add_argument("-o", "--output", help="Çıktı dosyası (tek girdi için)")
     ap.add_argument("--scale", type=float, default=1.0,
                     help="Yazı yüksekliği çarpanı, ör. 0.8 (varsayılan 1.0)")
-    ap.add_argument("--margin", type=float, default=1.0,
-                    help="Yazı çevresinde bırakılacak pay, çizim birimi (varsayılan 1.0)")
+    ap.add_argument("--margin", type=float, default=None,
+                    help="Yazı çevresinde bırakılacak pay, çizim birimi "
+                         "(varsayılan: otomatik — medyan yazı yüksekliğinin 0.3'ü)")
     ap.add_argument("--max-shift", type=float, default=12.0,
                     help="En büyük kaydırma = bu değer × yazı yüksekliği (varsayılan 12)")
     ap.add_argument("--layers", nargs="*",
