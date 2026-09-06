@@ -12,6 +12,8 @@ düşük yansıyan atalet.
   (spesifikasyonlar, motor seçimi, dişli geometrisi ve mukavemeti, yataklama,
   elektronik, termal analiz, kütle bütçesi, sonraki adımlar)
 - [`calc/qdd_hesap.py`](calc/qdd_hesap.py) — boyutlandırma ve doğrulama hesapları
+- [`sta4fix/`](sta4fix/README.md) — Sta4CAD DWG/DXF çıktılarında iç içe giren
+  yazıları otomatik düzelten yardımcı araç (`python -m sta4fix cizim.dxf`)
 
 ## Hesapları çalıştırma
 
