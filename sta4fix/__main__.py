@@ -24,6 +24,7 @@ import tempfile
 from pathlib import Path
 
 import ezdxf
+from ezdxf import recover
 
 from .fixer import fix_dxf
 
@@ -58,7 +59,14 @@ def process(path: Path, args) -> None:
         print(f"[{path.name}] DWG algılandı, DXF'e çevriliyor...")
         src = dwg_to_dxf(path)
 
-    doc = ezdxf.readfile(src)
+    # recover modu; dönüştürücülerin (LibreDWG/ODA) ürettiği kusurlu
+    # DXF'leri de onararak okur — temiz dosyalar için de güvenlidir.
+    try:
+        doc, auditor = recover.readfile(src)
+        if auditor.fixes:
+            print(f"  ({len(auditor.fixes)} DXF kusuru otomatik onarıldı)")
+    except ezdxf.DXFStructureError:
+        sys.exit(f"HATA: {src} okunamadı — dosya DXF değil ya da ağır hasarlı.")
     report = fix_dxf(
         doc,
         margin=args.margin,

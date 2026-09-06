@@ -40,6 +40,9 @@ DWG kapalı bir formattır; araç DXF üzerinde çalışır. Üç seçenek:
 Düzeltilen `_fixed.dxf` dosyası AutoCAD/BricsCAD/DraftSight ile açılıp
 yeniden DWG olarak kaydedilebilir.
 
+Dönüştürücülerin ürettiği kusurlu DXF'ler `ezdxf.recover` ile otomatik
+onarılır; boru hattı DWG 2000 / 2010 / 2018 örnek dosyalarıyla test edilmiştir.
+
 ## Parametreler
 
 | Parametre | Varsayılan | Açıklama |

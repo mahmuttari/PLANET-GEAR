@@ -110,11 +110,19 @@ class Obstacle:
 
 
 class Grid:
-    """Basit tekdüze ızgara uzamsal indeksi."""
+    """Basit tekdüze ızgara uzamsal indeksi.
+
+    Çok geniş alana yayılan varlıklar (ör. çizim sınırı, kesit çizgileri)
+    ızgaraya milyonlarca hücre olarak yazılmasın diye ayrı bir doğrusal
+    listede tutulur — MAX_CELLS bunun eşiğidir.
+    """
+
+    MAX_CELLS = 4096
 
     def __init__(self, cell: float):
         self.cell = max(cell, 1e-6)
         self.cells: dict = {}
+        self.large: list = []
 
     def _range(self, box: Rect):
         c = self.cell
@@ -124,12 +132,18 @@ class Grid:
         )
 
     def add(self, item, box: Rect):
+        if not all(map(math.isfinite, (box.x0, box.y0, box.x1, box.y1))):
+            return
         xs, ys = self._range(box)
+        if len(xs) * len(ys) > self.MAX_CELLS:
+            self.large.append(item)
+            return
         for i in xs:
             for j in ys:
                 self.cells.setdefault((i, j), []).append(item)
 
     def query(self, box: Rect):
+        yield from self.large
         xs, ys = self._range(box)
         seen = set()
         for i in xs:
