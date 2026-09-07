@@ -39,6 +39,11 @@ def build_demo(path=None):
     for txt, pos in labels:
         msp.add_text(txt, height=6, dxfattribs={"layer": "YAZI"}).set_placement(pos)
 
+    # poz balonu: daire içindeki poz numarası, etriye çizgisinin üstünde —
+    # daire yazıyla BİRLİKTE taşınmalı
+    msp.add_text("12", height=6, dxfattribs={"layer": "POZ"}).set_placement((100, 29))
+    msp.add_circle((105.2, 31.1), radius=7.2, dxfattribs={"layer": "POZ"})
+
     if path:
         doc.saveas(path)
     return doc
@@ -81,11 +86,30 @@ def count_overlaps(doc, margin=0.0):
 
 def main():
     doc = build_demo()
+    msp = doc.modelspace()
+    poz_text = next(e for e in msp if e.dxftype() == "TEXT" and e.dxf.text == "12")
+    poz_circle = next(e for e in msp if e.dxftype() == "CIRCLE")
+    rel_before = (poz_circle.dxf.center.x - poz_text.dxf.insert.x,
+                  poz_circle.dxf.center.y - poz_text.dxf.insert.y)
+    pos_before = (poz_text.dxf.insert.x, poz_text.dxf.insert.y)
+
     before = count_overlaps(doc)
     assert before >= 5, f"demo çizim yeterince çakışmalı değil: {before}"
 
     report = fix_dxf(doc, margin=1.0)
     after = count_overlaps(doc)
+
+    # poz balonu yazıyla birlikte taşınmış olmalı
+    moved_dist = abs(poz_text.dxf.insert.x - pos_before[0]) + \
+                 abs(poz_text.dxf.insert.y - pos_before[1])
+    rel_after = (poz_circle.dxf.center.x - poz_text.dxf.insert.x,
+                 poz_circle.dxf.center.y - poz_text.dxf.insert.y)
+    assert moved_dist > 1e-6, "poz yazısı hiç taşınmadı (çakışıktı)"
+    assert abs(rel_after[0] - rel_before[0]) < 1e-6 and \
+           abs(rel_after[1] - rel_before[1]) < 1e-6, \
+           f"poz dairesi yazıyla birlikte taşınmadı: {rel_before} → {rel_after}"
+    assert report.grouped_symbols >= 1, "hiç sembol gruplanmadı"
+    print(f"poz balonu birlikte taşındı ✓ (gruplanan sembol: {report.grouped_symbols})")
 
     print(f"önce: {before} çakışan yazı | bulunan: {report.overlapping} | "
           f"taşınan: {report.moved} | sonra: {after} | "

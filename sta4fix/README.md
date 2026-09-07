@@ -7,6 +7,10 @@ Sta4CAD'in DWG/DXF olarak dışa aktardığı kiriş, kolon ve döşeme detaylar
   geometrisiyle ve birbirleriyle çakışanları bulur.
 - Her çakışan yazıyı, orijinal konumunun çevresinde halka taramasıyla bulunan
   **en yakın boş konuma** taşır.
+- Yazıya bağlı sembolleri — poz daireleri/yarım daireleri, kot (⊕) işaretleri,
+  döşeme etiket kutuları — otomatik tespit eder ve yazıyla **birlikte, katı
+  grup olarak** taşır; birden çok yazıyı saran semboller (D103 kutusu gibi)
+  bütün yazılarıyla tek blok halinde hareket eder.
 - Yazı yüksekliğinden fazla kayan yazılara, orijinal noktayı gösteren
   **kılavuz çizgisi** ekler (ayrı `STA4FIX_LEADER` katmanında, kırmızı —
   istenmezse katman kapatılır veya `--no-leader` kullanılır).
