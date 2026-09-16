@@ -457,11 +457,33 @@ Google Earth'ün gösterdiği yüzey ile aynı kaynaktan beslenir.
 6. Anahtarın yanındaki kalem simgesine basıp **kısıtlayın**:
    - **API restrictions** (*API kısıtlamaları*): **Restrict key** seçip
      yalnızca **Maps Elevation API**'yi işaretleyin.
-   - **Application restrictions** (*Uygulama kısıtlamaları*):
-     **IP addresses** seçip **Add an item** ile kurumunuzun dış IP adresini
-     yazın. Bu araç sunucu tarafından istek attığı için **HTTP referrers**
-     kısıtlaması **çalışmaz**.
+   - **Application restrictions** (*Uygulama kısıtlamaları*): bilgisayarın
+     bağlantı türüne göre seçin, aşağıdaki tabloya bakın.
 7. **Save** deyin. Kısıtlamaların etkin olması birkaç dakika sürebilir.
+
+**Uygulama kısıtlaması nasıl seçilir?**
+
+| Kurulum yeri | Seçim | Neden |
+|---|---|---|
+| Kurum ağı, sabit IP | **IP addresses** + dış IP adresi | En güçlü koruma; anahtar sızsa bile başka yerden kullanılamaz |
+| Ev bağlantısı, değişken IP | **None** (kısıtlamasız bırakın) | Ev IP'si modem yeniden başlayınca değişir; kısıtlama koyarsanız anahtar habersizce çalışmaz olur |
+
+**HTTP referrers** seçeneğini hiçbir durumda seçmeyin. Araç istekleri
+sunucu tarafından attığı için bu kısıtlama daima `REQUEST_DENIED` verir.
+
+Uygulama kısıtlamasını **None** bırakmak zorunda kaldıysanız korumasız
+kalmazsınız. Gerçek güvenlik ağınız şu ikisidir ve ikisi de zaten
+kurulacak:
+
+- **API kısıtlaması:** Anahtar yalnızca Elevation API'yi çağırabilir.
+  Sızsa bile başka Google servisiyle kullanılamaz.
+- **Günlük kota sınırı:** Aşağıdaki kota adımıyla günlük istek sayısına
+  tavan koyarsınız. Anahtar tamamen ele geçse bile günlük zarar bu tavanla
+  sınırlıdır ve küçük bir tutardır.
+
+Dış IP adresinizi öğrenmek isterseniz tarayıcıda "ip adresim" aratmanız
+yeterlidir. Sabit IP'niz olup olmadığını internet sağlayıcınıza
+sorabilirsiniz; Türkiye'de ev aboneliklerinde IP çoğunlukla değişkendir.
 
 #### Anahtarı araca verme
 
@@ -572,8 +594,10 @@ Bu iki ayarla, anahtarınız sızsa bile azami zarar önceden bellidir.
   maskelenir.
 - Anahtar yalnızca sizin bilgisayarınızdan Google'a gider; arada başka bir
   sunucu yoktur.
-- Kurum bilgisayarında kullanacaksanız anahtarı IP ile kısıtlamak, sızması
-  durumunda kötüye kullanımı engeller.
+- Sabit IP'li bir kurum ağındaysanız anahtarı IP ile kısıtlayın. Ev
+  bağlantısı gibi değişken IP'li yerlerde bu kısıtlama anahtarı habersizce
+  çalışmaz hale getirir; onun yerine API kısıtlamasına ve günlük kota
+  sınırına güvenin.
 
 #### Buna gerçekten gerek var mı?
 
@@ -839,7 +863,7 @@ python -m unittest discover -s testler -v
 |---|---|
 | `sunucuya erişilemedi` | Kurum vekil sunucusu (proxy) ayarlarını denetleyin. `HTTPS_PROXY` ortam değişkeni ayarlıysa araç bunu kendiliğinden kullanır. Erişim yoksa `--kaynak yerel` ile kendi SYM verinizi kullanın |
 | `HTTP 429` / işlem çok yavaş | OpenTopoData açık sunucusu saniyede 1 istek kabul eder. Aralığı büyütün, alanı küçültün ya da kurum içi sunucu kurun |
-| Google `REQUEST_DENIED` | Elevation API etkin mi, anahtar kısıtları uygun mu, faturalandırma açık mı denetleyin. En sık nedeni, anahtarın ve etkinleştirilen API'nin farklı projelerde olmasıdır |
+| Google `REQUEST_DENIED` | Elevation API etkin mi, anahtar kısıtları uygun mu, faturalandırma açık mı denetleyin. En sık iki neden: anahtar ile etkinleştirilen API'nin farklı projelerde olması, ya da değişken IP'li bir bağlantıda anahtara IP kısıtlaması konmuş olması |
 | Bütçe ekranındaki servis listesinde Elevation API yok | O projede henüz etkinleştirilmemiştir. **API'ler ve Hizmetler > Kitaplık** yolundan etkinleştirin |
 | `nokta sayısı güvenlik sınırını aşıyor` | Aralığı büyütün veya `--azami-nokta` değerini yükseltin. 1 km²'lik alanda 5 m aralık 40 000 nokta demektir |
 | NCN dosyası boş | Noktaların kotu okunamamış. `--ncn-kotsuz sifir` kullanın ya da kaynağın kapsama alanını denetleyin |
