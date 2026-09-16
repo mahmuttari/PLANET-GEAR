@@ -415,19 +415,23 @@ Google Earth'ün gösterdiği yüzey ile aynı kaynaktan beslenir.
 
 #### Anahtar nasıl alınır
 
+> Menü adları aşağıda **İngilizce** verilmiştir; Google Cloud konsolu
+> çoğu kurulumda İngilizce açılır. Konsolunuz Türkçe ise karşılıkları
+> parantez içindedir.
+
 1. [console.cloud.google.com](https://console.cloud.google.com) adresine
    Google hesabınızla girin.
-2. Üstteki proje seçicisinden **Yeni Proje** oluşturun (örn. "ISU Kot
-   Karelaji") ve bu projeyi seçin.
-3. Sol menüden **Faturalandırma**'ya girip projeye bir faturalandırma hesabı
-   bağlayın. Elevation API, kullanım ücretsiz aralıkta kalsa bile
-   faturalandırma hesabı olmadan çalışmaz.
-4. Sol menüden **API'ler ve Hizmetler > Kitaplık** yolunu izleyin, arama
-   kutusuna **Elevation API** yazın, çıkan sonuca girip **Etkinleştir**
-   deyin.
-5. **API'ler ve Hizmetler > Kimlik Bilgileri** sayfasına gidin.
-   **Kimlik bilgileri oluştur > API anahtarı** deyin. Oluşan anahtarı
-   kopyalayın (`AIza...` ile başlar).
+2. Üstteki proje seçicisinden **New Project** (*Yeni Proje*) ile bir proje
+   oluşturun (örn. "ISU Kot Karelaji") ve bu projeyi seçin.
+3. Sol menüden **Billing** (*Faturalandırma*) bölümüne girip projeye bir
+   faturalandırma hesabı bağlayın. Elevation API, kullanım ücretsiz
+   aralıkta kalsa bile faturalandırma hesabı olmadan çalışmaz.
+4. Sol menüden **APIs & Services > Library** (*API'ler ve Hizmetler >
+   Kitaplık*) yolunu izleyin, arama kutusuna **Elevation API** yazın, çıkan
+   **Maps Elevation API** kaydına girip **Enable** (*Etkinleştir*) deyin.
+5. **APIs & Services > Credentials** (*Kimlik Bilgileri*) sayfasına gidin.
+   **Create credentials > API key** deyin. Oluşan anahtarı kopyalayın
+   (`AIza...` ile başlar).
 > **En sık yapılan hata:** API anahtarı ile etkinleştirilen API'nin **aynı
 > projede** olması gerekir. Anahtarı bir projede oluşturup Elevation API'yi
 > başka bir projede etkinleştirirseniz istekler `REQUEST_DENIED` döner.
@@ -441,12 +445,13 @@ Google Earth'ün gösterdiği yüzey ile aynı kaynaktan beslenir.
 > görünmüyorsa büyük olasılıkla henüz etkinleştirilmemiştir.
 
 6. Anahtarın yanındaki kalem simgesine basıp **kısıtlayın**:
-   - **API kısıtlamaları**: "Anahtarı kısıtla" seçip yalnızca
-     **Elevation API**'yi işaretleyin.
-   - **Uygulama kısıtlamaları**: **IP adresleri** seçip kurumunuzun dış IP
-     adresini yazın. Bu araç sunucu tarafından istek attığı için
-     "HTTP yönlendiren" (referrer) kısıtlaması **çalışmaz**.
-7. Kaydedin. Kısıtlamaların etkin olması birkaç dakika sürebilir.
+   - **API restrictions** (*API kısıtlamaları*): **Restrict key** seçip
+     yalnızca **Maps Elevation API**'yi işaretleyin.
+   - **Application restrictions** (*Uygulama kısıtlamaları*):
+     **IP addresses** seçip **Add an item** ile kurumunuzun dış IP adresini
+     yazın. Bu araç sunucu tarafından istek attığı için **HTTP referrers**
+     kısıtlaması **çalışmaz**.
+7. **Save** deyin. Kısıtlamaların etkin olması birkaç dakika sürebilir.
 
 #### Anahtarı araca verme
 
@@ -501,33 +506,42 @@ Bu ikisi karıştırılır ama farklı işler yapar. **İkisini birden kurun.**
 
 **1. Bütçe uyarısı — yalnızca haber verir, harcamayı durdurmaz.**
 
-Google Cloud konsolunda **Faturalandırma > Bütçeler ve uyarılar**
-(*Billing > Budgets & alerts*) yolunu izleyin:
+Google Cloud konsolunda **Billing > Budgets & alerts**
+(*Faturalandırma > Bütçeler ve uyarılar*) yolunu izleyin:
 
-1. **Bütçe oluştur** (*Create budget*) düğmesine basın.
-2. Bütçeye bir ad verin (örn. "Elevation API aylık sınır").
-3. **Kapsam** bölümünde Elevation API'yi etkinleştirdiğiniz projeyi seçin.
-   Tüm projeleri değil, yalnızca o projeyi seçmek daha isabetli uyarı verir.
-4. Aynı ekrandaki **Servisler** filtresine `elevat` yazıp çıkan
-   **Maps Elevation API** kaydını işaretleyin, **Tamam** deyin. Böylece bütçe
-   yalnızca bu servisin harcamasını izler; aynı projede başka işler de
-   varsa onlar bütçeye karışmaz. Liste boş çıkıyorsa API henüz
-   etkinleştirilmemiş demektir; filtreyi boş bırakıp önce API'yi
-   etkinleştirin.
-5. **Tutar** (*Amount*) bölümüne aylık üst sınırınızı yazın (örn. 200 TL).
-6. **Eylemler** (*Actions*) bölümünde eşikleri işaretleyin: %50, %90, %100.
-   Her eşikte faturalandırma yöneticilerine e-posta gider.
-7. **Kaydet** (*Save*) deyin.
+1. **Create budget** düğmesine basın.
+2. **Name** kutusuna anlamlı bir ad yazın (örn. "Elevation API aylik sinir").
+3. **Scope** (*Kapsam*) bölümünde **Time range** değerini **Monthly**
+   bırakın ve Elevation API'yi etkinleştirdiğiniz projeyi seçin.
+4. Aynı bölümdeki **Services** filtresine `elevat` yazıp çıkan
+   **Maps Elevation API** kaydını işaretleyin, **OK** deyin. Böylece bütçe
+   yalnızca bu servisin harcamasını izler; aynı projede başka işler varsa
+   onlar bütçeye karışmaz. Liste boş çıkıyorsa API henüz etkinleştirilmemiş
+   demektir; filtreyi boş bırakıp önce API'yi etkinleştirin.
+5. **Amount** (*Tutar*) bölümünde **Budget type** olarak
+   **Specified amount** seçin, **Target amount** kutusuna aylık üst
+   sınırınızı yazın (örn. 200).
+6. **Actions** (*Eylemler*) bölümünde eşikleri %50, %90 ve %100 olarak
+   ayarlayın, **Trigger on** değerini **Actual** bırakın.
+   **Manage notifications** altında **Email alerts to billing admins and
+   users** işaretli olsun.
+7. **Save** (*Kaydet*) deyin.
 
 Önemli: bütçe dolduğunda Google **hizmeti kapatmaz**, yalnızca e-posta
 gönderir. Gerçek tavan için ikinci adım gerekir.
 
 **2. Kota sınırı — harcamayı fiilen durdurur.**
 
-**API'ler ve Hizmetler > Etkin API'ler ve hizmetler > Elevation API**
-yolunu izleyip **Kotalar ve sistem sınırları** (*Quotas & system limits*)
-sekmesine girin. Burada günlük ve dakikalık istek sınırlarını
-düşürebilirsiniz:
+En kısa yol: sol menüden **Google Maps Platform > Quotas**. Açılan sayfada
+üstteki **API** listesinden **Maps Elevation API**'yi seçin.
+
+Bu menü yoksa ikinci yol: **APIs & Services > Enabled APIs & services**
+listesinden **Maps Elevation API**'ye tıklayıp **Quotas & System Limits**
+sekmesine girin. Sınırı değiştirmek için satırın solundaki kutuyu
+işaretleyip kalem simgesine (**Edit**) basın, yeni değeri yazıp
+**Submit request** deyin.
+
+Düşürülecek iki değer:
 
 | Sınır | Öneri | Karşılığı |
 |---|---|---|
