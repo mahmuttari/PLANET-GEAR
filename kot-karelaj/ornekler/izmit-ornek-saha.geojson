@@ -1,0 +1,54 @@
+{
+ "type": "FeatureCollection",
+ "name": "izmit-ornek-saha",
+ "crs": {
+  "type": "name",
+  "properties": {
+   "name": "urn:ogc:def:crs:OGC:1.3:CRS84"
+  }
+ },
+ "features": [
+  {
+   "type": "Feature",
+   "properties": {
+    "ad": "Proje sahası",
+    "kurum": "Örnek"
+   },
+   "geometry": {
+    "type": "Polygon",
+    "coordinates": [
+     [
+      [
+       29.9285,
+       40.7712
+      ],
+      [
+       29.9398,
+       40.7735
+      ],
+      [
+       29.9467,
+       40.7688
+      ],
+      [
+       29.9441,
+       40.7601
+      ],
+      [
+       29.9327,
+       40.7578
+      ],
+      [
+       29.9258,
+       40.7639
+      ],
+      [
+       29.9285,
+       40.7712
+      ]
+     ]
+    ]
+   }
+  }
+ ]
+}

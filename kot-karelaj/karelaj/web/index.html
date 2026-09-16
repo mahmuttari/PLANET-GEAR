@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kot Karelajı</title>
+<style>
+  :root {
+    --arka: #12161c; --panel: #1a2029; --panel2: #222a35; --cizgi: #2f3a48;
+    --metin: #e7ecf3; --soluk: #97a3b4; --vurgu: #4da3ff; --vurgu2: #2b7fd4;
+    --yesil: #46c17f; --sari: #e8b552; --kirmizi: #e4635a;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    font: 13px/1.5 "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+    background: var(--arka); color: var(--metin); overflow: hidden;
+  }
+  #duzen { display: flex; height: 100%; }
+  #yan { width: 372px; min-width: 372px; background: var(--panel); border-right: 1px solid var(--cizgi);
+         display: flex; flex-direction: column; }
+  #baslik { padding: 12px 16px; border-bottom: 1px solid var(--cizgi); }
+  #baslik h1 { margin: 0; font-size: 15px; letter-spacing: .3px; }
+  #baslik p { margin: 3px 0 0; font-size: 11.5px; color: var(--soluk); }
+  #panelicerik { overflow-y: auto; padding: 12px 16px 18px; flex: 1; }
+  #harita-sarmal { flex: 1; position: relative; background: #0b0e12; }
+  canvas { display: block; width: 100%; height: 100%; cursor: grab; }
+  canvas.cizim { cursor: crosshair; }
+  canvas.suruklenen { cursor: grabbing; }
+
+  fieldset { border: 1px solid var(--cizgi); border-radius: 7px; margin: 0 0 12px; padding: 10px 11px 12px; }
+  legend { padding: 0 6px; font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: var(--vurgu); }
+  label { display: block; font-size: 11.5px; color: var(--soluk); margin: 8px 0 3px; }
+  label:first-of-type { margin-top: 0; }
+  input, select, textarea, button { font: inherit; }
+  input[type=text], input[type=number], select, textarea {
+    width: 100%; padding: 6px 8px; background: var(--panel2); color: var(--metin);
+    border: 1px solid var(--cizgi); border-radius: 5px;
+  }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--vurgu); }
+  .ikili { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .uclu { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+  .onay { display: flex; align-items: center; gap: 7px; margin: 7px 0; font-size: 12px; color: var(--metin); }
+  .onay input { width: auto; margin: 0; }
+  .yardim { font-size: 10.8px; color: var(--soluk); margin-top: 4px; line-height: 1.45; }
+  button {
+    padding: 8px 12px; border-radius: 6px; border: 1px solid var(--cizgi);
+    background: var(--panel2); color: var(--metin); cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--vurgu); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.birincil { background: var(--vurgu2); border-color: var(--vurgu2); color: #fff; font-weight: 600; }
+  button.birincil:hover:not(:disabled) { background: var(--vurgu); }
+  button.secili { background: var(--vurgu2); border-color: var(--vurgu2); color: #fff; }
+  .dugme-satiri { display: flex; gap: 7px; margin-top: 10px; }
+  .dugme-satiri button { flex: 1; }
+
+  #arac-cubugu { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; z-index: 5; flex-wrap: wrap; }
+  #arac-cubugu button { background: rgba(26,32,41,.94); backdrop-filter: blur(3px); padding: 6px 10px; font-size: 12px; }
+  #zum { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 5; }
+  #zum button { width: 32px; height: 32px; padding: 0; font-size: 17px; background: rgba(26,32,41,.94); }
+  #durum {
+    position: absolute; left: 10px; bottom: 10px; z-index: 5; font-size: 11.5px;
+    background: rgba(18,22,28,.92); border: 1px solid var(--cizgi); border-radius: 6px;
+    padding: 6px 10px; color: var(--soluk); font-variant-numeric: tabular-nums;
+  }
+  #kaynakca {
+    position: absolute; right: 10px; bottom: 10px; z-index: 5; font-size: 10px;
+    color: var(--soluk); background: rgba(18,22,28,.8); padding: 3px 7px; border-radius: 4px;
+  }
+  #ipucu {
+    position: absolute; left: 50%; top: 12px; transform: translateX(-50%); z-index: 6;
+    background: rgba(43,127,212,.95); color: #fff; padding: 7px 14px; border-radius: 6px;
+    font-size: 12px; display: none; box-shadow: 0 3px 12px rgba(0,0,0,.4);
+  }
+  #sonuc { margin-top: 4px; }
+  .kutu { border: 1px solid var(--cizgi); border-radius: 7px; padding: 10px 11px; margin-bottom: 10px; background: var(--panel2); }
+  .kutu.hata { border-color: var(--kirmizi); }
+  .kutu.iyi { border-color: var(--yesil); }
+  .kutu h3 { margin: 0 0 6px; font-size: 12px; }
+  .satir { display: flex; justify-content: space-between; gap: 10px; font-size: 11.5px; padding: 2px 0; }
+  .satir span:last-child { color: var(--metin); font-variant-numeric: tabular-nums; }
+  .satir span:first-child { color: var(--soluk); }
+  a.dosya {
+    display: flex; justify-content: space-between; align-items: center; gap: 8px;
+    padding: 6px 9px; margin: 4px 0; background: var(--panel); border: 1px solid var(--cizgi);
+    border-radius: 5px; color: var(--vurgu); text-decoration: none; font-size: 12px;
+  }
+  a.dosya:hover { border-color: var(--vurgu); }
+  a.dosya small { color: var(--soluk); }
+  pre.rapor {
+    max-height: 260px; overflow: auto; background: #0e1217; border: 1px solid var(--cizgi);
+    border-radius: 6px; padding: 9px; font-size: 10.5px; line-height: 1.45; white-space: pre;
+    color: var(--soluk);
+  }
+  .yukleniyor { display: inline-block; width: 12px; height: 12px; border: 2px solid var(--cizgi);
+    border-top-color: var(--vurgu); border-radius: 50%; animation: don .8s linear infinite; vertical-align: -2px; }
+  @keyframes don { to { transform: rotate(360deg); } }
+  .gizli { display: none !important; }
+</style>
+</head>
+<body>
+<div id="duzen">
+  <aside id="yan">
+    <div id="baslik">
+      <h1>Kot Karelajı</h1>
+      <p>Alanı harita üzerinde çizin, aralığı seçin, Netcad NCN olarak indirin.</p>
+    </div>
+    <div id="panelicerik">
+
+      <fieldset>
+        <legend>1 · Çalışma alanı</legend>
+        <div class="dugme-satiri" style="margin-top:0">
+          <button id="btn-dikdortgen" type="button">Dikdörtgen</button>
+          <button id="btn-poligon" type="button">Poligon</button>
+          <button id="btn-temizle" type="button">Temizle</button>
+        </div>
+        <label for="alan-ad">Alan adı (dosya adı olarak kullanılır)</label>
+        <input type="text" id="alan-ad" value="karelaj" maxlength="80">
+        <label for="konum-ara">Haritayı bir koordinata götür (enlem, boylam)</label>
+        <div style="display:flex; gap:7px">
+          <input type="text" id="konum-ara" placeholder="40.7654, 29.9408" style="flex:1">
+          <button type="button" id="btn-git">Git</button>
+        </div>
+        <p class="yardim">
+          Google Earth'ten kaydettiğiniz <b>.kml</b> ya da <b>.geojson</b> dosyasını
+          haritanın üzerine sürükleyip bırakarak da alan yükleyebilirsiniz.
+        </p>
+        <div id="alan-ozeti" class="yardim"></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>2 · Karelaj</legend>
+        <div class="ikili">
+          <div>
+            <label for="aralik">Aralık (m)</label>
+            <input type="number" id="aralik" value="25" min="0.1" step="any">
+          </div>
+          <div>
+            <label for="donme">Döndürme (°)</label>
+            <input type="number" id="donme" value="0" step="any">
+          </div>
+        </div>
+        <label for="sistem">Koordinat sistemi</label>
+        <select id="sistem"><option value="otomatik">Otomatik (alanın 3° dilimi, ITRF96)</option></select>
+        <label for="hizalama">Izgara başlangıcı</label>
+        <select id="hizalama">
+          <option value="tam-kat">Aralığın tam katlarına oturt</option>
+          <option value="alan">Alanın güneybatı köşesinden başlat</option>
+        </select>
+        <div class="onay"><input type="checkbox" id="kirp" checked><label for="kirp" style="margin:0">Alan sınırının dışını at</label></div>
+        <div class="ikili">
+          <div>
+            <label for="no-profil">Nokta numarası</label>
+            <select id="no-profil">
+              <option value="sira">Sıra numarası (1, 2, 3…)</option>
+              <option value="satir-sutun">Satır-sütun (001-001)</option>
+              <option value="sutun-satir">Sütun-satır (001-001)</option>
+            </select>
+          </div>
+          <div>
+            <label for="no-onek">Numara öneki</label>
+            <input type="text" id="no-onek" placeholder="örn. K" maxlength="12">
+          </div>
+        </div>
+        <label for="kod">Nokta kodu (NCN'de kod sütunu)</label>
+        <input type="text" id="kod" placeholder="örn. KARELAJ" maxlength="24">
+      </fieldset>
+
+      <fieldset>
+        <legend>3 · Kot kaynağı</legend>
+        <label for="kaynak">Kaynak</label>
+        <select id="kaynak">
+          <option value="opentopodata">OpenTopoData (açık, anahtarsız)</option>
+          <option value="google">Google Elevation API (Google Earth verisi)</option>
+          <option value="open-elevation">Open-Elevation (açık, SRTM 30 m)</option>
+          <option value="yerel">Yerel SYM dosyası (kurum verisi)</option>
+        </select>
+        <div id="grup-otd">
+          <label for="veri-kumesi">Veri kümesi</label>
+          <select id="veri-kumesi"></select>
+          <div class="yardim" id="veri-kumesi-bilgi"></div>
+        </div>
+        <div id="grup-google" class="gizli">
+          <label for="google-anahtar">Google API anahtarı</label>
+          <input type="text" id="google-anahtar" placeholder="AIza...">
+          <p class="yardim">Anahtar yalnızca bu bilgisayardan Google'a gider, hiçbir yere kaydedilmez.</p>
+        </div>
+        <div id="grup-yerel" class="gizli">
+          <label for="sym">SYM dosyası veya karo klasörü (sunucudaki yol)</label>
+          <input type="text" id="sym" placeholder="D:\veri\sym\kocaeli.tif">
+          <label for="dem-sistemi">SYM koordinat sistemi (dosyada yoksa)</label>
+          <select id="dem-sistemi"><option value="">Dosyadan oku</option></select>
+        </div>
+        <label for="ornekleme">Ara değer yöntemi</label>
+        <select id="ornekleme">
+          <option value="bilineer">Bilineer (varsayılan)</option>
+          <option value="bikubik">Bikübik</option>
+          <option value="en-yakin">En yakın komşu</option>
+        </select>
+        <label for="kot-kaydirma">Düşey kaydırma (m)</label>
+        <input type="number" id="kot-kaydirma" value="0" step="any">
+        <p class="yardim">
+          Küresel modeller EGM96/EGM2008 jeoidine göre kot verir; TUDKA-99 ile
+          arasındaki yerel farkı burada düzeltebilirsiniz.
+        </p>
+        <div class="onay"><input type="checkbox" id="kot-yok"><label for="kot-yok" style="margin:0">Kot okuma, yalnızca konumları üret</label></div>
+      </fieldset>
+
+      <fieldset>
+        <legend>4 · Çıktı</legend>
+        <div class="uclu" id="bicim-kutulari"></div>
+        <label for="ncn-profil">NCN sütun düzeni</label>
+        <select id="ncn-profil"></select>
+        <div class="ikili">
+          <div>
+            <label for="kontur">Eş yükselti aralığı (m)</label>
+            <input type="number" id="kontur" placeholder="boş = yok" step="any" min="0.01">
+          </div>
+          <div>
+            <label for="hacim-kotu">Hacim referans kotu (m)</label>
+            <input type="number" id="hacim-kotu" placeholder="boş = yok" step="any">
+          </div>
+        </div>
+      </fieldset>
+
+      <div class="dugme-satiri">
+        <button type="button" id="btn-onizle">Önizle</button>
+        <button type="button" id="btn-uret" class="birincil">Üret ve indir</button>
+      </div>
+      <div id="sonuc"></div>
+    </div>
+  </aside>
+
+  <div id="harita-sarmal">
+    <canvas id="harita"></canvas>
+    <div id="arac-cubugu">
+      <button type="button" id="btn-uydu" class="secili">Uydu</button>
+      <button type="button" id="btn-sokak">Sokak</button>
+      <button type="button" id="btn-etiket" class="secili">Etiketler</button>
+    </div>
+    <div id="zum">
+      <button type="button" id="btn-yakin" title="Yakınlaştır">+</button>
+      <button type="button" id="btn-uzak" title="Uzaklaştır">−</button>
+    </div>
+    <div id="ipucu"></div>
+    <div id="durum">Hazır</div>
+    <div id="kaynakca"></div>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+// ---------------------------------------------------------------------------
+// Harita çekirdeği: Web Mercator döşeme (tile) haritası, dış kütüphane yok
+// ---------------------------------------------------------------------------
+
+const TASYAPRAK = {
+  uydu: {
+    url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/${z}/${y}/${x}`,
+    azami: 19,
+    kaynak: "Görüntü: Esri, Maxar, Earthstar Geographics"
+  },
+  sokak: {
+    url: (z, x, y) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`,
+    azami: 19,
+    kaynak: "© OpenStreetMap katkıcıları"
+  },
+  etiket: {
+    url: (z, x, y) => `https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/${z}/${y}/${x}`,
+    azami: 19,
+    kaynak: ""
+  }
+};
+
+const TASBOY = 256;
+const tuval = document.getElementById("harita");
+const ctx = tuval.getContext("2d");
+
+const durum = {
+  merkezEnlem: 40.7654,
+  merkezBoylam: 29.9408,
+  zum: 13,
+  taban: "uydu",
+  etiketler: true,
+  halkalar: [],          // [[ [boylam, enlem], ... ], ...]
+  cizimKipi: null,       // null | "dikdortgen" | "poligon"
+  gecici: null,          // çizim sırasındaki geçici geometri
+  onizleme: [],          // [[boylam, enlem], ...]
+  onizlemeBilgi: null,
+  fare: null
+};
+
+const tasOnbellek = new Map();
+let cizimBekliyor = false;
+
+function boylamPiksel(boylam, z) { return (boylam + 180) / 360 * Math.pow(2, z) * TASBOY; }
+function enlemPiksel(enlem, z) {
+  const r = Math.max(-85.05112878, Math.min(85.05112878, enlem)) * Math.PI / 180;
+  return (1 - Math.log(Math.tan(r) + 1 / Math.cos(r)) / Math.PI) / 2 * Math.pow(2, z) * TASBOY;
+}
+function pikselBoylam(px, z) { return px / (Math.pow(2, z) * TASBOY) * 360 - 180; }
+function pikselEnlem(py, z) {
+  const n = Math.PI - 2 * Math.PI * py / (Math.pow(2, z) * TASBOY);
+  return 180 / Math.PI * Math.atan(0.5 * (Math.exp(n) - Math.exp(-n)));
+}
+
+function tuvalOlcu() {
+  const oran = window.devicePixelRatio || 1;
+  const g = tuval.clientWidth, y = tuval.clientHeight;
+  if (tuval.width !== Math.round(g * oran) || tuval.height !== Math.round(y * oran)) {
+    tuval.width = Math.round(g * oran);
+    tuval.height = Math.round(y * oran);
+  }
+  ctx.setTransform(oran, 0, 0, oran, 0, 0);
+  return { g, y };
+}
+
+function kokenPiksel(olcu) {
+  return {
+    x: boylamPiksel(durum.merkezBoylam, durum.zum) - olcu.g / 2,
+    y: enlemPiksel(durum.merkezEnlem, durum.zum) - olcu.y / 2
+  };
+}
+
+function ekranKoordinat(boylam, enlem, olcu, koken) {
+  return {
+    x: boylamPiksel(boylam, durum.zum) - koken.x,
+    y: enlemPiksel(enlem, durum.zum) - koken.y
+  };
+}
+
+function cografiKoordinat(ekranX, ekranY, olcu, koken) {
+  return [pikselBoylam(koken.x + ekranX, durum.zum), pikselEnlem(koken.y + ekranY, durum.zum)];
+}
+
+function tasAl(katman, z, x, y) {
+  const anahtar = `${katman}/${z}/${x}/${y}`;
+  if (tasOnbellek.has(anahtar)) return tasOnbellek.get(anahtar);
+  const resim = new Image();
+  resim.crossOrigin = "anonymous";
+  resim.onload = () => cizimIste();
+  resim.onerror = () => { resim.hatali = true; };
+  resim.src = TASYAPRAK[katman].url(z, x, y);
+  tasOnbellek.set(anahtar, resim);
+  if (tasOnbellek.size > 900) {
+    const ilk = tasOnbellek.keys().next().value;
+    tasOnbellek.delete(ilk);
+  }
+  return resim;
+}
+
+function katmanCiz(katman, olcu, koken, saydam) {
+  const z = durum.zum;
+  const enBuyuk = Math.pow(2, z);
+  const ilkX = Math.floor(koken.x / TASBOY), sonX = Math.floor((koken.x + olcu.g) / TASBOY);
+  const ilkY = Math.floor(koken.y / TASBOY), sonY = Math.floor((koken.y + olcu.y) / TASBOY);
+  ctx.globalAlpha = saydam || 1;
+  for (let ty = ilkY; ty <= sonY; ty++) {
+    if (ty < 0 || ty >= enBuyuk) continue;
+    for (let tx = ilkX; tx <= sonX; tx++) {
+      const sarmalX = ((tx % enBuyuk) + enBuyuk) % enBuyuk;
+      const resim = tasAl(katman, z, sarmalX, ty);
+      if (resim.complete && !resim.hatali && resim.naturalWidth) {
+        ctx.drawImage(resim, Math.round(tx * TASBOY - koken.x), Math.round(ty * TASBOY - koken.y), TASBOY, TASBOY);
+      }
+    }
+  }
+  ctx.globalAlpha = 1;
+}
+
+function halkaCiz(halka, olcu, koken, cizgiRengi, dolguRengi, kapali) {
+  if (!halka || halka.length < 2) return;
+  ctx.beginPath();
+  halka.forEach(([boylam, enlem], i) => {
+    const p = ekranKoordinat(boylam, enlem, olcu, koken);
+    if (i === 0) ctx.moveTo(p.x, p.y); else ctx.lineTo(p.x, p.y);
+  });
+  if (kapali) ctx.closePath();
+  if (dolguRengi && kapali) { ctx.fillStyle = dolguRengi; ctx.fill(); }
+  ctx.strokeStyle = cizgiRengi; ctx.lineWidth = 2; ctx.stroke();
+  ctx.fillStyle = "#fff";
+  halka.forEach(([boylam, enlem]) => {
+    const p = ekranKoordinat(boylam, enlem, olcu, koken);
+    ctx.beginPath(); ctx.arc(p.x, p.y, 3.5, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = cizgiRengi; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+}
+
+function ciz() {
+  const olcu = tuvalOlcu();
+  const koken = kokenPiksel(olcu);
+  ctx.fillStyle = "#0b0e12";
+  ctx.fillRect(0, 0, olcu.g, olcu.y);
+  katmanCiz(durum.taban, olcu, koken);
+  if (durum.etiketler && durum.taban === "uydu") katmanCiz("etiket", olcu, koken, 0.9);
+
+  durum.halkalar.forEach((halka, i) => {
+    halkaCiz(halka, olcu, koken, i === 0 ? "#ffd24d" : "#ff8f6b",
+             i === 0 ? "rgba(255,210,77,.13)" : "rgba(255,143,107,.13)", true);
+  });
+
+  if (durum.gecici) {
+    halkaCiz(durum.gecici.halka, olcu, koken, "#4da3ff", "rgba(77,163,255,.14)", durum.gecici.kapali);
+  }
+
+  if (durum.onizleme.length) {
+    ctx.fillStyle = "#46c17f";
+    const yaricap = durum.onizleme.length > 2500 ? 1.2 : (durum.onizleme.length > 800 ? 1.8 : 2.4);
+    durum.onizleme.forEach(([boylam, enlem]) => {
+      const p = ekranKoordinat(boylam, enlem, olcu, koken);
+      if (p.x < -5 || p.y < -5 || p.x > olcu.g + 5 || p.y > olcu.y + 5) return;
+      ctx.beginPath(); ctx.arc(p.x, p.y, yaricap, 0, Math.PI * 2); ctx.fill();
+    });
+  }
+  olcekCiz(olcu);
+  cizimBekliyor = false;
+}
+
+function olcekCiz(olcu) {
+  const metre = 156543.03392 * Math.cos(durum.merkezEnlem * Math.PI / 180) / Math.pow(2, durum.zum);
+  const hedef = 110;
+  let uzunluk = metre * hedef;
+  const us = Math.pow(10, Math.floor(Math.log10(uzunluk)));
+  uzunluk = (uzunluk / us >= 5 ? 5 : uzunluk / us >= 2 ? 2 : 1) * us;
+  const piksel = uzunluk / metre;
+  const x0 = olcu.g - piksel - 18, y0 = olcu.y - 34;
+  ctx.strokeStyle = "rgba(255,255,255,.85)"; ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(x0, y0 - 5); ctx.lineTo(x0, y0); ctx.lineTo(x0 + piksel, y0); ctx.lineTo(x0 + piksel, y0 - 5);
+  ctx.stroke();
+  ctx.fillStyle = "rgba(255,255,255,.9)"; ctx.font = "11px system-ui";
+  ctx.textAlign = "center";
+  ctx.fillText(uzunluk >= 1000 ? (uzunluk / 1000) + " km" : uzunluk + " m", x0 + piksel / 2, y0 - 8);
+  ctx.textAlign = "left";
+}
+
+function cizimIste() {
+  if (cizimBekliyor) return;
+  cizimBekliyor = true;
+  requestAnimationFrame(ciz);
+}
+
+// ---------------------------------------------------------------------------
+// Etkileşim
+// ---------------------------------------------------------------------------
+
+let suruklemeBasi = null, suruklendi = false;
+
+tuval.addEventListener("mousedown", (e) => {
+  const kutu = tuval.getBoundingClientRect();
+  const ex = e.clientX - kutu.left, ey = e.clientY - kutu.top;
+  if (durum.cizimKipi === "dikdortgen") {
+    const olcu = { g: tuval.clientWidth, y: tuval.clientHeight };
+    const koken = kokenPiksel(olcu);
+    durum.gecici = { tur: "dikdortgen", bas: cografiKoordinat(ex, ey, olcu, koken), halka: [], kapali: true };
+    return;
+  }
+  suruklemeBasi = { x: e.clientX, y: e.clientY, enlem: durum.merkezEnlem, boylam: durum.merkezBoylam };
+  suruklendi = false;
+  tuval.classList.add("suruklenen");
+});
+
+window.addEventListener("mousemove", (e) => {
+  const kutu = tuval.getBoundingClientRect();
+  const ex = e.clientX - kutu.left, ey = e.clientY - kutu.top;
+  const olcu = { g: tuval.clientWidth, y: tuval.clientHeight };
+  const koken = kokenPiksel(olcu);
+
+  if (ex >= 0 && ey >= 0 && ex <= olcu.g && ey <= olcu.y) {
+    const [boylam, enlem] = cografiKoordinat(ex, ey, olcu, koken);
+    durumYaz(`Enlem ${enlem.toFixed(6)}°  ·  Boylam ${boylam.toFixed(6)}°  ·  Yakınlaştırma ${durum.zum}`);
+  }
+
+  if (durum.gecici && durum.gecici.tur === "dikdortgen" && durum.gecici.bas) {
+    const [boylam, enlem] = cografiKoordinat(ex, ey, olcu, koken);
+    const [b0, e0] = durum.gecici.bas;
+    durum.gecici.halka = [[b0, e0], [boylam, e0], [boylam, enlem], [b0, enlem]];
+    cizimIste();
+    return;
+  }
+  if (durum.gecici && durum.gecici.tur === "poligon" && durum.gecici.halka.length) {
+    const [boylam, enlem] = cografiKoordinat(ex, ey, olcu, koken);
+    durum.gecici.imlec = [boylam, enlem];
+    cizimIste();
+  }
+  if (!suruklemeBasi) return;
+  const dx = e.clientX - suruklemeBasi.x, dy = e.clientY - suruklemeBasi.y;
+  if (Math.abs(dx) > 2 || Math.abs(dy) > 2) suruklendi = true;
+  const olcek = Math.pow(2, durum.zum) * TASBOY;
+  const merkezX = boylamPiksel(suruklemeBasi.boylam, durum.zum) - dx;
+  const merkezY = enlemPiksel(suruklemeBasi.enlem, durum.zum) - dy;
+  durum.merkezBoylam = pikselBoylam(Math.max(0, Math.min(olcek, merkezX)), durum.zum);
+  durum.merkezEnlem = pikselEnlem(Math.max(0, Math.min(olcek, merkezY)), durum.zum);
+  cizimIste();
+});
+
+window.addEventListener("mouseup", () => {
+  if (durum.gecici && durum.gecici.tur === "dikdortgen" && durum.gecici.halka.length === 4) {
+    const halka = durum.gecici.halka;
+    const enKisa = Math.abs(halka[0][0] - halka[1][0]) + Math.abs(halka[0][1] - halka[3][1]);
+    durum.gecici = null;
+    if (enKisa > 1e-7) {
+      durum.halkalar = [halka];
+      cizimKipiKapat();
+      onizlemeSifirla();
+      alanOzetiYaz();
+    }
+    cizimIste();
+  }
+  suruklemeBasi = null;
+  tuval.classList.remove("suruklenen");
+});
+
+tuval.addEventListener("click", (e) => {
+  if (durum.cizimKipi !== "poligon" || suruklendi) return;
+  const kutu = tuval.getBoundingClientRect();
+  const olcu = { g: tuval.clientWidth, y: tuval.clientHeight };
+  const koken = kokenPiksel(olcu);
+  const nokta = cografiKoordinat(e.clientX - kutu.left, e.clientY - kutu.top, olcu, koken);
+  if (!durum.gecici) durum.gecici = { tur: "poligon", halka: [], kapali: false };
+  durum.gecici.halka.push(nokta);
+  ipucuGoster(`Poligon: ${durum.gecici.halka.length} köşe. Bitirmek için çift tıklayın veya Enter'a basın.`);
+  cizimIste();
+});
+
+tuval.addEventListener("dblclick", (e) => {
+  e.preventDefault();
+  poligonuBitir();
+});
+
+tuval.addEventListener("contextmenu", (e) => {
+  e.preventDefault();
+  if (durum.gecici && durum.gecici.tur === "poligon" && durum.gecici.halka.length) {
+    durum.gecici.halka.pop();
+    cizimIste();
+  }
+});
+
+window.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && durum.cizimKipi === "poligon") poligonuBitir();
+  if (e.key === "Escape") { durum.gecici = null; cizimKipiKapat(); cizimIste(); }
+});
+
+tuval.addEventListener("wheel", (e) => {
+  e.preventDefault();
+  const kutu = tuval.getBoundingClientRect();
+  const ex = e.clientX - kutu.left, ey = e.clientY - kutu.top;
+  const olcu = { g: tuval.clientWidth, y: tuval.clientHeight };
+  const koken = kokenPiksel(olcu);
+  const [imlecBoylam, imlecEnlem] = cografiKoordinat(ex, ey, olcu, koken);
+  const yon = e.deltaY < 0 ? 1 : -1;
+  const yeni = Math.max(2, Math.min(TASYAPRAK[durum.taban].azami, durum.zum + yon));
+  if (yeni === durum.zum) return;
+  durum.zum = yeni;
+  // İmlecin altındaki noktayı sabit tut
+  const olcu2 = olcu;
+  const yeniKoken = {
+    x: boylamPiksel(imlecBoylam, durum.zum) - ex,
+    y: enlemPiksel(imlecEnlem, durum.zum) - ey
+  };
+  durum.merkezBoylam = pikselBoylam(yeniKoken.x + olcu2.g / 2, durum.zum);
+  durum.merkezEnlem = pikselEnlem(yeniKoken.y + olcu2.y / 2, durum.zum);
+  cizimIste();
+}, { passive: false });
+
+window.addEventListener("resize", cizimIste);
+
+function poligonuBitir() {
+  if (durum.gecici && durum.gecici.tur === "poligon" && durum.gecici.halka.length >= 3) {
+    durum.halkalar = [durum.gecici.halka.slice()];
+    durum.gecici = null;
+    cizimKipiKapat();
+    onizlemeSifirla();
+    alanOzetiYaz();
+    cizimIste();
+  } else if (durum.gecici) {
+    ipucuGoster("Poligon için en az 3 köşe gerekir.", 2200);
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Arayüz yardımcıları
+// ---------------------------------------------------------------------------
+
+const $ = (kimlik) => document.getElementById(kimlik);
+function durumYaz(metin) { $("durum").textContent = metin; }
+let ipucuZaman = null;
+function ipucuGoster(metin, sure) {
+  const e = $("ipucu");
+  e.textContent = metin; e.style.display = "block";
+  clearTimeout(ipucuZaman);
+  if (sure) ipucuZaman = setTimeout(() => { e.style.display = "none"; }, sure);
+}
+function ipucuGizle() { $("ipucu").style.display = "none"; clearTimeout(ipucuZaman); }
+
+function cizimKipiAc(kip) {
+  durum.cizimKipi = kip;
+  durum.gecici = null;
+  tuval.classList.add("cizim");
+  $("btn-dikdortgen").classList.toggle("secili", kip === "dikdortgen");
+  $("btn-poligon").classList.toggle("secili", kip === "poligon");
+  ipucuGoster(kip === "dikdortgen"
+    ? "Dikdörtgen çizmek için haritada basılı tutup sürükleyin."
+    : "Poligon köşelerini tıklayarak ekleyin. Bitirmek için çift tıklayın, son köşeyi silmek için sağ tıklayın.");
+}
+function cizimKipiKapat() {
+  durum.cizimKipi = null;
+  tuval.classList.remove("cizim");
+  $("btn-dikdortgen").classList.remove("secili");
+  $("btn-poligon").classList.remove("secili");
+  ipucuGizle();
+}
+function onizlemeSifirla() { durum.onizleme = []; durum.onizlemeBilgi = null; }
+
+function sayiTr(deger, basamak) {
+  if (deger === null || deger === undefined || isNaN(deger)) return "-";
+  return Number(deger).toLocaleString("tr-TR", {
+    minimumFractionDigits: basamak === undefined ? 2 : basamak,
+    maximumFractionDigits: basamak === undefined ? 2 : basamak
+  });
+}
+function boyutTr(bayt) {
+  if (bayt < 1024) return bayt + " B";
+  if (bayt < 1024 * 1024) return sayiTr(bayt / 1024, 1) + " KB";
+  return sayiTr(bayt / 1024 / 1024, 1) + " MB";
+}
+
+function alanOzetiYaz() {
+  const e = $("alan-ozeti");
+  if (!durum.halkalar.length) { e.textContent = ""; return; }
+  const kose = durum.halkalar.reduce((t, h) => t + h.length, 0);
+  e.innerHTML = `<b>Alan seçildi:</b> ${durum.halkalar.length} halka, ${kose} köşe noktası.`;
+}
+
+$("btn-dikdortgen").onclick = () => durum.cizimKipi === "dikdortgen" ? cizimKipiKapat() : cizimKipiAc("dikdortgen");
+$("btn-poligon").onclick = () => durum.cizimKipi === "poligon" ? cizimKipiKapat() : cizimKipiAc("poligon");
+$("btn-temizle").onclick = () => {
+  durum.halkalar = []; durum.gecici = null; onizlemeSifirla(); cizimKipiKapat();
+  alanOzetiYaz(); $("sonuc").innerHTML = ""; cizimIste();
+};
+$("btn-yakin").onclick = () => { durum.zum = Math.min(TASYAPRAK[durum.taban].azami, durum.zum + 1); cizimIste(); };
+$("btn-uzak").onclick = () => { durum.zum = Math.max(2, durum.zum - 1); cizimIste(); };
+$("btn-uydu").onclick = () => { durum.taban = "uydu"; tabanGuncelle(); };
+$("btn-sokak").onclick = () => { durum.taban = "sokak"; tabanGuncelle(); };
+$("btn-etiket").onclick = () => { durum.etiketler = !durum.etiketler; tabanGuncelle(); };
+function tabanGuncelle() {
+  $("btn-uydu").classList.toggle("secili", durum.taban === "uydu");
+  $("btn-sokak").classList.toggle("secili", durum.taban === "sokak");
+  $("btn-etiket").classList.toggle("secili", durum.etiketler);
+  $("btn-etiket").disabled = durum.taban !== "uydu";
+  $("kaynakca").textContent = TASYAPRAK[durum.taban].kaynak;
+  cizimIste();
+}
+
+$("btn-git").onclick = () => {
+  const ham = $("konum-ara").value.trim().replace(/,\s*/g, ",");
+  const parca = ham.split(/[,\s]+/).map(Number).filter(v => !isNaN(v));
+  if (parca.length < 2) { ipucuGoster("Koordinatı 'enlem, boylam' biçiminde yazın.", 2500); return; }
+  let [enlem, boylam] = parca;
+  if (Math.abs(enlem) > 90) { [enlem, boylam] = [boylam, enlem]; }
+  if (Math.abs(enlem) > 90 || Math.abs(boylam) > 180) { ipucuGoster("Koordinat geçersiz.", 2500); return; }
+  durum.merkezEnlem = enlem; durum.merkezBoylam = boylam;
+  durum.zum = Math.max(durum.zum, 15);
+  cizimIste();
+};
+$("konum-ara").addEventListener("keydown", (e) => { if (e.key === "Enter") $("btn-git").click(); });
+
+$("kaynak").onchange = () => {
+  const k = $("kaynak").value;
+  $("grup-otd").classList.toggle("gizli", k !== "opentopodata");
+  $("grup-google").classList.toggle("gizli", k !== "google");
+  $("grup-yerel").classList.toggle("gizli", k !== "yerel");
+};
+
+// ---------------------------------------------------------------------------
+// Dosya sürükle-bırak (KML / GeoJSON)
+// ---------------------------------------------------------------------------
+
+["dragover", "drop"].forEach(tur => {
+  tuval.addEventListener(tur, (e) => { e.preventDefault(); e.stopPropagation(); });
+});
+tuval.addEventListener("drop", (e) => {
+  const dosya = e.dataTransfer.files && e.dataTransfer.files[0];
+  if (!dosya) return;
+  const okuyucu = new FileReader();
+  okuyucu.onload = () => {
+    try {
+      const halkalar = geometriAyristir(dosya.name, okuyucu.result);
+      if (!halkalar.length) throw new Error("Dosyada poligon bulunamadı.");
+      durum.halkalar = halkalar;
+      onizlemeSifirla();
+      alanOzetiYaz();
+      const adSiz = dosya.name.replace(/\.[^.]+$/, "");
+      if (adSiz) $("alan-ad").value = adSiz.slice(0, 80);
+      haritayiAlanaGotur();
+      ipucuGoster(`${dosya.name} yüklendi (${halkalar[0].length} köşe).`, 3000);
+    } catch (hata) {
+      ipucuGoster("Dosya okunamadı: " + hata.message, 4000);
+    }
+  };
+  okuyucu.readAsText(dosya, "utf-8");
+});
+
+function geometriAyristir(ad, icerik) {
+  const halkalar = [];
+  if (/\.(geojson|json)$/i.test(ad)) {
+    const veri = JSON.parse(icerik);
+    const isle = (g) => {
+      if (!g) return;
+      if (g.type === "Polygon") g.coordinates.forEach(h => halkalar.push(h.map(p => [p[0], p[1]])));
+      else if (g.type === "MultiPolygon") g.coordinates.forEach(p => halkalar.push(p[0].map(q => [q[0], q[1]])));
+      else if (g.type === "LineString") halkalar.push(g.coordinates.map(p => [p[0], p[1]]));
+      else if (g.type === "GeometryCollection") g.geometries.forEach(isle);
+    };
+    if (veri.type === "FeatureCollection") veri.features.forEach(o => isle(o.geometry));
+    else if (veri.type === "Feature") isle(veri.geometry);
+    else isle(veri);
+  } else {
+    const belge = new DOMParser().parseFromString(icerik, "text/xml");
+    const dugumler = belge.getElementsByTagName("*");
+    for (const dugum of dugumler) {
+      if (dugum.localName !== "coordinates" || !dugum.textContent) continue;
+      const noktalar = dugum.textContent.trim().split(/\s+/).map(p => {
+        const a = p.split(",");
+        return [parseFloat(a[0]), parseFloat(a[1])];
+      }).filter(p => !isNaN(p[0]) && !isNaN(p[1]));
+      if (noktalar.length >= 3) halkalar.push(noktalar);
+    }
+  }
+  return halkalar.map(temizle).filter(h => h.length >= 3);
+}
+
+function temizle(halka) {
+  const c = halka.slice();
+  while (c.length > 1 && Math.abs(c[0][0] - c[c.length - 1][0]) < 1e-12 && Math.abs(c[0][1] - c[c.length - 1][1]) < 1e-12) c.pop();
+  return c;
+}
+
+function haritayiAlanaGotur() {
+  const hepsi = durum.halkalar.flat();
+  if (!hepsi.length) return;
+  const boylamlar = hepsi.map(p => p[0]), enlemler = hepsi.map(p => p[1]);
+  durum.merkezBoylam = (Math.min(...boylamlar) + Math.max(...boylamlar)) / 2;
+  durum.merkezEnlem = (Math.min(...enlemler) + Math.max(...enlemler)) / 2;
+  const genislik = Math.max(1e-6, Math.max(...boylamlar) - Math.min(...boylamlar));
+  const yukseklik = Math.max(1e-6, Math.max(...enlemler) - Math.min(...enlemler));
+  const olcu = { g: tuval.clientWidth || 800, y: tuval.clientHeight || 600 };
+  let z = 19;
+  while (z > 2) {
+    const px = (boylamPiksel(Math.max(...boylamlar), z) - boylamPiksel(Math.min(...boylamlar), z));
+    const py = (enlemPiksel(Math.min(...enlemler), z) - enlemPiksel(Math.max(...enlemler), z));
+    if (px < olcu.g * 0.85 && py < olcu.y * 0.85) break;
+    z--;
+  }
+  durum.zum = z;
+  cizimIste();
+}
+
+// ---------------------------------------------------------------------------
+// Sunucu ile iletişim
+// ---------------------------------------------------------------------------
+
+function istekGovdesi() {
+  const bicimler = Array.from(document.querySelectorAll("#bicim-kutulari input:checked")).map(e => e.value);
+  return {
+    halkalar: durum.halkalar,
+    ad: $("alan-ad").value.trim() || "karelaj",
+    aralik: parseFloat($("aralik").value),
+    donme: parseFloat($("donme").value) || 0,
+    sistem: $("sistem").value,
+    hizalama: $("hizalama").value,
+    kirp: $("kirp").checked,
+    no_profil: $("no-profil").value,
+    no_onek: $("no-onek").value,
+    kod: $("kod").value,
+    kaynak: $("kaynak").value,
+    veri_kumesi: $("veri-kumesi").value,
+    google_anahtar: $("google-anahtar").value,
+    sym: $("sym").value,
+    dem_sistemi: $("dem-sistemi").value,
+    ornekleme: $("ornekleme").value,
+    kot_kaydirma: parseFloat($("kot-kaydirma").value) || 0,
+    kot_yok: $("kot-yok").checked,
+    bicimler: bicimler,
+    ncn_profil: $("ncn-profil").value,
+    kontur: $("kontur").value ? parseFloat($("kontur").value) : null,
+    hacim_kotu: $("hacim-kotu").value !== "" ? parseFloat($("hacim-kotu").value) : null
+  };
+}
+
+async function sunucuyaGonder(uc, govde) {
+  const yanit = await fetch(uc, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(govde)
+  });
+  const veri = await yanit.json();
+  if (!yanit.ok || veri.hata) throw new Error(veri.hata || ("Sunucu hatası: " + yanit.status));
+  return veri;
+}
+
+function alanVarMi() {
+  if (!durum.halkalar.length) {
+    sonucYaz(`<div class="kutu hata"><h3>Alan seçilmedi</h3>
+      <div class="yardim">Önce "Dikdörtgen" veya "Poligon" düğmesiyle haritada çalışma alanını çizin,
+      ya da bir KML/GeoJSON dosyasını haritaya sürükleyin.</div></div>`);
+    return false;
+  }
+  return true;
+}
+
+function sonucYaz(html) { $("sonuc").innerHTML = html; }
+
+$("btn-onizle").onclick = async () => {
+  if (!alanVarMi()) return;
+  const dugme = $("btn-onizle");
+  dugme.disabled = true;
+  sonucYaz('<div class="kutu"><span class="yukleniyor"></span> Önizleme hesaplanıyor…</div>');
+  try {
+    const veri = await sunucuyaGonder("/api/onizleme", istekGovdesi());
+    durum.onizleme = veri.noktalar || [];
+    durum.onizlemeBilgi = veri;
+    cizimIste();
+    if (veri.uyari) {
+      sonucYaz(`<div class="kutu hata"><h3>Önizleme yapılamadı</h3><div class="yardim">${veri.uyari}</div></div>`);
+    } else {
+      sonucYaz(`<div class="kutu iyi"><h3>Önizleme</h3>
+        <div class="satir"><span>Nokta sayısı</span><span>${sayiTr(veri.nokta_sayisi, 0)}</span></div>
+        <div class="satir"><span>Satır × sütun</span><span>${veri.satir} × ${veri.sutun}</span></div>
+        <div class="satir"><span>Alan</span><span>${sayiTr(veri.alan_m2 / 10000, 4)} ha</span></div>
+        <div class="satir"><span>Koordinat sistemi</span><span>${veri.sistem_kod}</span></div>
+        ${veri.seyreltme > 1 ? `<div class="yardim">Haritada her ${veri.seyreltme}. nokta gösteriliyor.</div>` : ""}
+        </div>`);
+    }
+  } catch (hata) {
+    sonucYaz(`<div class="kutu hata"><h3>Hata</h3><div class="yardim">${hata.message}</div></div>`);
+  } finally {
+    dugme.disabled = false;
+  }
+};
+
+$("btn-uret").onclick = async () => {
+  if (!alanVarMi()) return;
+  const dugme = $("btn-uret");
+  dugme.disabled = true;
+  const cevrimici = ["opentopodata", "open-elevation", "google"].includes($("kaynak").value) && !$("kot-yok").checked;
+  sonucYaz(`<div class="kutu"><span class="yukleniyor"></span> Karelaj üretiliyor…
+    ${cevrimici ? '<div class="yardim">Kot değerleri çevrimiçi servisten okunuyor. Nokta sayısı çoksa bu işlem birkaç dakika sürebilir.</div>' : ""}</div>`);
+  try {
+    const veri = await sunucuyaGonder("/api/uret", istekGovdesi());
+    durum.onizleme = [];
+    cizimIste();
+    const ist = veri.istatistik || {};
+    const dosyalar = (veri.dosyalar || []).map(d =>
+      `<a class="dosya" href="${d.baglanti}" download><span>${d.ad}</span><small>${boyutTr(d.boyut)}</small></a>`).join("");
+    sonucYaz(`
+      <div class="kutu iyi">
+        <h3>Karelaj üretildi</h3>
+        <div class="satir"><span>Nokta sayısı</span><span>${sayiTr(veri.nokta_sayisi, 0)}</span></div>
+        <div class="satir"><span>Satır × sütun</span><span>${veri.satir} × ${veri.sutun}</span></div>
+        <div class="satir"><span>Alan</span><span>${sayiTr(veri.alan_m2 / 10000, 4)} ha</span></div>
+        ${ist.en_dusuk !== undefined ? `
+        <div class="satir"><span>En düşük kot</span><span>${sayiTr(ist.en_dusuk, 2)} m</span></div>
+        <div class="satir"><span>En yüksek kot</span><span>${sayiTr(ist.en_yuksek, 2)} m</span></div>
+        <div class="satir"><span>Ortalama kot</span><span>${sayiTr(ist.ortalama, 2)} m</span></div>` : ""}
+        ${veri.eksik_kot ? `<div class="satir"><span style="color:var(--sari)">Kotu okunamayan</span><span>${sayiTr(veri.eksik_kot, 0)}</span></div>` : ""}
+        ${veri.okuma_ozeti ? `<div class="yardim">${veri.okuma_ozeti}</div>` : ""}
+        ${(veri.uyarilar || []).map(u => `<div class="yardim" style="color:var(--sari)">! ${u}</div>`).join("")}
+      </div>
+      <div class="kutu"><h3>Dosyalar</h3>${dosyalar}
+        <div class="yardim">Dosyalar ayrıca sunucudaki <code>${veri.klasor}</code> klasörüne yazıldı.</div>
+      </div>
+      ${veri.hacim && veri.hacim.length ? `<div class="kutu"><h3>Hacim hesabı</h3><pre class="rapor">${veri.hacim.join("\n")}</pre></div>` : ""}
+      <div class="kutu"><h3>Teknik özet raporu</h3><pre class="rapor">${veri.rapor.replace(/&/g, "&amp;").replace(/</g, "&lt;")}</pre></div>
+    `);
+  } catch (hata) {
+    sonucYaz(`<div class="kutu hata"><h3>Hata</h3><div class="yardim">${hata.message}</div></div>`);
+  } finally {
+    dugme.disabled = false;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Başlangıç
+// ---------------------------------------------------------------------------
+
+const BICIM_ADLARI = {
+  ncn: "NCN (Netcad)", csv: "CSV (Excel)", xyz: "XYZ",
+  dxf: "DXF (CAD)", kml: "KML (Google Earth)", geojson: "GeoJSON", rapor: "Rapor"
+};
+const VARSAYILAN_BICIMLER = ["ncn", "kml", "rapor"];
+
+async function baslat() {
+  tabanGuncelle();
+  cizimIste();
+  const kutular = $("bicim-kutulari");
+  Object.entries(BICIM_ADLARI).forEach(([kod, ad]) => {
+    const etiket = document.createElement("label");
+    etiket.className = "onay";
+    etiket.style.margin = "3px 0";
+    etiket.innerHTML = `<input type="checkbox" value="${kod}" ${VARSAYILAN_BICIMLER.includes(kod) ? "checked" : ""}><span>${ad}</span>`;
+    kutular.appendChild(etiket);
+  });
+  try {
+    const yanit = await fetch("/api/baslangic");
+    const veri = await yanit.json();
+    const sistem = $("sistem"), demSistem = $("dem-sistemi");
+    veri.sistemler.forEach(s => {
+      sistem.appendChild(new Option(`${s.kod} — ${s.ad}`, s.kod));
+      demSistem.appendChild(new Option(`${s.kod} — ${s.ad}`, s.kod));
+    });
+    const vk = $("veri-kumesi");
+    veri.veri_kumeleri.forEach(d => vk.appendChild(new Option(`${d.ad} (${d.cozunurluk})`, d.kod)));
+    vk.value = "srtm30m";
+    const bilgiYaz = () => {
+      const secili = veri.veri_kumeleri.find(d => d.kod === vk.value);
+      $("veri-kumesi-bilgi").textContent = secili ? `Düşey datum: ${secili.datum}` : "";
+    };
+    vk.onchange = bilgiYaz; bilgiYaz();
+    const np = $("ncn-profil");
+    veri.ncn_profilleri.forEach(p => np.appendChild(new Option(`${p.kod} — ${p.duzen}`, p.kod)));
+    np.value = "netcad";
+  } catch (hata) {
+    ipucuGoster("Sunucu bilgileri alınamadı: " + hata.message, 5000);
+  }
+}
+baslat();
+</script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<kml xmlns="http://www.opengis.net/kml/2.2">
+  <Document>
+    <name>Örnek proje sahası - İzmit</name>
+    <description>Kot karelajı aracı için örnek çalışma alanı.
+Google Earth'te çizilip "Yer İşaretini Kaydet" ile alınmış bir poligonu temsil eder.</description>
+    <Placemark>
+      <name>Proje sahası</name>
+      <Polygon>
+        <outerBoundaryIs>
+          <LinearRing>
+            <coordinates>
+            29.9285000,40.7712000,0
+            29.9398000,40.7735000,0
+            29.9467000,40.7688000,0
+            29.9441000,40.7601000,0
+            29.9327000,40.7578000,0
+            29.9258000,40.7639000,0
+            29.9285000,40.7712000,0
+            </coordinates>
+          </LinearRing>
+        </outerBoundaryIs>
+      </Polygon>
+    </Placemark>
+  </Document>
+</kml>

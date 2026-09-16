@@ -10,3 +10,20 @@ indirilenler/
 
 # Günlükler
 *.log
+
+# Python (kot-karelaj)
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.venv/
+venv/
+
+# Kot karelajı çıktıları ve önbelleği
+cikti/
+kot-karelaj/cikti/
+.karelaj/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
