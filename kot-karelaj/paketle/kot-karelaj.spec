@@ -3,9 +3,17 @@
 PyInstaller tanım dosyası
 =========================
 
-Tek dosyalık, kurulum gerektirmeyen bir uygulama üretir. Windows'ta
-``KotKarelaji.exe`` adını alır ve çift tıklandığında doğrudan harita
-arayüzünü açar.
+Kurulum gerektirmeyen, tek dosyalık **iki** uygulama üretir:
+
+``KotKarelaji.exe``
+    Penceresiz (konsolsuz) sürüm. Çift tıklandığında siyah bir komut
+    penceresi açılmaz; doğrudan tarayıcıda harita arayüzü gelir. Günlük
+    kaydı çıktı klasöründeki ``kot-karelaji-gunluk.txt`` dosyasına yazılır,
+    ölümcül hatalar uyarı kutusuyla bildirilir.
+
+``KotKarelaji-konsol.exe``
+    Komut satırından kullanmak isteyenler için konsollu sürüm. Aynı
+    programdır, yalnızca çıktıyı komut penceresine yazar.
 
 Kullanım (kot-karelaj klasöründen)::
 
@@ -63,23 +71,42 @@ analiz = Analysis(
 
 pyz = PYZ(analiz.pure)
 
-exe = EXE(
+SIMGE = os.path.join(SPECPATH, "kot-karelaj.ico")
+
+ORTAK = dict(
+    debug=False,
+    bootloader_ignore_signals=False,
+    strip=False,
+    upx=False,
+    runtime_tmpdir=None,
+    disable_windowed_traceback=False,
+    argv_emulation=False,
+    target_arch=None,
+    codesign_identity=None,
+    entitlements_file=None,
+    icon=SIMGE,
+)
+
+# Penceresiz sürüm: çift tıklandığında komut penceresi açılmaz
+exe_pencere = EXE(
     pyz,
     analiz.scripts,
     analiz.binaries,
     analiz.datas,
     [],
     name="KotKarelaji",
-    debug=False,
-    bootloader_ignore_signals=False,
-    strip=False,
-    upx=False,
-    runtime_tmpdir=None,
+    console=False,
+    **ORTAK,
+)
+
+# Konsollu sürüm: komut satırından kullanım için
+exe_konsol = EXE(
+    pyz,
+    analiz.scripts,
+    analiz.binaries,
+    analiz.datas,
+    [],
+    name="KotKarelaji-konsol",
     console=True,
-    disable_windowed_traceback=False,
-    argv_emulation=False,
-    target_arch=None,
-    codesign_identity=None,
-    entitlements_file=None,
-    icon=os.path.join(SPECPATH, "kot-karelaj.ico"),
+    **ORTAK,
 )

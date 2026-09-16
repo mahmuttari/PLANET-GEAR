@@ -23,8 +23,10 @@ from __future__ import annotations
 import json
 import os
 import posixpath
+import socket
 import sys
 import threading
+import time
 import traceback
 import urllib.parse
 import webbrowser
@@ -60,6 +62,11 @@ from .yazicilar import (
 
 ONIZLEME_AZAMI_NOKTA = 6000
 URETIM_AZAMI_NOKTA = 200000
+
+# Penceresiz (konsolsuz) çalışmada tarayıcı sekmesi kapatıldığında sunucunun
+# arkada asılı kalmaması için yaşam sinyali izlenir.
+YASAM_ZAMAN_ASIMI_SN = 1800.0
+_yasam = {"son": time.time()}
 
 
 class ArayuzHatasi(Exception):
@@ -164,7 +171,13 @@ class _Isleyici(BaseHTTPRequestHandler):
         parcali = urllib.parse.urlparse(self.path)
         try:
             govde = self._govde_oku()
-            if parcali.path == "/api/onizleme":
+            if parcali.path == "/api/yasam":
+                _yasam["son"] = time.time()
+                self._json_yanit({"tamam": True})
+            elif parcali.path == "/api/kapat":
+                self._json_yanit({"tamam": True, "ileti": "Uygulama kapatılıyor."})
+                threading.Thread(target=self.server.shutdown, daemon=True).start()
+            elif parcali.path == "/api/onizleme":
                 self._json_yanit(_onizleme(govde))
             elif parcali.path == "/api/uret":
                 self._json_yanit(_uret(govde, self.cikti_klasoru))
@@ -230,6 +243,7 @@ def _baslangic_verisi() -> Dict[str, Any]:
         ],
         "onbellek_yolu": varsayilan_onbellek_yolu(),
         "onizleme_azami": ONIZLEME_AZAMI_NOKTA,
+        "penceresiz": sys.stdout is None,
         # Yalnızca "ayarlı mı" bilgisi gönderilir; anahtarın kendisi asla
         # tarayıcıya verilmez.
         "google_anahtari_ortamda": bool(
@@ -489,6 +503,61 @@ def _uret(govde: Dict[str, Any], cikti_klasoru: str) -> Dict[str, Any]:
     }
 
 
+def _bos_kapi_ile_sunucu(adres: str, kapi: int, isleyici, deneme: int = 25):
+    """
+    İlk boş kapıda sunucu açar.
+
+    Uygulama arkada asılı kalmış bir kopyası yüzünden açılamazsa kullanıcı
+    çaresiz kalmasın diye, istenen kapı doluysa sıradaki kapılar denenir.
+    """
+    son_hata = None
+    for kayma in range(deneme):
+        try:
+            return ThreadingHTTPServer((adres, kapi + kayma), isleyici)
+        except OSError as hata:
+            son_hata = hata
+            if hata.errno not in (
+                getattr(__import__("errno"), "EADDRINUSE", 98),
+                getattr(__import__("errno"), "EACCES", 13),
+            ):
+                raise
+    raise OSError(
+        f"{adres}:{kapi}-{kapi + deneme - 1} aralığında boş kapı bulunamadı "
+        f"({son_hata})."
+    )
+
+
+def _bekci_baslat(sunucu, zaman_asimi: float = YASAM_ZAMAN_ASIMI_SN) -> None:
+    """Tarayıcıdan yaşam sinyali kesilirse sunucuyu kapatır."""
+
+    def gozle() -> None:
+        while True:
+            time.sleep(30.0)
+            if time.time() - _yasam["son"] > zaman_asimi:
+                sunucu.shutdown()
+                return
+
+    threading.Thread(target=gozle, daemon=True).start()
+
+
+def _pencere_uyarisi(baslik: str, ileti: str) -> bool:
+    """
+    Windows'ta uyarı kutusu gösterir.
+
+    Penceresiz uygulamada yazdırılacak bir konsol olmadığından, açılışta
+    oluşan ölümcül hatalar kullanıcıya böyle bildirilir.
+    """
+    if sys.platform != "win32":
+        return False
+    try:
+        import ctypes
+
+        ctypes.windll.user32.MessageBoxW(0, ileti, baslik, 0x10)
+        return True
+    except Exception:  # pragma: no cover - yalnızca Windows
+        return False
+
+
 def _guvenli_ad(ad: str) -> str:
     """Dosya adından yol ayırıcıları ve sorunlu karakterleri temizler."""
     temiz = "".join(
@@ -508,38 +577,69 @@ def arayuzu_baslat(
     kapi: int = 8777,
     tarayici_ac: bool = True,
     cikti_klasoru: str = "cikti",
+    penceresiz: bool = False,
+    gunluk_yolu: Optional[str] = None,
 ) -> int:
-    """Yerel arayüz sunucusunu başlatır ve Ctrl+C'ye kadar çalıştırır."""
+    """
+    Yerel arayüz sunucusunu başlatır.
+
+    ``penceresiz`` seçeneği, konsolu olmayan (Windows'ta pencere kipinde
+    paketlenmiş) uygulamalar içindir: ölümcül hatalar uyarı kutusuyla
+    bildirilir ve tarayıcı sekmesi kapatıldığında sunucu kendiliğinden
+    kapanır.
+    """
     if not os.path.exists(_web_dosyasi("index.html")):
-        print(
-            "HATA: Arayüz dosyası bulunamadı (karelaj/web/index.html).",
-            file=sys.stderr,
-        )
+        ileti = "Arayüz dosyası bulunamadı (karelaj/web/index.html)."
+        print(f"HATA: {ileti}", file=sys.stderr)
+        if penceresiz:
+            _pencere_uyarisi("Kot Karelajı", ileti)
         return 2
-    os.makedirs(cikti_klasoru, exist_ok=True)
+    try:
+        os.makedirs(cikti_klasoru, exist_ok=True)
+    except OSError as hata:
+        ileti = f"Çıktı klasörü oluşturulamadı:\n{cikti_klasoru}\n\n{hata}"
+        print(f"HATA: {ileti}", file=sys.stderr)
+        if penceresiz:
+            _pencere_uyarisi("Kot Karelajı", ileti)
+        return 2
 
     isleyici = type("_YapilandirilmisIsleyici", (_Isleyici,), {"cikti_klasoru": cikti_klasoru})
     try:
-        sunucu = ThreadingHTTPServer((adres, kapi), isleyici)
+        sunucu = _bos_kapi_ile_sunucu(adres, kapi, isleyici)
     except OSError as hata:
-        print(
-            f"HATA: {adres}:{kapi} dinlenemedi ({hata}). "
-            f"Başka bir kapı deneyin: --kapi 8778",
-            file=sys.stderr,
+        ileti = (
+            f"Sunucu başlatılamadı ({hata}).\n\n"
+            f"Başka bir kapı deneyebilirsiniz."
         )
+        print(f"HATA: {ileti}", file=sys.stderr)
+        if penceresiz:
+            _pencere_uyarisi("Kot Karelajı", ileti)
         return 2
 
-    baglanti = f"http://{adres}:{sunucu.server_address[1]}/"
+    secilen_kapi = sunucu.server_address[1]
+    baglanti = f"http://{adres}:{secilen_kapi}/"
     print("=" * 66)
     print("  KOT KARELAJI - harita arayüzü")
     print("=" * 66)
     print(f"  Adres        : {baglanti}")
     print(f"  Çıktı klasörü: {os.path.abspath(cikti_klasoru)}")
-    print("  Durdurmak için Ctrl+C")
+    if gunluk_yolu:
+        print(f"  Günlük dosyası: {gunluk_yolu}")
+    if penceresiz:
+        print("  Kapatmak için tarayıcıdaki 'Uygulamayı kapat' düğmesini kullanın.")
+    else:
+        print("  Durdurmak için Ctrl+C")
     print("=" * 66)
     # Paketlenmiş uygulamada ya da çıktı bir dosyaya yönlendirildiğinde
     # arabellek nedeniyle adresin geç görünmemesi için hemen boşaltılır.
-    sys.stdout.flush()
+    try:
+        sys.stdout.flush()
+    except (AttributeError, ValueError, OSError):
+        pass
+
+    if penceresiz:
+        _yasam["son"] = time.time()
+        _bekci_baslat(sunucu)
 
     if tarayici_ac:
         threading.Timer(0.6, lambda: webbrowser.open(baglanti)).start()

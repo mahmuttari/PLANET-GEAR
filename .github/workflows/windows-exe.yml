@@ -45,9 +45,12 @@ jobs:
         working-directory: kot-karelaj
         shell: pwsh
         run: |
-          $exe = "dist\KotKarelaji.exe"
-          if (-not (Test-Path $exe)) { throw "KotKarelaji.exe olusmadi" }
-          Write-Host "Boyut: $([math]::Round((Get-Item $exe).Length / 1MB, 2)) MB"
+          $exe = "dist\KotKarelaji-konsol.exe"
+          $exeGui = "dist\KotKarelaji.exe"
+          foreach ($d in @($exe, $exeGui)) {
+            if (-not (Test-Path $d)) { throw "$d olusmadi" }
+            Write-Host "$d : $([math]::Round((Get-Item $d).Length / 1MB, 2)) MB"
+          }
 
           # Alt komutlar calisiyor mu?
           # Not: ciktiyi "| Select-Object -First N" ile kirpmayin; PowerShell
@@ -77,7 +80,7 @@ jobs:
           if ($satirlar.Count -lt 100) { throw "NCN dosyasi beklenenden kisa" }
           if ($satirlar[0].Split(",").Count -ne 5) { throw "NCN sutun sayisi 5 degil" }
 
-          # Harita arayuzu aciliyor mu?
+          # Konsollu surumde harita arayuzu aciliyor mu?
           $is = Start-Process -FilePath $exe -ArgumentList "arayuz","--kapi","8791","--tarayici-yok" -PassThru
           Start-Sleep -Seconds 6
           try {
@@ -89,6 +92,37 @@ jobs:
           } finally {
             Stop-Process -Id $is.Id -Force -ErrorAction SilentlyContinue
           }
+
+          # Penceresiz surum: konsolu yok, gunluge yazmali ve kapat ucuyla
+          # duzgun kapanmali
+          $isGui = Start-Process -FilePath $exeGui -ArgumentList "arayuz","--kapi","8793","--tarayici-yok" -PassThru
+          Start-Sleep -Seconds 8
+          try {
+            $g = Invoke-RestMethod -Uri "http://127.0.0.1:8793/api/baslangic" -TimeoutSec 20
+            if (-not $g.penceresiz) { throw "Penceresiz surum kendini konsollu sanıyor" }
+            Write-Host "Penceresiz surum yanit verdi, penceresiz bayragi dogru."
+
+            Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8793/api/yasam" -TimeoutSec 10 | Out-Null
+            Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8793/api/kapat" -TimeoutSec 10 | Out-Null
+            Start-Sleep -Seconds 5
+            if (-not $isGui.HasExited) { throw "Kapat ucu calismadi, surec hala acik" }
+            Write-Host "Kapat ucu calisti, surec duzgun kapandi."
+          } finally {
+            if (-not $isGui.HasExited) {
+              Stop-Process -Id $isGui.Id -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          # Penceresiz surum gunluk dosyasi yazmali
+          $gunlukler = @(
+            "$env:USERPROFILE\Documents\Kot Karelaji\kot-karelaji-gunluk.txt",
+            "$env:USERPROFILE\Kot Karelaji\kot-karelaji-gunluk.txt"
+          )
+          $bulunan = $gunlukler | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $bulunan) { throw "Penceresiz surum gunluk dosyasi yazmadi" }
+          Write-Host "Gunluk dosyasi: $bulunan"
+          Get-Content $bulunan -TotalCount 6 | ForEach-Object { Write-Host "  $_" }
+
           Write-Host "Tum sinamalar basarili."
 
       - name: Kullanım notunu ekle
@@ -99,18 +133,24 @@ jobs:
           KOT KARELAJI - Windows uygulamasi
           =================================
 
-          KotKarelaji.exe dosyasina cift tiklayin. Tarayicida harita
-          arayuzu acilir. Alani cizin, araligi secin, "Uret ve indir"
-          dugmesine basin.
+          Bu klasorde iki dosya var:
+
+          KotKarelaji.exe          <- gunluk kullanim icin bunu kullanin
+            Cift tiklayin. Komut penceresi ACILMAZ; dogrudan tarayicida
+            harita arayuzu gelir. Alani cizin, araligi secin, "Uret ve
+            indir" dugmesine basin.
+            Kapatmak icin arayuzdeki "Uygulamayi kapat" dugmesini kullanin.
+
+          KotKarelaji-konsol.exe   <- komut satiri kullanimi icin
+            Ayni programdir, ciktiyi komut penceresine yazar.
+              KotKarelaji-konsol.exe uret --alan saha.kml --aralik 25
+              KotKarelaji-konsol.exe --help
 
           Uretilen dosyalar: Belgeler\Kot Karelaji
+          Gunluk kaydi      : Belgeler\Kot Karelaji\kot-karelaji-gunluk.txt
 
-          Kurulum gerekmez, Python gerekmez. Dosyayi USB bellege kopyalayip
+          Kurulum gerekmez, Python gerekmez. Dosyalari USB bellege kopyalayip
           baska bir bilgisayarda da calistirabilirsiniz.
-
-          Komut satirindan kullanmak isterseniz:
-            KotKarelaji.exe uret --alan saha.kml --aralik 25
-            KotKarelaji.exe --help
 
           Ornek alan dosyalari ve ornek sayisal yukseklik modeli, depodaki
           kot-karelaj\ornekler klasorundedir.
@@ -124,6 +164,7 @@ jobs:
           name: KotKarelaji-windows
           path: |
             kot-karelaj/dist/KotKarelaji.exe
+            kot-karelaj/dist/KotKarelaji-konsol.exe
             kot-karelaj/dist/OKUBENI.txt
           retention-days: 90
           if-no-files-found: error

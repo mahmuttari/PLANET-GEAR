@@ -1466,6 +1466,39 @@ class CliTesti(unittest.TestCase):
         finally:
             sys.argv = eski
 
+    def test_penceresiz_kip_gunluge_yazar(self):
+        """
+        Konsolsuz (pencere kipinde paketlenmiş) çalışmada stdout ve stderr
+        None olur. Program çökmemeli, çıktıyı günlük dosyasına yazmalı.
+        """
+        from karelaj import cli
+
+        klasor = tempfile.mkdtemp()
+        eski_cikti, eski_hata = sys.stdout, sys.stderr
+        eski_varsayilan = cli.varsayilan_cikti_klasoru
+        try:
+            cli.varsayilan_cikti_klasoru = lambda: klasor
+            sys.stdout = None
+            sys.stderr = None
+            self.assertTrue(cli.penceresiz_mi())
+            kod = cli.main(["sistemler"])
+        finally:
+            try:
+                if sys.stdout is not None and sys.stdout not in (eski_cikti, eski_hata):
+                    sys.stdout.close()
+            except Exception:
+                pass
+            sys.stdout, sys.stderr = eski_cikti, eski_hata
+            cli.varsayilan_cikti_klasoru = eski_varsayilan
+
+        self.assertEqual(kod, 0)
+        gunluk = os.path.join(klasor, "kot-karelaji-gunluk.txt")
+        self.assertTrue(os.path.exists(gunluk), "günlük dosyası oluşmadı")
+        with open(gunluk, encoding="utf-8") as f:
+            icerik = f.read()
+        self.assertIn("ITRF96-TM30", icerik)
+        self.assertIn("başlatıldı", icerik)
+
     def test_boru_erken_kapanirsa(self):
         """
         Çıktı borusu erken kapandığında (``... | more`` gibi) program

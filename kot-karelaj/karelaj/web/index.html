@@ -57,6 +57,16 @@
 
   #arac-cubugu { position: absolute; top: 10px; left: 10px; display: flex; gap: 6px; z-index: 5; flex-wrap: wrap; }
   #arac-cubugu button { background: rgba(26,32,41,.94); backdrop-filter: blur(3px); padding: 6px 10px; font-size: 12px; }
+  #btn-kapat { border-color: var(--kirmizi); color: var(--kirmizi); }
+  #btn-kapat:hover { background: var(--kirmizi); color: #fff; border-color: var(--kirmizi); }
+  #kapandi {
+    position: fixed; inset: 0; z-index: 50; display: none;
+    background: rgba(18,22,28,.97); align-items: center; justify-content: center;
+    text-align: center; padding: 24px;
+  }
+  #kapandi div { max-width: 420px; }
+  #kapandi h2 { margin: 0 0 8px; font-size: 18px; }
+  #kapandi p { margin: 0; color: var(--soluk); font-size: 13px; line-height: 1.6; }
   #zum { position: absolute; right: 10px; top: 10px; display: flex; flex-direction: column; gap: 5px; z-index: 5; }
   #zum button { width: 32px; height: 32px; padding: 0; font-size: 17px; background: rgba(26,32,41,.94); }
   #durum {
@@ -238,6 +248,7 @@
       <button type="button" id="btn-uydu" class="secili">Uydu</button>
       <button type="button" id="btn-sokak">Sokak</button>
       <button type="button" id="btn-etiket" class="secili">Etiketler</button>
+      <button type="button" id="btn-kapat" class="gizli" title="Uygulamayı kapat">Uygulamayı kapat</button>
     </div>
     <div id="zum">
       <button type="button" id="btn-yakin" title="Yakınlaştır">+</button>
@@ -246,6 +257,14 @@
     <div id="ipucu"></div>
     <div id="durum">Hazır</div>
     <div id="kaynakca"></div>
+  </div>
+</div>
+
+<div id="kapandi">
+  <div>
+    <h2>Kot Karelajı kapatıldı</h2>
+    <p>Uygulama durduruldu. Bu sekmeyi kapatabilirsiniz.<br>
+       Yeniden kullanmak için <b>KotKarelaji</b> uygulamasını tekrar açın.</p>
   </div>
 </div>
 
@@ -645,6 +664,7 @@ $("btn-uzak").onclick = () => { durum.zum = Math.max(2, durum.zum - 1); cizimIst
 $("btn-uydu").onclick = () => { durum.taban = "uydu"; tabanGuncelle(); };
 $("btn-sokak").onclick = () => { durum.taban = "sokak"; tabanGuncelle(); };
 $("btn-etiket").onclick = () => { durum.etiketler = !durum.etiketler; tabanGuncelle(); };
+$("btn-kapat").onclick = uygulamayiKapat;
 function tabanGuncelle() {
   $("btn-uydu").classList.toggle("secili", durum.taban === "uydu");
   $("btn-sokak").classList.toggle("secili", durum.taban === "sokak");
@@ -892,6 +912,21 @@ const BICIM_ADLARI = {
 };
 const VARSAYILAN_BICIMLER = ["ncn", "kml", "rapor"];
 
+let yasamZamanlayici = null;
+
+function yasamSinyaliBaslat() {
+  const gonder = () => { fetch("/api/yasam", { method: "POST" }).catch(() => {}); };
+  gonder();
+  yasamZamanlayici = setInterval(gonder, 30000);
+}
+
+async function uygulamayiKapat() {
+  if (!confirm("Kot Karelajı kapatılsın mı?\n\nÜretilen dosyalar diskte kalır.")) return;
+  clearInterval(yasamZamanlayici);
+  try { await fetch("/api/kapat", { method: "POST" }); } catch (hata) { /* sunucu zaten kapanmış olabilir */ }
+  $("kapandi").style.display = "flex";
+}
+
 async function baslat() {
   tabanGuncelle();
   cizimIste();
@@ -919,6 +954,10 @@ async function baslat() {
       $("veri-kumesi-bilgi").textContent = secili ? `Düşey datum: ${secili.datum}` : "";
     };
     vk.onchange = bilgiYaz; bilgiYaz();
+    if (veri.penceresiz) {
+      $("btn-kapat").classList.remove("gizli");
+      yasamSinyaliBaslat();
+    }
     const np = $("ncn-profil");
     veri.ncn_profilleri.forEach(p => np.appendChild(new Option(`${p.kod} — ${p.duzen}`, p.kod)));
     np.value = "netcad";

@@ -67,6 +67,53 @@ BICIMLER = ("ncn", "csv", "xyz", "dxf", "kml", "geojson", "rapor")
 VARSAYILAN_BICIMLER = "ncn,kml,rapor"
 
 
+def penceresiz_mi() -> bool:
+    """
+    Uygulama konsolsuz (pencere kipinde) mi çalışıyor?
+
+    PyInstaller ile ``console=False`` seçeneğiyle paketlenen Windows
+    uygulamalarında ``sys.stdout`` ve ``sys.stderr`` ``None`` olur; tek
+    güvenilir belirti budur.
+    """
+    return sys.stdout is None or sys.stderr is None
+
+
+def gunluk_dosyasi_yolu() -> str:
+    """Penceresiz çalışmada ekran çıktısının yazılacağı günlük dosyası."""
+    klasor = varsayilan_cikti_klasoru()
+    if not os.path.isabs(klasor):
+        klasor = os.path.abspath(klasor)
+    return os.path.join(klasor, "kot-karelaji-gunluk.txt")
+
+
+def cikti_akislarini_hazirla() -> Optional[str]:
+    """
+    Konsolsuz çalışmada ``stdout``/``stderr`` yerine günlük dosyası açar.
+
+    Pencere kipinde bu akışlar ``None`` olduğundan her ``print`` çağrısı
+    hata verir. Çıktı bir dosyaya yönlendirilerek hem çökme önlenir hem de
+    bir sorun çıktığında kullanıcıya gösterilecek bir kayıt kalır.
+
+    Günlük dosyasının yolunu, açılabildiyse döndürür.
+    """
+    if not penceresiz_mi():
+        return None
+    try:
+        yol = gunluk_dosyasi_yolu()
+        os.makedirs(os.path.dirname(yol), exist_ok=True)
+        dosya = open(yol, "a", encoding="utf-8", errors="replace", buffering=1)
+        dosya.write(f"\n{'=' * 60}\n{time.strftime('%d.%m.%Y %H:%M:%S')} - başlatıldı\n")
+        sys.stdout = dosya
+        sys.stderr = dosya
+        return yol
+    except OSError:
+        # Günlük açılamazsa da program çalışmaya devam etmeli
+        bos = open(os.devnull, "w", encoding="utf-8")
+        sys.stdout = bos
+        sys.stderr = bos
+        return None
+
+
 def cikti_kodlamasini_ayarla() -> None:
     """
     Ekran çıktısının Türkçe karakterlerde çökmemesini sağlar.
@@ -695,6 +742,8 @@ def komut_arayuz(secenekler) -> int:
         kapi=secenekler.kapi,
         tarayici_ac=not secenekler.tarayici_yok,
         cikti_klasoru=secenekler.cikti,
+        penceresiz=penceresiz_mi(),
+        gunluk_yolu=getattr(secenekler, "_gunluk_yolu", None),
     )
 
 
@@ -974,6 +1023,24 @@ def _boru_hatasi_mi(hata: BaseException) -> bool:
     return isinstance(hata, OSError) and hata.errno in (errno.EPIPE, errno.EINVAL)
 
 
+def _hatayi_bildir(ileti: str, gunluk_yolu: Optional[str] = None) -> None:
+    """
+    Hatayı kullanıcıya ulaştırır.
+
+    Konsol varsa yazdırır; pencere kipinde okunacak bir konsol olmadığı
+    için Windows uyarı kutusu gösterir.
+    """
+    print(f"\nHATA: {ileti}\n", file=sys.stderr)
+    if not penceresiz_mi():
+        return
+    from .sunucu import _pencere_uyarisi
+
+    tam = ileti
+    if gunluk_yolu:
+        tam += f"\n\nAyrıntılar için günlük dosyası:\n{gunluk_yolu}"
+    _pencere_uyarisi("Kot Karelajı - hata", tam)
+
+
 def _pencereyi_acik_tut() -> None:
     """
     Paketlenmiş uygulamada hata iletisinin okunabilmesi için bekler.
@@ -981,7 +1048,7 @@ def _pencereyi_acik_tut() -> None:
     Çift tıklayarak açılan bir konsol penceresi, program bitince hemen
     kapanır ve kullanıcı hatayı göremez.
     """
-    if not paketlenmis_mi():
+    if not paketlenmis_mi() or penceresiz_mi():
         return
     try:
         input("\nKapatmak için Enter tuşuna basın... ")
@@ -990,6 +1057,7 @@ def _pencereyi_acik_tut() -> None:
 
 
 def main(argumanlar: Optional[Sequence[str]] = None) -> int:
+    gunluk_yolu = cikti_akislarini_hazirla()
     cikti_kodlamasini_ayarla()
     ham = list(argumanlar if argumanlar is not None else sys.argv[1:])
     bilinen_komutlar = {"uret", "sistemler", "kaynaklar", "donustur", "onbellek", "arayuz"}
@@ -1001,13 +1069,14 @@ def main(argumanlar: Optional[Sequence[str]] = None) -> int:
 
     cozumleyici = cozumleyici_olustur()
     secenekler = cozumleyici.parse_args(ham)
+    setattr(secenekler, "_gunluk_yolu", gunluk_yolu)
     if not getattr(secenekler, "islev", None):
         cozumleyici.print_help()
         return 1
     try:
         return secenekler.islev(secenekler)
     except KullanimHatasi as hata:
-        print(f"\nHATA: {hata}\n", file=sys.stderr)
+        _hatayi_bildir(str(hata), gunluk_yolu)
         _pencereyi_acik_tut()
         return 2
     except UnicodeEncodeError as hata:
@@ -1023,11 +1092,11 @@ def main(argumanlar: Optional[Sequence[str]] = None) -> int:
         _pencereyi_acik_tut()
         return 2
     except (ValueError, KaynakHatasi) as hata:
-        print(f"\nHATA: {hata}\n", file=sys.stderr)
+        _hatayi_bildir(str(hata), gunluk_yolu)
         _pencereyi_acik_tut()
         return 2
     except FileNotFoundError as hata:
-        print(f"\nHATA: Dosya bulunamadı: {hata}\n", file=sys.stderr)
+        _hatayi_bildir(f"Dosya bulunamadı: {hata}", gunluk_yolu)
         _pencereyi_acik_tut()
         return 2
     except KeyboardInterrupt:
@@ -1040,6 +1109,6 @@ def main(argumanlar: Optional[Sequence[str]] = None) -> int:
         import traceback
 
         traceback.print_exc()
-        print(f"\nBEKLENMEYEN HATA: {hata}\n", file=sys.stderr)
+        _hatayi_bildir(f"Beklenmeyen hata: {hata}", gunluk_yolu)
         _pencereyi_acik_tut()
         return 1

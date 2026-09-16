@@ -66,8 +66,9 @@ Alan seç  →  Aralık ver  →  Kot oku  →  NCN / DXF / KML / CSV + teknik r
 `KotKarelaji.exe`. Bakınız: [Windows uygulaması (exe)](#windows-uygulaması-exe).
 
 **2. Çift tıklanan başlatıcı (Python gerekir).** Depoyu indirin,
-`kot-karelaj` klasöründeki **`baslat.bat`** dosyasına çift tıklayın. Arayüz
-tarayıcıda açılır.
+`kot-karelaj` klasöründeki **`Baslat.vbs`** dosyasına çift tıklayın. Komut
+penceresi açılmadan arayüz tarayıcıda gelir. Komut penceresini görmek
+isterseniz `baslat.bat` dosyasını kullanın.
 
 **3. Komut satırı (Python gerekir).**
 
@@ -105,9 +106,17 @@ Depoya her gönderimde GitHub Actions bu dosyayı kendiliğinden üretir:
 4. Sayfanın altındaki **Artifacts** bölümünden **`KotKarelaji-windows`**
    dosyasını indirin ve ZIP'i açın.
 
-İçinden `KotKarelaji.exe` çıkar. Çift tıklayın; siyah bir konsol penceresi
-açılır ve tarayıcıda harita arayüzü gelir. Pencereyi kapatmak uygulamayı
-kapatır.
+ZIP'in içinden iki dosya çıkar:
+
+| Dosya | Ne zaman? |
+|---|---|
+| **`KotKarelaji.exe`** | Günlük kullanım. Çift tıklayın, **komut penceresi açılmaz**, doğrudan tarayıcıda harita arayüzü gelir |
+| `KotKarelaji-konsol.exe` | Komut satırı kullanımı. Aynı programdır, çıktıyı komut penceresine yazar |
+
+Penceresiz sürümü kapatmak için arayüzdeki sağ üstteki **Uygulamayı kapat**
+düğmesini kullanın. Konsolu olmadığı için ekran çıktısı
+`Belgeler\Kot Karelaji\kot-karelaji-gunluk.txt` dosyasına yazılır; bir
+sorun çıkarsa oraya bakın. Ölümcül hatalar ayrıca uyarı kutusuyla bildirilir.
 
 ### Kendiniz üretmek
 
@@ -127,8 +136,11 @@ pyinstaller paketle/kot-karelaj.spec --noconfirm --clean
 |---|---|
 | Çift tıklama | Harita arayüzü açılır (`arayuz` komutu varsayılır) |
 | Çıktı klasörü | `Belgeler\Kot Karelaji` (Python sürümünde bulunulan klasördeki `cikti`) |
-| Komut satırı | `KotKarelaji.exe uret --alan saha.kml --aralik 25` gibi tüm komutlar çalışır |
-| Hata | İleti yazılır ve pencere "Enter'a basın" diyerek açık kalır |
+| Komut satırı | `KotKarelaji-konsol.exe uret --alan saha.kml --aralik 25` gibi tüm komutlar çalışır |
+| Kapatma | Arayüzdeki **Uygulamayı kapat** düğmesi. Tarayıcı sekmesi kapatılıp unutulursa uygulama yarım saat sonra kendiliğinden kapanır |
+| Kapı meşgulse | Sıradaki boş kapı kendiliğinden seçilir; arayüz yine açılır |
+| Hata (penceresiz) | Uyarı kutusu çıkar, ayrıntı günlük dosyasına yazılır |
+| Hata (konsollu) | İleti yazılır ve pencere "Enter'a basın" diyerek açık kalır |
 
 > Uygulama imzalı değildir. Windows SmartScreen "Bilinmeyen yayımcı" uyarısı
 > verirse **Daha fazla bilgi > Yine de çalıştır** deyin. Kurum
@@ -934,7 +946,8 @@ python -m unittest discover -s testler -v     # 92 test
 ```
 kot-karelaj/
 ├── karelaj.py              Hızlı başlatıcı
-├── baslat.bat              Windows'ta çift tıklayarak arayüzü açar
+├── Baslat.vbs              Çift tıklayınca komut penceresiz açar
+├── baslat.bat              Komut penceresiyle açar (hata ayıklama için)
 ├── paketle/                Windows uygulaması (.exe) üretme dosyaları
 │   ├── kot-karelaj.spec    PyInstaller tanımı
 │   ├── exe-olustur.bat     Çift tıklayarak exe üretir
