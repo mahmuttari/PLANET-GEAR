@@ -184,7 +184,7 @@
         <div id="grup-google" class="gizli">
           <label for="google-anahtar">Google API anahtarı</label>
           <input type="text" id="google-anahtar" placeholder="AIza...">
-          <p class="yardim">Anahtar yalnızca bu bilgisayardan Google'a gider, hiçbir yere kaydedilmez.</p>
+          <p class="yardim" id="google-anahtar-bilgi">Anahtar yalnızca bu bilgisayardan Google'a gider, hiçbir yere kaydedilmez.</p>
         </div>
         <div id="grup-yerel" class="gizli">
           <label for="sym">SYM dosyası veya karo klasörü (sunucudaki yol)</label>
@@ -922,6 +922,13 @@ async function baslat() {
     const np = $("ncn-profil");
     veri.ncn_profilleri.forEach(p => np.appendChild(new Option(`${p.kod} — ${p.duzen}`, p.kod)));
     np.value = "netcad";
+    if (veri.google_anahtari_ortamda) {
+      $("google-anahtar").placeholder = "boş bırakın — ortam değişkeninden okunacak";
+      $("google-anahtar-bilgi").innerHTML =
+        "<b>GOOGLE_ELEVATION_ANAHTARI</b> ortam değişkeni tanımlı. Bu kutuyu boş " +
+        "bırakırsanız anahtar oradan okunur. Farklı bir anahtar kullanmak isterseniz " +
+        "buraya yazın.";
+    }
   } catch (hata) {
     ipucuGoster("Sunucu bilgileri alınamadı: " + hata.message, 5000);
   }

@@ -850,6 +850,22 @@ class KaynakTesti(unittest.TestCase):
         finally:
             kaynak.kapat()
 
+    def test_google_anahtari_ortam_degiskeninden(self):
+        """Anahtar verilmezse ortam değişkeninden okunmalı."""
+        eski = os.environ.get("GOOGLE_ELEVATION_ANAHTARI")
+        try:
+            os.environ["GOOGLE_ELEVATION_ANAHTARI"] = "AIzaORTAMDAN"
+            kaynak = kaynak_olustur("google")
+            self.assertEqual(kaynak.api_anahtari, "AIzaORTAMDAN")
+            # Açıkça verilen anahtar ortam değişkenini ezer
+            kaynak2 = kaynak_olustur("google", google_anahtari="AIzaACIKCA")
+            self.assertEqual(kaynak2.api_anahtari, "AIzaACIKCA")
+        finally:
+            if eski is None:
+                os.environ.pop("GOOGLE_ELEVATION_ANAHTARI", None)
+            else:
+                os.environ["GOOGLE_ELEVATION_ANAHTARI"] = eski
+
     def test_kaynak_olustur_hatalari(self):
         with self.assertRaises(KaynakHatasi):
             kaynak_olustur("yok-boyle")

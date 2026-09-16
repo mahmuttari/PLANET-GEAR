@@ -230,6 +230,12 @@ def _baslangic_verisi() -> Dict[str, Any]:
         ],
         "onbellek_yolu": varsayilan_onbellek_yolu(),
         "onizleme_azami": ONIZLEME_AZAMI_NOKTA,
+        # Yalnızca "ayarlı mı" bilgisi gönderilir; anahtarın kendisi asla
+        # tarayıcıya verilmez.
+        "google_anahtari_ortamda": bool(
+            os.environ.get("GOOGLE_ELEVATION_ANAHTARI")
+            or os.environ.get("GOOGLE_ELEVATION_API_KEY")
+        ),
     }
 
 
