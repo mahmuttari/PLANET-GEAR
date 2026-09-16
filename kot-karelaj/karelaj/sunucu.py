@@ -66,7 +66,7 @@ URETIM_AZAMI_NOKTA = 200000
 # Penceresiz (konsolsuz) çalışmada tarayıcı sekmesi kapatıldığında sunucunun
 # arkada asılı kalmaması için yaşam sinyali izlenir.
 YASAM_ZAMAN_ASIMI_SN = 1800.0
-_yasam = {"son": time.time()}
+_yasam = {"son": time.time(), "penceresiz": False}
 
 
 class ArayuzHatasi(Exception):
@@ -243,7 +243,7 @@ def _baslangic_verisi() -> Dict[str, Any]:
         ],
         "onbellek_yolu": varsayilan_onbellek_yolu(),
         "onizleme_azami": ONIZLEME_AZAMI_NOKTA,
-        "penceresiz": sys.stdout is None,
+        "penceresiz": bool(_yasam["penceresiz"]),
         # Yalnızca "ayarlı mı" bilgisi gönderilir; anahtarın kendisi asla
         # tarayıcıya verilmez.
         "google_anahtari_ortamda": bool(
@@ -603,6 +603,7 @@ def arayuzu_baslat(
             _pencere_uyarisi("Kot Karelajı", ileti)
         return 2
 
+    _yasam["penceresiz"] = penceresiz
     isleyici = type("_YapilandirilmisIsleyici", (_Isleyici,), {"cikti_klasoru": cikti_klasoru})
     try:
         sunucu = _bos_kapi_ile_sunucu(adres, kapi, isleyici)
@@ -637,6 +638,7 @@ def arayuzu_baslat(
     except (AttributeError, ValueError, OSError):
         pass
 
+    _yasam["penceresiz"] = penceresiz
     if penceresiz:
         _yasam["son"] = time.time()
         _bekci_baslat(sunucu)

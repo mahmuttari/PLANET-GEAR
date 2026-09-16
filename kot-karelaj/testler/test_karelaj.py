@@ -1499,6 +1499,37 @@ class CliTesti(unittest.TestCase):
         self.assertIn("ITRF96-TM30", icerik)
         self.assertIn("başlatıldı", icerik)
 
+    def test_penceresiz_bayragi_yonlendirmeden_sonra_korunur(self):
+        """
+        Pencere kipinde çıktı günlük dosyasına yönlendirildikten sonra da
+        uygulama kendini penceresiz bilmelidir.
+
+        Tek belirti stdout/stderr'ın None olmasıdır; yönlendirme bu belirtiyi
+        sildiği için durum önceden saptanıp saklanır. Saklanmazsa arayüz
+        kapatma düğmesini göstermez ve süreç arkada asılı kalır.
+        """
+        from karelaj import cli
+
+        eski_cikti, eski_hata = sys.stdout, sys.stderr
+        eski_durum = cli._penceresiz
+        try:
+            sys.stdout = None
+            sys.stderr = None
+            self.assertTrue(cli.penceresiz_durumunu_sabitle())
+            # Günlük dosyasına yönlendirilmiş gibi davran
+            sys.stdout = io.StringIO()
+            sys.stderr = io.StringIO()
+            self.assertTrue(
+                cli.penceresiz_mi(),
+                "yönlendirme sonrası pencere kipi bilgisi kaybolmamalı",
+            )
+        finally:
+            sys.stdout, sys.stderr = eski_cikti, eski_hata
+            cli._penceresiz = eski_durum
+
+        # Konsollu çalışmada durum yeniden saptanınca False olmalı
+        self.assertFalse(cli.penceresiz_durumunu_sabitle())
+
     def test_boru_erken_kapanirsa(self):
         """
         Çıktı borusu erken kapandığında (``... | more`` gibi) program

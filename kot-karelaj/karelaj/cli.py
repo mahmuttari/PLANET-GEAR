@@ -67,15 +67,38 @@ BICIMLER = ("ncn", "csv", "xyz", "dxf", "kml", "geojson", "rapor")
 VARSAYILAN_BICIMLER = "ncn,kml,rapor"
 
 
+_penceresiz: Optional[bool] = None
+
+
+def penceresiz_durumunu_sabitle() -> bool:
+    """
+    Konsolsuz çalışıp çalışmadığımızı saptar ve saklar.
+
+    Bu saptama, çıktı akışları değiştirilmeden **önce** yapılmak
+    zorundadır: pencere kipinin tek belirtisi ``sys.stdout`` ve
+    ``sys.stderr`` değerlerinin ``None`` olmasıdır ve bu akışlar hemen
+    ardından günlük dosyasıyla değiştirildiğinde belirti kaybolur.
+    ``main`` her çağrıldığında yeniden saptanır.
+    """
+    global _penceresiz
+    _penceresiz = sys.stdout is None or sys.stderr is None
+    return _penceresiz
+
+
 def penceresiz_mi() -> bool:
     """
     Uygulama konsolsuz (pencere kipinde) mi çalışıyor?
 
-    PyInstaller ile ``console=False`` seçeneğiyle paketlenen Windows
-    uygulamalarında ``sys.stdout`` ve ``sys.stderr`` ``None`` olur; tek
-    güvenilir belirti budur.
+    Akışlar **şu anda** boşsa kesinlikle pencere kipindeyiz. Değilse,
+    ``penceresiz_durumunu_sabitle`` ile önceden saptanmış değer geçerlidir:
+    pencere kipinde akışlar günlük dosyasıyla değiştirildiği için sonradan
+    bakıldığında boş görünmezler.
     """
-    return sys.stdout is None or sys.stderr is None
+    if sys.stdout is None or sys.stderr is None:
+        return True
+    if _penceresiz is not None:
+        return _penceresiz
+    return False
 
 
 def gunluk_dosyasi_yolu() -> str:
@@ -1057,6 +1080,8 @@ def _pencereyi_acik_tut() -> None:
 
 
 def main(argumanlar: Optional[Sequence[str]] = None) -> int:
+    # Akışlar değiştirilmeden önce pencere kipi saptanmalıdır.
+    penceresiz_durumunu_sabitle()
     gunluk_yolu = cikti_akislarini_hazirla()
     cikti_kodlamasini_ayarla()
     ham = list(argumanlar if argumanlar is not None else sys.argv[1:])
