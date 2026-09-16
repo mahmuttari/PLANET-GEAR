@@ -66,9 +66,11 @@ jobs:
           $cikti | ForEach-Object { Write-Host $_ }
           if (-not ($cikti -match "495\.001")) { throw "donusum sonucu beklenen degerde degil" }
 
-          # Ornek alandan gercek uretim
+          # Ornek alandan gercek uretim. Netcad duzenini uctan uca sinamak
+          # icin bolu isaretli nokta numarasi ve nokta kodu da verilir.
           & $exe uret --alan ornekler\izmit-ornek-saha.kml --aralik 100 `
               --kaynak yerel --sym ornekler\ornek-sym.asc --dem-sistemi ITRF96-TM30 `
+              --no-profil satir-sutun --no-ayirac / --kod KARELAJ `
               --bicim ncn,csv,dxf,kml,rapor -c "$env:RUNNER_TEMP\sinama" --ad sinama
           if ($LASTEXITCODE -ne 0) { throw "uret komutu basarisiz" }
 
@@ -78,7 +80,13 @@ jobs:
           Write-Host "NCN satir sayisi: $($satirlar.Count)"
           Write-Host "Ilk satir: $($satirlar[0])"
           if ($satirlar.Count -lt 100) { throw "NCN dosyasi beklenenden kisa" }
-          if ($satirlar[0].Split(",").Count -ne 5) { throw "NCN sutun sayisi 5 degil" }
+
+          # Netcad duzeni:  1/13 494900.00 4515400.00 87.92 0 "KARELAJ" "" ""
+          $desen = '^\d+/\d+ \d+\.\d{2} \d+\.\d{2} -?\d+\.\d{2} 0 "KARELAJ" "" ""$'
+          $bozuk = $satirlar | Where-Object { $_ -notmatch $desen }
+          if ($bozuk) { throw "NCN duzeni beklenen bicimde degil: $($bozuk[0])" }
+          if ($satirlar[0].Split(" ").Count -ne 8) { throw "NCN alan sayisi 8 degil" }
+          Write-Host "NCN duzeni Netcad bicimiyle uyumlu ($($satirlar.Count) satir)."
 
           # Konsollu surumde harita arayuzu aciliyor mu?
           $is = Start-Process -FilePath $exe -ArgumentList "arayuz","--kapi","8791","--tarayici-yok" -PassThru
