@@ -508,12 +508,16 @@ Google Cloud konsolunda **Faturalandırma > Bütçeler ve uyarılar**
 2. Bütçeye bir ad verin (örn. "Elevation API aylık sınır").
 3. **Kapsam** bölümünde Elevation API'yi etkinleştirdiğiniz projeyi seçin.
    Tüm projeleri değil, yalnızca o projeyi seçmek daha isabetli uyarı verir.
-   Aynı ekrandaki **Servisler** filtresini **boş bırakın**; zorunlu değildir
-   ve boş bırakıldığında bütçe projedeki tüm harcamayı kapsar.
-4. **Tutar** bölümüne aylık üst sınırınızı yazın (örn. 200 TL).
-5. **Eylemler** bölümünde eşikleri işaretleyin: %50, %90, %100. Her eşikte
-   faturalandırma yöneticilerine e-posta gider.
-6. **Bitir** deyin.
+4. Aynı ekrandaki **Servisler** filtresine `elevat` yazıp çıkan
+   **Maps Elevation API** kaydını işaretleyin, **Tamam** deyin. Böylece bütçe
+   yalnızca bu servisin harcamasını izler; aynı projede başka işler de
+   varsa onlar bütçeye karışmaz. Liste boş çıkıyorsa API henüz
+   etkinleştirilmemiş demektir; filtreyi boş bırakıp önce API'yi
+   etkinleştirin.
+5. **Tutar** (*Amount*) bölümüne aylık üst sınırınızı yazın (örn. 200 TL).
+6. **Eylemler** (*Actions*) bölümünde eşikleri işaretleyin: %50, %90, %100.
+   Her eşikte faturalandırma yöneticilerine e-posta gider.
+7. **Kaydet** (*Save*) deyin.
 
 Önemli: bütçe dolduğunda Google **hizmeti kapatmaz**, yalnızca e-posta
 gönderir. Gerçek tavan için ikinci adım gerekir.
