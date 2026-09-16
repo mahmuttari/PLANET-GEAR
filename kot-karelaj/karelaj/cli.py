@@ -65,6 +65,30 @@ BICIMLER = ("ncn", "csv", "xyz", "dxf", "kml", "geojson", "rapor")
 VARSAYILAN_BICIMLER = "ncn,kml,rapor"
 
 
+def paketlenmis_mi() -> bool:
+    """Program, PyInstaller ile tek dosyalık bir uygulama olarak mı çalışıyor?"""
+    return bool(getattr(sys, "frozen", False))
+
+
+def varsayilan_cikti_klasoru() -> str:
+    """
+    Çıktıların yazılacağı varsayılan klasör.
+
+    Kaynak koddan çalışırken bulunulan klasörün altındaki ``cikti``
+    kullanılır. Paketlenmiş uygulamada ise program Masaüstünden ya da
+    Program Files içinden çalıştırılabileceği için, kullanıcının
+    Belgeler klasörü altında sabit ve yazılabilir bir yer seçilir.
+    """
+    if not paketlenmis_mi():
+        return "cikti"
+    ev = os.path.expanduser("~")
+    for ad in ("Documents", "Belgeler"):
+        aday = os.path.join(ev, ad)
+        if os.path.isdir(aday):
+            return os.path.join(aday, "Kot Karelaji")
+    return os.path.join(ev, "Kot Karelaji")
+
+
 class KullanimHatasi(Exception):
     """Kullanıcı girdisi hatalı olduğunda."""
 
@@ -725,7 +749,10 @@ def _uret_seceneklerini_ekle(a: argparse.ArgumentParser) -> None:
     g.add_argument("--kot-yok", action="store_true", help="Kot okuma; yalnızca nokta konumlarını üret.")
 
     g = a.add_argument_group("Çıktı")
-    g.add_argument("-c", "--cikti", default="cikti", metavar="KLASOR", help="Çıktı klasörü (varsayılan: cikti).")
+    g.add_argument(
+        "-c", "--cikti", default=varsayilan_cikti_klasoru(), metavar="KLASOR",
+        help=f"Çıktı klasörü (varsayılan: {varsayilan_cikti_klasoru()}).",
+    )
     g.add_argument("--ad", default=None, metavar="AD", help="Çıktı dosyalarının temel adı.")
     g.add_argument(
         "--bicim", default=VARSAYILAN_BICIMLER, metavar="LISTE",
@@ -825,17 +852,36 @@ def cozumleyici_olustur() -> argparse.ArgumentParser:
     arayuz.add_argument("--kapi", type=int, default=8777, metavar="N", help="Dinlenecek kapı (varsayılan: 8777).")
     arayuz.add_argument("--adres", default="127.0.0.1", metavar="ADRES", help="Dinlenecek adres (varsayılan: 127.0.0.1).")
     arayuz.add_argument("--tarayici-yok", action="store_true", help="Tarayıcıyı kendiliğinden açma.")
-    arayuz.add_argument("-c", "--cikti", default="cikti", metavar="KLASOR", help="Çıktı klasörü.")
+    arayuz.add_argument(
+        "-c", "--cikti", default=varsayilan_cikti_klasoru(), metavar="KLASOR",
+        help="Çıktı klasörü.",
+    )
     arayuz.set_defaults(islev=komut_arayuz)
 
     return ana
 
 
+def _pencereyi_acik_tut() -> None:
+    """
+    Paketlenmiş uygulamada hata iletisinin okunabilmesi için bekler.
+
+    Çift tıklayarak açılan bir konsol penceresi, program bitince hemen
+    kapanır ve kullanıcı hatayı göremez.
+    """
+    if not paketlenmis_mi():
+        return
+    try:
+        input("\nKapatmak için Enter tuşuna basın... ")
+    except (EOFError, KeyboardInterrupt):
+        pass
+
+
 def main(argumanlar: Optional[Sequence[str]] = None) -> int:
     ham = list(argumanlar if argumanlar is not None else sys.argv[1:])
     bilinen_komutlar = {"uret", "sistemler", "kaynaklar", "donustur", "onbellek", "arayuz"}
-    if ham and ham[0] not in bilinen_komutlar and not ham[0].startswith("-"):
-        pass
+    if not ham and paketlenmis_mi():
+        # Uygulamaya çift tıklandığında doğrudan harita arayüzünü aç
+        ham = ["arayuz"]
     elif ham and ham[0].startswith("-") and ham[0] not in ("-h", "--help"):
         ham.insert(0, "uret")  # komut verilmediyse 'uret' varsay
 
@@ -848,13 +894,23 @@ def main(argumanlar: Optional[Sequence[str]] = None) -> int:
         return secenekler.islev(secenekler)
     except KullanimHatasi as hata:
         print(f"\nHATA: {hata}\n", file=sys.stderr)
+        _pencereyi_acik_tut()
         return 2
     except (ValueError, KaynakHatasi) as hata:
         print(f"\nHATA: {hata}\n", file=sys.stderr)
+        _pencereyi_acik_tut()
         return 2
     except FileNotFoundError as hata:
         print(f"\nHATA: Dosya bulunamadı: {hata}\n", file=sys.stderr)
+        _pencereyi_acik_tut()
         return 2
     except KeyboardInterrupt:
         print("\nİşlem kullanıcı tarafından durduruldu.", file=sys.stderr)
         return 130
+    except Exception as hata:  # paketlenmiş uygulamada izlemeyi göster
+        import traceback
+
+        traceback.print_exc()
+        print(f"\nBEKLENMEYEN HATA: {hata}\n", file=sys.stderr)
+        _pencereyi_acik_tut()
+        return 1

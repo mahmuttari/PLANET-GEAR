@@ -67,6 +67,19 @@ class ArayuzHatasi(Exception):
 
 
 def _web_dosyasi(ad: str) -> str:
+    """
+    Arayüz dosyasının tam yolunu verir.
+
+    PyInstaller ile tek dosyalık ``.exe`` hâline getirildiğinde paketin
+    içeriği geçici bir klasöre açılır ve bu klasörün yolu ``sys._MEIPASS``
+    ile bildirilir. Kaynak koddan çalışırken böyle bir değişken olmadığı
+    için modülün kendi klasörüne bakılır.
+    """
+    paket_koku = getattr(sys, "_MEIPASS", None)
+    if paket_koku:
+        aday = os.path.join(paket_koku, "karelaj", "web", ad)
+        if os.path.exists(aday):
+            return aday
     return os.path.join(os.path.dirname(os.path.abspath(__file__)), "web", ad)
 
 
@@ -517,6 +530,9 @@ def arayuzu_baslat(
     print(f"  Çıktı klasörü: {os.path.abspath(cikti_klasoru)}")
     print("  Durdurmak için Ctrl+C")
     print("=" * 66)
+    # Paketlenmiş uygulamada ya da çıktı bir dosyaya yönlendirildiğinde
+    # arabellek nedeniyle adresin geç görünmemesi için hemen boşaltılır.
+    sys.stdout.flush()
 
     if tarayici_ac:
         threading.Timer(0.6, lambda: webbrowser.open(baglanti)).start()

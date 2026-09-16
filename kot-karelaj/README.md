@@ -17,8 +17,10 @@ Alan seç  →  Aralık ver  →  Kot oku  →  NCN / DXF / KML / CSV + teknik r
 
 - [Öne çıkanlar](#öne-çıkanlar)
 - [Kurulum](#kurulum)
+- [Windows uygulaması (exe)](#windows-uygulaması-exe)
 - [Hızlı başlangıç](#hızlı-başlangıç)
 - [Harita arayüzü](#harita-arayüzü)
+- [Google Earth ile birlikte çalışma](#google-earth-ile-birlikte-çalışma)
 - [Çalışma alanının tanımlanması](#çalışma-alanının-tanımlanması)
 - [Karelaj parametreleri](#karelaj-parametreleri)
 - [Koordinat sistemleri](#koordinat-sistemleri)
@@ -58,13 +60,27 @@ Alan seç  →  Aralık ver  →  Kot oku  →  NCN / DXF / KML / CSV + teknik r
 
 ## Kurulum
 
-Gereksinim: **Python 3.8 veya üzeri**. Başka hiçbir şey gerekmez.
+Üç kullanım yolu var. Kurum bilgisayarında en kolayı birincisidir.
+
+**1. Hazır Windows uygulaması (Python gerekmez).** Tek dosyalık
+`KotKarelaji.exe`. Bakınız: [Windows uygulaması (exe)](#windows-uygulaması-exe).
+
+**2. Çift tıklanan başlatıcı (Python gerekir).** Depoyu indirin,
+`kot-karelaj` klasöründeki **`baslat.bat`** dosyasına çift tıklayın. Arayüz
+tarayıcıda açılır.
+
+**3. Komut satırı (Python gerekir).**
 
 ```bash
 git clone <bu-depo>
 cd PLANET-GEAR/kot-karelaj
 python karelaj.py --help
 ```
+
+Python yolunu kullanacaksanız gereksinim **Python 3.8 veya üzeridir**; başka
+hiçbir şey kurulmaz. Windows'ta `python` komutu tanınmıyorsa `py` deneyin.
+Python kurulu değilse python.org'dan kurun ve kurulum ekranındaki
+**"Add Python to PATH"** kutusunu işaretleyin.
 
 İsteğe bağlı olarak sisteme kurulabilir (`karelaj` komutu her yerden çalışır):
 
@@ -73,10 +89,55 @@ pip install .
 karelaj --help
 ```
 
+## Windows uygulaması (exe)
+
+Kurulum, Python ve yönetici yetkisi gerektirmeyen tek dosyalık bir uygulama
+üretilebilir. Dosyayı USB belleğe kopyalayıp başka bir bilgisayarda da
+çalıştırabilirsiniz.
+
+### Hazır dosyayı indirmek
+
+Depoya her gönderimde GitHub Actions bu dosyayı kendiliğinden üretir:
+
+1. GitHub'da depoyu açın, üstteki **Actions** sekmesine girin.
+2. Soldan **"Windows uygulaması (.exe) oluştur"** iş akışını seçin.
+3. En üstteki başarılı (yeşil tikli) çalışmaya tıklayın.
+4. Sayfanın altındaki **Artifacts** bölümünden **`KotKarelaji-windows`**
+   dosyasını indirin ve ZIP'i açın.
+
+İçinden `KotKarelaji.exe` çıkar. Çift tıklayın; siyah bir konsol penceresi
+açılır ve tarayıcıda harita arayüzü gelir. Pencereyi kapatmak uygulamayı
+kapatır.
+
+### Kendiniz üretmek
+
+İnternet kısıtlıysa ya da dosyayı kendiniz derlemek isterseniz, `kot-karelaj`
+klasöründeki **`paketle\exe-olustur.bat`** dosyasına çift tıklayın. Betik
+PyInstaller'ı kurar, uygulamayı paketler ve `kot-karelaj\dist\KotKarelaji.exe`
+dosyasını üretir. Elle yapmak isterseniz:
+
+```bash
+pip install pyinstaller
+pyinstaller paketle/kot-karelaj.spec --noconfirm --clean
+```
+
+### Uygulamanın davranışı
+
+| Durum | Ne olur |
+|---|---|
+| Çift tıklama | Harita arayüzü açılır (`arayuz` komutu varsayılır) |
+| Çıktı klasörü | `Belgeler\Kot Karelaji` (Python sürümünde bulunulan klasördeki `cikti`) |
+| Komut satırı | `KotKarelaji.exe uret --alan saha.kml --aralik 25` gibi tüm komutlar çalışır |
+| Hata | İleti yazılır ve pencere "Enter'a basın" diyerek açık kalır |
+
+> Uygulama imzalı değildir. Windows SmartScreen "Bilinmeyen yayımcı" uyarısı
+> verirse **Daha fazla bilgi > Yine de çalıştır** deyin. Kurum
+> bilgisayarlarında uygulama beyaz listesi varsa BT biriminden izin gerekebilir.
+
 ## Hızlı başlangıç
 
 **Yol 1 — Harita arayüzü (en kolay).** Tarayıcıda uydu görüntüsü üzerinde alan
-çizip indirirsiniz:
+çizip indirirsiniz. `KotKarelaji.exe` dosyasına çift tıklayın, ya da:
 
 ```bash
 python karelaj.py arayuz
@@ -122,6 +183,58 @@ Harita için hiçbir dış JavaScript kütüphanesi kullanılmaz (Leaflet, Googl
 Maps API vb. yoktur); yalnızca uydu görüntüsü döşemeleri internetten çekilir.
 İnternet erişimi yoksa arayüz yine açılır, harita boş görünür ama koordinat
 girerek ve yerel SYM kullanarak çalışmayı sürdürebilirsiniz.
+
+## Google Earth ile birlikte çalışma
+
+Google Earth Pro'nun eklenti (plugin) desteği yoktur; içine düğme eklenemez.
+Bunun yerine iki program arasında **KML dosyasıyla gidip gelinir**. Pratikte
+tek tıklık bir akıştır ve gündelik kullanımda fazlasıyla yeterlidir.
+
+### 1. Alanı Google Earth'te çizip araca vermek
+
+1. Google Earth Pro'da sahayı ekrana getirin.
+2. Üstteki araç çubuğundan **Poligon Ekle** düğmesine basın (sarı beşgen
+   simge). Açılan pencereye bir ad yazın, sonra haritada köşeleri tıklayarak
+   alanı çizin ve **Tamam** deyin.
+3. Sol taraftaki **Yerlerim** listesinde oluşan öğeye sağ tıklayın,
+   **Yeri Farklı Kaydet** deyin ve **`.kml`** olarak kaydedin.
+4. Kot Karelajı'nın harita arayüzünde bu dosyayı **haritanın üzerine
+   sürükleyip bırakın**. Alan yüklenir, harita kendiliğinden oraya gider.
+
+Komut satırını kullanıyorsanız aynı dosyayı doğrudan verin:
+
+```bash
+python karelaj.py uret --alan "C:\Users\adiniz\Desktop\saha.kml" --aralik 25
+```
+
+> Google Earth bir dosyada birden çok yer işareti tutabilir. Tek bir tanesini
+> kullanmak isterseniz `--alan-katman "Saha adı"` ile adını verin.
+
+### 2. Sonucu Google Earth'te denetlemek
+
+Çıktı biçimleri arasında **KML** işaretliyse (varsayılan olarak işaretlidir),
+üretilen `.kml` dosyasına çift tıklayın. Google Earth açılır ve şunları
+gösterir:
+
+- Çalışma alanı sınırı (kırmızı poligon),
+- Karelaj noktaları (her birine tıklayınca nokta numarası, Y, X, Z ve
+  koordinat sistemi görünür),
+- Varsa eş yükselti eğrileri, arazi yüzeyine giydirilmiş olarak.
+
+Bu, **noktaların doğru yere oturduğunu gözle denetlemenin en hızlı yoludur**.
+Netcad'e aktarmadan önce bu adımı atlamayın; yanlış dilim ya da yanlış datum
+seçimi burada hemen görülür.
+
+Dosyayı kalıcı tutmak isterseniz Google Earth'te **Yerlerim** altına
+sürükleyin; program her açıldığında yüklü gelir.
+
+### 3. Kot değerleri hakkında
+
+Google Earth'ün ekranın altında gösterdiği yükseklik ile bu aracın yazdığı kot
+aynı kaynaktan gelmez; araç varsayılan olarak OpenTopoData'yı kullanır.
+Birebir Google Earth arazi verisini istiyorsanız kaynak olarak **Google
+Elevation API**'yi seçin ve kendi API anahtarınızı girin. Bu, Google verisine
+erişmenin resmî ve lisanslı yoludur.
 
 ## Çalışma alanının tanımlanması
 
@@ -579,6 +692,11 @@ python -m unittest discover -s testler -v     # 92 test
 ```
 kot-karelaj/
 ├── karelaj.py              Hızlı başlatıcı
+├── baslat.bat              Windows'ta çift tıklayarak arayüzü açar
+├── paketle/                Windows uygulaması (.exe) üretme dosyaları
+│   ├── kot-karelaj.spec    PyInstaller tanımı
+│   ├── exe-olustur.bat     Çift tıklayarak exe üretir
+│   └── kot-karelaj.ico     Uygulama simgesi
 ├── pyproject.toml          Paket tanımı (kurulum isteğe bağlı)
 ├── karelaj/
 │   ├── cli.py              Komut satırı arayüzü

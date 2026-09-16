@@ -4,7 +4,7 @@ Bu depo, birbirinden bağımsız çalışan araçları barındırır.
 
 | Araç | Klasör | Ne yapar? |
 |---|---|---|
-| **Kot Karelajı** | [`kot-karelaj/`](kot-karelaj/) | Seçilen alandan belirli aralıklarla kot karelajı üretir; noktaları **Netcad NCN**, DXF, KML, CSV ve teknik rapor olarak verir. Python, harici bağımlılık yok. |
+| **Kot Karelajı** | [`kot-karelaj/`](kot-karelaj/) | Seçilen alandan belirli aralıklarla kot karelajı üretir; noktaları **Netcad NCN**, DXF, KML, CSV ve teknik rapor olarak verir. Windows için kurulum gerektirmeyen `KotKarelaji.exe` sürümü GitHub Actions'ta üretilir. |
 | **WhatsApp Masraf Fiş/Dekont İndirici** | bu klasör | Bir WhatsApp grubundaki tüm PDF ve resim biçimindeki masraf fişlerini indirir. Node.js. |
 
 ---

@@ -1,0 +1,121 @@
+name: Windows uygulaması (.exe) oluştur
+
+# Kot karelajı aracının Windows'ta kurulum gerektirmeden çalışan tek
+# dosyalık sürümünü üretir. Üretilen dosya, çalışmanın "Artifacts"
+# bölümünden indirilir.
+
+on:
+  push:
+    branches:
+      - "**"
+    paths:
+      - "kot-karelaj/**"
+      - ".github/workflows/windows-exe.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows-exe:
+    name: KotKarelaji.exe
+    runs-on: windows-latest
+
+    steps:
+      - name: Depoyu al
+        uses: actions/checkout@v4
+
+      - name: Python kur
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Testleri çalıştır
+        working-directory: kot-karelaj
+        run: python -m unittest discover -s testler -v
+
+      - name: PyInstaller kur
+        run: python -m pip install --upgrade pip pyinstaller
+
+      - name: Uygulamayı paketle
+        working-directory: kot-karelaj
+        run: python -m PyInstaller paketle/kot-karelaj.spec --noconfirm --clean
+
+      - name: Üretilen uygulamayı sına
+        working-directory: kot-karelaj
+        shell: pwsh
+        run: |
+          $exe = "dist\KotKarelaji.exe"
+          if (-not (Test-Path $exe)) { throw "KotKarelaji.exe olusmadi" }
+          Write-Host "Boyut: $([math]::Round((Get-Item $exe).Length / 1MB, 2)) MB"
+
+          # Alt komutlar calisiyor mu?
+          & $exe sistemler | Select-Object -First 3
+          if ($LASTEXITCODE -ne 0) { throw "sistemler komutu basarisiz" }
+          & $exe donustur "40.7654,29.9408"
+          if ($LASTEXITCODE -ne 0) { throw "donustur komutu basarisiz" }
+
+          # Ornek alandan gercek uretim
+          & $exe uret --alan ornekler\izmit-ornek-saha.kml --aralik 100 `
+              --kaynak yerel --sym ornekler\ornek-sym.asc --dem-sistemi ITRF96-TM30 `
+              --bicim ncn,csv,dxf,kml,rapor -c "$env:RUNNER_TEMP\sinama" --ad sinama
+          if ($LASTEXITCODE -ne 0) { throw "uret komutu basarisiz" }
+
+          $ncn = "$env:RUNNER_TEMP\sinama\sinama.ncn"
+          if (-not (Test-Path $ncn)) { throw "NCN dosyasi olusmadi" }
+          $satirlar = Get-Content $ncn
+          Write-Host "NCN satir sayisi: $($satirlar.Count)"
+          Write-Host "Ilk satir: $($satirlar[0])"
+          if ($satirlar.Count -lt 100) { throw "NCN dosyasi beklenenden kisa" }
+          if ($satirlar[0].Split(",").Count -ne 5) { throw "NCN sutun sayisi 5 degil" }
+
+          # Harita arayuzu aciliyor mu?
+          $is = Start-Process -FilePath $exe -ArgumentList "arayuz","--kapi","8791","--tarayici-yok" -PassThru
+          Start-Sleep -Seconds 6
+          try {
+            $yanit = Invoke-WebRequest -Uri "http://127.0.0.1:8791/" -UseBasicParsing -TimeoutSec 20
+            if ($yanit.StatusCode -ne 200) { throw "Arayuz yanit vermedi" }
+            Write-Host "Arayuz yaniti: HTTP $($yanit.StatusCode), $($yanit.Content.Length) bayt"
+            $api = Invoke-WebRequest -Uri "http://127.0.0.1:8791/api/baslangic" -UseBasicParsing -TimeoutSec 20
+            if ($api.StatusCode -ne 200) { throw "API yanit vermedi" }
+          } finally {
+            Stop-Process -Id $is.Id -Force -ErrorAction SilentlyContinue
+          }
+          Write-Host "Tum sinamalar basarili."
+
+      - name: Kullanım notunu ekle
+        working-directory: kot-karelaj
+        shell: pwsh
+        run: |
+          @"
+          KOT KARELAJI - Windows uygulamasi
+          =================================
+
+          KotKarelaji.exe dosyasina cift tiklayin. Tarayicida harita
+          arayuzu acilir. Alani cizin, araligi secin, "Uret ve indir"
+          dugmesine basin.
+
+          Uretilen dosyalar: Belgeler\Kot Karelaji
+
+          Kurulum gerekmez, Python gerekmez. Dosyayi USB bellege kopyalayip
+          baska bir bilgisayarda da calistirabilirsiniz.
+
+          Komut satirindan kullanmak isterseniz:
+            KotKarelaji.exe uret --alan saha.kml --aralik 25
+            KotKarelaji.exe --help
+
+          Ornek alan dosyalari ve ornek sayisal yukseklik modeli, depodaki
+          kot-karelaj\ornekler klasorundedir.
+
+          Ayrintili kullanim: kot-karelaj\README.md
+          "@ | Out-File -FilePath "dist\OKUBENI.txt" -Encoding utf8
+
+      - name: Uygulamayı yükle
+        uses: actions/upload-artifact@v4
+        with:
+          name: KotKarelaji-windows
+          path: |
+            kot-karelaj/dist/KotKarelaji.exe
+            kot-karelaj/dist/OKUBENI.txt
+          retention-days: 90
+          if-no-files-found: error
