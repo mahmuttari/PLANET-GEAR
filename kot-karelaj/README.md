@@ -429,8 +429,18 @@ Google Earth'ün gösterdiği yüzey ile aynı kaynaktan beslenir.
 4. Sol menüden **APIs & Services > Library** (*API'ler ve Hizmetler >
    Kitaplık*) yolunu izleyin, arama kutusuna **Elevation API** yazın, çıkan
    **Maps Elevation API** kaydına girip **Enable** (*Etkinleştir*) deyin.
+
+   > **Daha kısa yol:** Konsolun hamburger menüsünden (☰) doğrudan
+   > **Google Maps Platform** bölümüne girebilirsiniz. Bu bölümün kendi sol
+   > menüsünde **APIs & Services**, **Quotas** ve **Keys & Credentials**
+   > başlıkları yan yana durur; harita işleri için gereken her şey oradadır.
+   > **APIs & Services** sayfasında **PRODUCTS** süzgecinden **Maps**'i
+   > seçince **Elevation API** listede çıkar; sağındaki **Enable**
+   > bağlantısına basmanız yeter. **STATUS** süzgecinden **Enabled**'ı
+   > seçerek hangi API'lerin zaten açık olduğunu görebilirsiniz.
 5. **APIs & Services > Credentials** (*Kimlik Bilgileri*) sayfasına gidin.
-   **Create credentials > API key** deyin. Oluşan anahtarı kopyalayın
+   Google Maps Platform bölümündeyseniz aynı sayfanın adı
+   **Keys & Credentials**'tır. **Create credentials > API key** deyin. Oluşan anahtarı kopyalayın
    (`AIza...` ile başlar).
 > **En sık yapılan hata:** API anahtarı ile etkinleştirilen API'nin **aynı
 > projede** olması gerekir. Anahtarı bir projede oluşturup Elevation API'yi
