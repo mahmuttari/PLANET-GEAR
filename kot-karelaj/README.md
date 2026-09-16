@@ -689,30 +689,52 @@ Netcad'in nokta dosyası (`.ncn`), her satırı bir nokta olan düz metin bir
 dosyadır. Netcad'in **Nokta > Dosyadan Nokta Oku** penceresi sütun düzenini
 kullanıcıya seçtirdiği için, bu araç düzeni ayarlanabilir kılar.
 
-**Varsayılan çıktı** (`--ncn-profil netcad`):
+**Varsayılan çıktı** (`--ncn-profil netcad`) Netcad'in kendi yazdığı nokta
+dosyalarıyla birebir aynı düzendedir:
 
 ```
-1,494200.000,4513900.000,181.399,KARELAJ
-2,494225.000,4513900.000,185.245,KARELAJ
+1/4 429903.20 4064858.18 636.44 0 "YPA1" "" ""
+2/5 429894.98 4064863.90 632.89 0 "KDA" "" ""
 ```
 
-Sütunlar: `NoktaNo , Y (sağa değer) , X (yukarı değer) , Z (kot) , Kod`
+Sekiz alan, tek boşlukla ayrılır:
 
-- Ayırıcı **virgül**, ondalık ayırıcı **nokta**, satır sonu **CRLF**,
-  kodlama **cp1254** (Windows Türkçe). Netcad'in beklediği düzen budur.
-- Koordinatlar ve kot varsayılan olarak **3 ondalık** (milimetre) yazılır.
+| Sıra | Alan | Açıklama |
+|---|---|---|
+| 1 | NoktaNo | Nokta numarası |
+| 2 | Y | Sağa değer (easting), 2 ondalık |
+| 3 | X | Yukarı değer (northing), 2 ondalık |
+| 4 | Z | Kot, 2 ondalık |
+| 5 | KodNo | Netcad'in sayısal kod alanı; varsayılan `0` |
+| 6 | "Kod" | Nokta kodu, çift tırnak içinde |
+| 7 | "" | Boş açıklama alanı |
+| 8 | "" | Boş açıklama alanı |
+
+Satır sonu **CRLF**, kodlama **cp1254** (Windows Türkçe).
+
+**Nokta numarasındaki bölü işareti.** Netcad'in kesit dosyalarında numaralar
+`kesit/nokta` biçimindedir. Karelajda aynı görünümü satır/sütun numarasıyla
+elde edersiniz:
+
+```bash
+--no-profil satir-sutun --no-ayirac /
+```
+
+Bu, `1/13`, `2/9` gibi numaralar üretir. Varsayılan numaralandırma ise düz
+sıra numarasıdır (`1`, `2`, `3` ...).
 
 ### Hazır profiller
 
-| `--ncn-profil` | Düzen | Ayırıcı |
-|---|---|---|
-| `netcad` (varsayılan) | `no y x z kod` | virgül |
-| `netcad-bosluk` | `no y x z kod` | boşluk, sabit genişlik |
-| `no-y-x-z` | `no y x z` | virgül |
-| `no-x-y-z-kod` | `no x y z kod` | virgül |
-| `y-x-z` | `y x z` | virgül |
-| `x-y-z` | `x y z` | virgül |
-| `ayrintili` | `no y x z kod enlem boylam` + başlık | virgül |
+| `--ncn-profil` | Düzen | Ayırıcı | Ondalık | Tırnak |
+|---|---|---|---|---|
+| `netcad` (varsayılan) | `no y x z kodno kod bos bos` | boşluk | 2 | var |
+| `netcad-virgul` | `no y x z kod` | virgül | 3 | yok |
+| `netcad-bosluk` | `no y x z kod` | boşluk, sabit genişlik | 3 | yok |
+| `no-y-x-z` | `no y x z` | virgül | 3 | yok |
+| `no-x-y-z-kod` | `no x y z kod` | virgül | 3 | yok |
+| `y-x-z` | `y x z` | virgül | 3 | yok |
+| `x-y-z` | `x y z` | virgül | 3 | yok |
+| `ayrintili` | `no y x z kod enlem boylam` + başlık | virgül | 3 | yok |
 
 ### Elle ayarlama
 
@@ -722,12 +744,16 @@ Sütunlar: `NoktaNo , Y (sağa değer) , X (yukarı değer) , Z (kot) , Kod`
 --ncn-ondalik 3                 # koordinat ondalık basamağı
 --ncn-ondalik-z 2               # kot ondalık basamağı
 --ncn-baslik                    # başlık satırı ekle
+--ncn-tirnak yok                # metin alanlarındaki tırnakları kaldır
+--ncn-kod-no 0                  # sayısal kod alanına yazılacak değer
 --ncn-kodlama utf-8             # varsayılan cp1254
 --ncn-satir-sonu lf             # varsayılan crlf
 ```
 
-Kullanılabilir sütunlar: `no`, `y`, `x`, `z`, `kod`, `enlem`, `boylam`,
-`satir`, `sutun`, `aciklama`.
+Kullanılabilir sütunlar: `no`, `y`, `x`, `z`, `kod`, `kodno`, `bos`,
+`enlem`, `boylam`, `satir`, `sutun`, `aciklama`. Bunlardan `kodno` sayısal
+kod alanını, `bos` ise boş bir alanı yazar; `kod`, `aciklama` ve `bos`
+sütunları tırnak açıkken çift tırnağa alınır.
 
 ### Kotu okunamayan noktalar
 

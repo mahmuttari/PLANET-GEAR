@@ -301,6 +301,7 @@ def komut_uret(secenekler) -> int:
         onek=secenekler.no_onek,
         baslangic=secenekler.no_baslangic,
         basamak=secenekler.no_basamak,
+        ayirac=secenekler.no_ayirac,
     )
     ayar = KarelajAyari(
         aralik=secenekler.aralik,
@@ -470,6 +471,8 @@ def _dosyalari_yaz(secenekler, karelaj, konturlar, sessiz: bool) -> List[str]:
             kotsuz=kotsuz,
             kodlama=secenekler.ncn_kodlama,
             satir_sonu=secenekler.ncn_satir_sonu,
+            tirnak=secenekler.ncn_tirnak,
+            kod_no=secenekler.ncn_kod_no,
         )
         yol = os.path.join(secenekler.cikti, f"{temel}.ncn")
         adet = ncn_yaz(yol, karelaj.noktalar, ayar)
@@ -782,7 +785,15 @@ def _uret_seceneklerini_ekle(a: argparse.ArgumentParser) -> None:
     )
     g.add_argument("--no-onek", default="", metavar="METIN", help="Nokta numarası öneki.")
     g.add_argument("--no-baslangic", type=int, default=1, metavar="N", help="İlk nokta numarası.")
-    g.add_argument("--no-basamak", type=int, default=0, metavar="N", help="Numara basamak sayısı (sıfır dolgulu).")
+    g.add_argument(
+        "--no-basamak", type=int, default=0, metavar="N",
+        help="Numara basamak sayısı (sıfır dolgulu). 0 = dolgu yok.",
+    )
+    g.add_argument(
+        "--no-ayirac", default="-", metavar="KARAKTER",
+        help="satir-sutun/sutun-satir numaralarında ayırıcı (varsayılan: -). "
+             "Netcad kesit numaralarında / kullanılır.",
+    )
     g.add_argument("--kod", default="", metavar="METIN", help="Tüm noktalara yazılacak nokta kodu.")
     g.add_argument(
         "--azami-nokta", type=int, default=500000, metavar="N",
@@ -856,6 +867,14 @@ def _uret_seceneklerini_ekle(a: argparse.ArgumentParser) -> None:
     g.add_argument(
         "--ncn-kotsuz", choices=("atla", "sifir", "bos"), default=None,
         help="Kotu okunamayan noktalar: atla (varsayılan), sıfır yaz veya boş bırak.",
+    )
+    g.add_argument(
+        "--ncn-tirnak", default=None, metavar="KARAKTER",
+        help="Metin sütunlarını saracak tırnak karakteri; 'yok' ile kapatılır.",
+    )
+    g.add_argument(
+        "--ncn-kod-no", type=int, default=None, metavar="N",
+        help="NCN'deki sayısal kod alanına yazılacak değer (varsayılan: 0).",
     )
     g.add_argument("--ncn-kodlama", default=None, metavar="KODLAMA", help="Dosya kodlaması (varsayılan: cp1254).")
     g.add_argument("--ncn-satir-sonu", default=None, choices=("crlf", "lf"), help="Satır sonu (varsayılan: crlf).")

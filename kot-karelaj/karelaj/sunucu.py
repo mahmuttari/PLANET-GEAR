@@ -310,6 +310,7 @@ def _ayari_al(govde: Dict[str, Any], azami: int) -> KarelajAyari:
             onek=str(govde.get("no_onek") or ""),
             baslangic=int(baslangic),
             basamak=int(basamak),
+            ayirac=str(govde.get("no_ayirac") or "-"),
         ),
         nokta_kodu=str(govde.get("kod") or ""),
         azami_nokta=azami,

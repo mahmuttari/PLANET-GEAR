@@ -496,6 +496,20 @@ class IzgaraTesti(unittest.TestCase):
         self.assertTrue(all(n.no.startswith("K") for n in k.noktalar))
         self.assertRegex(k.noktalar[0].no, r"^K\d{2}-\d{2}$")
 
+        # basamak=0 -> sıfır dolgusu yok, ayırıcı seçilebilir (Netcad kesit
+        # numaralarındaki 1/2 biçimi)
+        k3 = karelaj_uret(
+            self.alan,
+            self.sistem,
+            KarelajAyari(
+                aralik=200.0,
+                numaralandirma=NumaralandirmaAyari(
+                    profil="satir-sutun", basamak=0, ayirac="/"
+                ),
+            ),
+        )
+        self.assertRegex(k3.noktalar[0].no, r"^\d+/\d+$")
+
         k2 = karelaj_uret(
             self.alan,
             self.sistem,
@@ -980,14 +994,42 @@ class YaziciTesti(unittest.TestCase):
         self.noktalar[2].kot = None
 
     def test_ncn_varsayilan_duzen(self):
+        """Varsayılan düzen Netcad'in kendi yazdığı biçimle aynı olmalı."""
         satirlar = ncn_satirlari(self.noktalar)
         self.assertEqual(len(satirlar), 2)  # kotsuz nokta atlanır
-        alanlar = satirlar[0].split(",")
-        self.assertEqual(len(alanlar), 5)
+        alanlar = satirlar[0].split(" ")
+        self.assertEqual(len(alanlar), 8)
         self.assertEqual(alanlar[0], "1-1")
-        self.assertAlmostEqual(float(alanlar[1]), 494000.0, places=3)  # Y = sağa
-        self.assertAlmostEqual(float(alanlar[2]), 4514000.0, places=3)  # X = yukarı
-        self.assertEqual(alanlar[4], "KARELAJ")
+        self.assertAlmostEqual(float(alanlar[1]), 494000.0, places=2)  # Y = sağa
+        self.assertAlmostEqual(float(alanlar[2]), 4514000.0, places=2)  # X = yukarı
+        self.assertEqual(alanlar[4], "0")  # sayısal kod alanı
+        self.assertEqual(alanlar[5], '"KARELAJ"')
+        self.assertEqual(alanlar[6], '""')
+        self.assertEqual(alanlar[7], '""')
+
+    def test_ncn_netcad_ornegiyle_birebir(self):
+        """
+        Netcad'in ürettiği gerçek bir dosyadan alınan satırlar, aynı
+        verilerle birebir yeniden üretilebilmeli.
+        """
+        ornekler = [
+            ("1/4", 429903.20, 4064858.18, 636.44, "YPA1",
+             '1/4 429903.20 4064858.18 636.44 0 "YPA1" "" ""'),
+            ("2/5", 429894.98, 4064863.90, 632.89, "KDA",
+             '2/5 429894.98 4064863.90 632.89 0 "KDA" "" ""'),
+            ("16/9", 429765.35, 4064920.00, 625.30, "DPO2",
+             '16/9 429765.35 4064920.00 625.30 0 "DPO2" "" ""'),
+            ("1/1", 429899.37, 4064851.80, 635.00, "YKO",
+             '1/1 429899.37 4064851.80 635.00 0 "YKO" "" ""'),
+        ]
+        noktalar = [
+            Nokta(no=no, saga=y, yukari=x, enlem=36.7, boylam=29.0,
+                  satir=0, sutun=0, kot=z, kod=kod)
+            for no, y, x, z, kod, _beklenen in ornekler
+        ]
+        uretilen = ncn_satirlari(noktalar, NCN_PROFILLERI["netcad"])
+        for satir, (_n, _y, _x, _z, _k, beklenen) in zip(uretilen, ornekler):
+            self.assertEqual(satir, beklenen)
 
     def test_ncn_profiller(self):
         for profil in NCN_PROFILLERI:
@@ -996,17 +1038,19 @@ class YaziciTesti(unittest.TestCase):
                 self.assertTrue(satirlar)
 
     def test_ncn_sutun_sirasi(self):
-        ayar = profil_coz("netcad", sutunlar="no,x,y,z")
+        ayar = profil_coz("netcad-virgul", sutunlar="no,x,y,z")
         alanlar = ncn_satirlari(self.noktalar, ayar)[0].split(",")
         self.assertAlmostEqual(float(alanlar[1]), 4514000.0, places=3)  # X önce
         self.assertAlmostEqual(float(alanlar[2]), 494000.0, places=3)
 
     def test_ncn_kotsuz_davranis(self):
-        self.assertEqual(len(ncn_satirlari(self.noktalar, profil_coz("netcad", kotsuz="atla"))), 2)
-        sifirli = ncn_satirlari(self.noktalar, profil_coz("netcad", kotsuz="sifir"))
+        self.assertEqual(
+            len(ncn_satirlari(self.noktalar, profil_coz("netcad-virgul", kotsuz="atla"))), 2
+        )
+        sifirli = ncn_satirlari(self.noktalar, profil_coz("netcad-virgul", kotsuz="sifir"))
         self.assertEqual(len(sifirli), 3)
         self.assertEqual(sifirli[2].split(",")[3], "0.000")
-        bos = ncn_satirlari(self.noktalar, profil_coz("netcad", kotsuz="bos"))
+        bos = ncn_satirlari(self.noktalar, profil_coz("netcad-virgul", kotsuz="bos"))
         self.assertEqual(bos[2].split(",")[3], "")
 
     def test_ncn_dosya_yazimi(self):
@@ -1016,11 +1060,13 @@ class YaziciTesti(unittest.TestCase):
         with open(yol, "rb") as f:
             ham = f.read()
         self.assertIn(b"\r\n", ham)  # Netcad Windows satır sonu bekler
-        self.assertTrue(ham.decode("cp1254").startswith("1-1,494000.000"))
+        self.assertTrue(ham.decode("cp1254").startswith("1-1 494000.00 4514000.00"))
 
     def test_ncn_hatali_ayar(self):
         with self.assertRaises(ValueError):
             profil_coz("netcad", sutunlar="no,olmayan")
+        self.assertEqual(profil_coz("netcad", tirnak="yok").tirnak, "")
+        self.assertEqual(profil_coz("netcad", kod_no=7).kod_no, 7)
         with self.assertRaises(ValueError):
             profil_coz("olmayan-profil")
         with self.assertRaises(ValueError):
@@ -1330,7 +1376,7 @@ class CliTesti(unittest.TestCase):
         with open(os.path.join(cikti, "deneme.ncn"), "rb") as f:
             satirlar = f.read().decode("cp1254").strip().splitlines()
         self.assertGreater(len(satirlar), 3)
-        self.assertEqual(len(satirlar[0].split(",")), 5)
+        self.assertEqual(len(satirlar[0].split(" ")), 8)
 
     def test_kot_yok(self):
         from karelaj.cli import main
@@ -1343,7 +1389,7 @@ class CliTesti(unittest.TestCase):
         self.assertEqual(kod, 0)
         with open(os.path.join(cikti, "a.ncn"), "rb") as f:
             ilk = f.read().decode("cp1254").splitlines()[0]
-        self.assertEqual(ilk.split(",")[3], "0.000")
+        self.assertEqual(ilk.split(" ")[3], "0.00")
 
     def test_hatali_sinir(self):
         from karelaj.cli import main

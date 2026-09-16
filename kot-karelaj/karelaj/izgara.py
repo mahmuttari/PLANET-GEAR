@@ -93,17 +93,21 @@ class NumaralandirmaAyari:
     onek: str = ""
     baslangic: int = 1
     basamak: int = 0
+    """Sıfır dolgulu basamak sayısı. ``0`` verilirse dolgu yapılmaz
+    (``1/2``); ``3`` verilirse ``001/002`` biçiminde yazılır."""
     ayirac: str = "-"
+    """``satir-sutun`` ve ``sutun-satir`` profillerinde iki sayıyı ayıran
+    karakter. Netcad'in kesit nokta numaralarında ``/`` kullanılır."""
 
     def uret(self, sira: int, satir: int, sutun: int) -> str:
         if self.profil == "sira":
             n = self.baslangic + sira
             govde = str(n).zfill(self.basamak) if self.basamak else str(n)
         elif self.profil == "satir-sutun":
-            b = self.basamak or 3
+            b = self.basamak
             govde = f"{str(satir + 1).zfill(b)}{self.ayirac}{str(sutun + 1).zfill(b)}"
         elif self.profil == "sutun-satir":
-            b = self.basamak or 3
+            b = self.basamak
             govde = f"{str(sutun + 1).zfill(b)}{self.ayirac}{str(satir + 1).zfill(b)}"
         else:
             raise ValueError(f"Bilinmeyen numaralandırma profili: {self.profil!r}")

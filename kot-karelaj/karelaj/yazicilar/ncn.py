@@ -8,9 +8,18 @@ bir dosyadır. Netcad'in **Nokta > Dosyadan Nokta Oku** penceresi sütun
 düzenini kullanıcıya seçtirdiği için, yaygın kullanılan tek bir düzen
 yerine bu yazıcı düzeni ayarlanabilir kılar.
 
-Varsayılan düzen, Türkiye'deki ölçme uygulamasında en yaygın olanıdır::
+Varsayılan düzen, Netcad'in kendi yazdığı nokta dosyalarıyla aynıdır::
 
-    NoktaNo , Y (sağa değer) , X (yukarı değer) , Z (kot) , Kod
+    NoktaNo  Y(sağa)  X(yukarı)  Z(kot)  KodNo  "Kod"  ""  ""
+    1/4 429903.20 4064858.18 636.44 0 "YPA1" "" ""
+
+Alanlar tek boşlukla ayrılır, koordinatlar ve kot iki ondalık basamakla
+yazılır, metin alanları çift tırnak içine alınır. ``KodNo`` alanı Netcad'in
+sayısal kod alanıdır ve varsayılan olarak ``0`` yazılır. Sondaki iki boş
+tırnaklı alan Netcad'in ayırdığı ek açıklama alanlarıdır.
+
+Virgülle ayrılmış eski düzen ``netcad-virgul`` profiliyle üretilir::
+
     1,494200.000,4513900.000,181.399,KARELAJ
 
 Burada **Y sağa değer (easting)**, **X yukarı değer (northing)** anlamına
@@ -41,7 +50,12 @@ SUTUN_BASLIKLARI: Dict[str, str] = {
     "satir": "Satir",
     "sutun": "Sutun",
     "aciklama": "Aciklama",
+    "kodno": "KodNo",
+    "bos": "Bos",
 }
+
+# Tırnak kullanıldığında tırnağa alınacak (metin) sütunlar
+TIRNAKLANACAK = ("kod", "aciklama", "bos")
 
 AYIRACLAR: Dict[str, str] = {
     "virgul": ",",
@@ -55,10 +69,12 @@ AYIRACLAR: Dict[str, str] = {
 class NcnAyari:
     """Netcad NCN yazım ayarları."""
 
-    sutunlar: List[str] = field(default_factory=lambda: ["no", "y", "x", "z", "kod"])
-    ayirac: str = ","
-    ondalik_xy: int = 3
-    ondalik_z: int = 3
+    sutunlar: List[str] = field(
+        default_factory=lambda: ["no", "y", "x", "z", "kodno", "kod", "bos", "bos"]
+    )
+    ayirac: str = " "
+    ondalik_xy: int = 2
+    ondalik_z: int = 2
     ondalik_derece: int = 8
     baslik_satiri: bool = False
     sabit_genislik: bool = False
@@ -66,6 +82,11 @@ class NcnAyari:
     kotsuz_davranis: str = "atla"
     """``"atla"`` (varsayılan), ``"sifir"`` (0.000 yaz) veya ``"bos"``."""
     kodsuz_metin: str = ""
+    tirnak: str = '"' 
+    """Metin sütunlarını saracak tırnak karakteri. Boş bırakılırsa tırnak
+    kullanılmaz. Netcad'in yazdığı dosyalarda çift tırnak kullanılır."""
+    kod_no: int = 0
+    """``kodno`` sütununa yazılacak tamsayı (Netcad'in sayısal kod alanı)."""
     kodlama: str = "cp1254"
     """Netcad Windows Türkçe (cp1254) kodlamasını bekler; ``utf-8`` de seçilebilir."""
 
@@ -88,15 +109,29 @@ class NcnAyari:
 
 
 # Hazır profiller
+def _virgullu(sutunlar: List[str], **ekler) -> NcnAyari:
+    """Virgülle ayrılmış, üç ondalıklı, tırnaksız klasik düzen."""
+    temel = dict(
+        sutunlar=sutunlar, ayirac=",", ondalik_xy=3, ondalik_z=3, tirnak=""
+    )
+    temel.update(ekler)
+    return NcnAyari(**temel)
+
+
 NCN_PROFILLERI: Dict[str, NcnAyari] = {
+    # Netcad'in kendi yazdığı düzen (varsayılan):
+    #   1/4 429903.20 4064858.18 636.44 0 "YPA1" "" ""
     "netcad": NcnAyari(),
-    "netcad-bosluk": NcnAyari(ayirac=" ", sabit_genislik=True),
-    "no-y-x-z": NcnAyari(sutunlar=["no", "y", "x", "z"]),
-    "no-x-y-z-kod": NcnAyari(sutunlar=["no", "x", "y", "z", "kod"]),
-    "y-x-z": NcnAyari(sutunlar=["y", "x", "z"]),
-    "x-y-z": NcnAyari(sutunlar=["x", "y", "z"]),
-    "ayrintili": NcnAyari(
-        sutunlar=["no", "y", "x", "z", "kod", "enlem", "boylam"], baslik_satiri=True
+    "netcad-virgul": _virgullu(["no", "y", "x", "z", "kod"]),
+    "netcad-bosluk": _virgullu(
+        ["no", "y", "x", "z", "kod"], ayirac=" ", sabit_genislik=True
+    ),
+    "no-y-x-z": _virgullu(["no", "y", "x", "z"]),
+    "no-x-y-z-kod": _virgullu(["no", "x", "y", "z", "kod"]),
+    "y-x-z": _virgullu(["y", "x", "z"]),
+    "x-y-z": _virgullu(["x", "y", "z"]),
+    "ayrintili": _virgullu(
+        ["no", "y", "x", "z", "kod", "enlem", "boylam"], baslik_satiri=True
     ),
 }
 
@@ -124,7 +159,19 @@ def _hucre(nokta, sutun: str, ayar: NcnAyari) -> str:
         return str(nokta.sutun + 1)
     if sutun == "aciklama":
         return nokta.kaynak or ""
+    if sutun == "kodno":
+        return str(ayar.kod_no)
+    if sutun == "bos":
+        return ""
     raise ValueError(f"Bilinmeyen NCN sütunu: {sutun!r}")
+
+
+def _hucre_bicimli(nokta, sutun: str, ayar: NcnAyari) -> str:
+    """Hücreyi üretir ve gerekiyorsa tırnağa alır."""
+    deger = _hucre(nokta, sutun, ayar)
+    if ayar.tirnak and sutun in TIRNAKLANACAK:
+        return f"{ayar.tirnak}{deger}{ayar.tirnak}"
+    return deger
 
 
 def ncn_satirlari(noktalar: Sequence, ayar: Optional[NcnAyari] = None) -> List[str]:
@@ -139,7 +186,7 @@ def ncn_satirlari(noktalar: Sequence, ayar: Optional[NcnAyari] = None) -> List[s
     ]
 
     tablo: List[List[str]] = [
-        [_hucre(n, s, ayar) for s in ayar.sutunlar] for n in yazilacak
+        [_hucre_bicimli(n, s, ayar) for s in ayar.sutunlar] for n in yazilacak
     ]
 
     if ayar.sabit_genislik and tablo:
@@ -151,7 +198,7 @@ def ncn_satirlari(noktalar: Sequence, ayar: Optional[NcnAyari] = None) -> List[s
                 max(g, len(SUTUN_BASLIKLARI[ayar.sutunlar[i]]))
                 for i, g in enumerate(genislikler)
             ]
-        sayisal = {"y", "x", "z", "satir", "sutun"}
+        sayisal = {"y", "x", "z", "satir", "sutun", "kodno"}
         def bicimle(satir: List[str]) -> str:
             parcalar = []
             for i, deger in enumerate(satir):
@@ -210,6 +257,8 @@ def profil_coz(
     kotsuz: Optional[str] = None,
     kodlama: Optional[str] = None,
     satir_sonu: Optional[str] = None,
+    tirnak: Optional[str] = None,
+    kod_no: Optional[int] = None,
 ) -> NcnAyari:
     """Komut satırı seçeneklerinden ``NcnAyari`` üretir."""
     temel = NCN_PROFILLERI.get(profil)
@@ -228,6 +277,8 @@ def profil_coz(
         sabit_genislik=temel.sabit_genislik,
         satir_sonu=temel.satir_sonu,
         kotsuz_davranis=temel.kotsuz_davranis,
+        tirnak=temel.tirnak,
+        kod_no=temel.kod_no,
         kodlama=temel.kodlama,
     )
     if sutunlar:
@@ -246,5 +297,9 @@ def profil_coz(
         ayar.kodlama = kodlama
     if satir_sonu:
         ayar.satir_sonu = {"crlf": "\r\n", "lf": "\n"}.get(satir_sonu.lower(), satir_sonu)
+    if tirnak is not None:
+        ayar.tirnak = "" if tirnak in ("yok", "none") else tirnak
+    if kod_no is not None:
+        ayar.kod_no = kod_no
     ayar.dogrula()
     return ayar
