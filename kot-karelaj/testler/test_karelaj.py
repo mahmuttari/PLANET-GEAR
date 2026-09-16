@@ -21,6 +21,7 @@ uygulaması bağımsız bir gerçeklemeye karşı sınanmış olur.
 from __future__ import annotations
 
 import base64
+import io
 import json
 import math
 import os
@@ -1358,6 +1359,28 @@ class CliTesti(unittest.TestCase):
         self.assertEqual(
             main(["onbellek", "--onbellek", os.path.join(self.klasor, "o.sqlite")]), 0
         )
+
+    def test_dar_kodlamali_cikti(self):
+        """
+        Türkçe karakter taşımayan bir çıktı kodlamasında (Windows'ta çıktı
+        dosyaya yönlendirildiğinde olduğu gibi) komutlar çökmemeli.
+        """
+        from karelaj.cli import main
+
+        for komut in (["sistemler"], ["kaynaklar"], ["donustur", "40.7654,29.9408"]):
+            with self.subTest(komut=komut[0]):
+                tampon = io.BytesIO()
+                dar = io.TextIOWrapper(tampon, encoding="cp1252", errors="strict")
+                eski_cikti, eski_hata = sys.stdout, sys.stderr
+                try:
+                    sys.stdout = dar
+                    sys.stderr = io.TextIOWrapper(
+                        io.BytesIO(), encoding="cp1252", errors="strict"
+                    )
+                    kod = main(komut)
+                finally:
+                    sys.stdout, sys.stderr = eski_cikti, eski_hata
+                self.assertEqual(kod, 0, f"{komut[0]} dar kodlamada başarısız oldu")
 
     def test_komut_verilmeden(self):
         """Komut yazılmadan seçenek verilirse 'uret' varsayılmalı."""

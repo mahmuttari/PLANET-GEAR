@@ -16,6 +16,7 @@ Komut satırı arayüzü
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import shlex
 import sys
@@ -63,6 +64,45 @@ from .yazicilar import (
 
 BICIMLER = ("ncn", "csv", "xyz", "dxf", "kml", "geojson", "rapor")
 VARSAYILAN_BICIMLER = "ncn,kml,rapor"
+
+
+def cikti_kodlamasini_ayarla() -> None:
+    """
+    Ekran çıktısının Türkçe karakterlerde çökmemesini sağlar.
+
+    Windows'ta çıktı bir konsola değil de dosyaya ya da boruya (pipe)
+    yönlendirildiğinde Python, sistemin yerel kod sayfasını kullanır.
+    Türkçe olmayan bir kod sayfasında (örn. cp1252) ``ğ``, ``ş``, ``İ``
+    gibi harfler kodlanamaz ve ``UnicodeEncodeError`` yükselir. Bu hata
+    ``ValueError`` alt sınıfı olduğundan sessizce "kullanım hatası" gibi
+    görünür.
+
+    Akışlar UTF-8'e ve ``replace`` hata davranışına ayarlanarak bu
+    tamamen önlenir. Windows konsolu zaten UTF-8 ile çalıştığı için
+    konsol çıktısında bir değişiklik olmaz.
+    """
+    for akis in (sys.stdout, sys.stderr):
+        if akis is None:
+            continue
+        try:
+            akis.reconfigure(encoding="utf-8", errors="replace")
+            continue
+        except (AttributeError, ValueError, OSError):
+            pass
+        # reconfigure yoksa akışı yeniden sarmalamayı dene
+        try:
+            tampon = getattr(akis, "buffer", None)
+            if tampon is None:
+                continue
+            sarmal = io.TextIOWrapper(
+                tampon, encoding="utf-8", errors="replace", line_buffering=True
+            )
+            if akis is sys.stdout:
+                sys.stdout = sarmal
+            else:
+                sys.stderr = sarmal
+        except (AttributeError, ValueError, OSError):
+            pass
 
 
 def paketlenmis_mi() -> bool:
@@ -877,6 +917,7 @@ def _pencereyi_acik_tut() -> None:
 
 
 def main(argumanlar: Optional[Sequence[str]] = None) -> int:
+    cikti_kodlamasini_ayarla()
     ham = list(argumanlar if argumanlar is not None else sys.argv[1:])
     bilinen_komutlar = {"uret", "sistemler", "kaynaklar", "donustur", "onbellek", "arayuz"}
     if not ham and paketlenmis_mi():
@@ -894,6 +935,18 @@ def main(argumanlar: Optional[Sequence[str]] = None) -> int:
         return secenekler.islev(secenekler)
     except KullanimHatasi as hata:
         print(f"\nHATA: {hata}\n", file=sys.stderr)
+        _pencereyi_acik_tut()
+        return 2
+    except UnicodeEncodeError as hata:
+        # Buraya normalde düşülmez; cikti_kodlamasini_ayarla() bunu önler.
+        # Yine de olursa, iletinin kendisi de yazılamayabileceği için
+        # yalnızca ASCII karakterlerle uyarılır.
+        print(
+            "\nHATA: Ekran ciktisi kodlanamadi "
+            f"({hata.encoding}). Cikti kodlamasini UTF-8 yapin: "
+            "set PYTHONIOENCODING=utf-8\n",
+            file=sys.stderr,
+        )
         _pencereyi_acik_tut()
         return 2
     except (ValueError, KaynakHatasi) as hata:

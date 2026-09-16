@@ -8,7 +8,7 @@ REM
 REM  Gereksinim: Python 3.8 veya uzeri
 REM ---------------------------------------------------------------------
 setlocal
-chcp 1254 >nul
+chcp 65001 >nul
 cd /d "%~dp0"
 title Kot Karelaji
 

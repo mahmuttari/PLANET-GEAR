@@ -8,7 +8,7 @@ REM
 REM  Gereksinim: Python 3.8+ ve internet erisimi (PyInstaller kurulumu icin)
 REM ---------------------------------------------------------------------
 setlocal
-chcp 1254 >nul
+chcp 65001 >nul
 cd /d "%~dp0\.."
 
 echo ============================================================
