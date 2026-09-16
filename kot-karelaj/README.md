@@ -428,6 +428,18 @@ Google Earth'ün gösterdiği yüzey ile aynı kaynaktan beslenir.
 5. **API'ler ve Hizmetler > Kimlik Bilgileri** sayfasına gidin.
    **Kimlik bilgileri oluştur > API anahtarı** deyin. Oluşan anahtarı
    kopyalayın (`AIza...` ile başlar).
+> **En sık yapılan hata:** API anahtarı ile etkinleştirilen API'nin **aynı
+> projede** olması gerekir. Anahtarı bir projede oluşturup Elevation API'yi
+> başka bir projede etkinleştirirseniz istekler `REQUEST_DENIED` döner.
+> Konsolun üst çubuğundaki proje adının her iki adımda da aynı olduğundan
+> emin olun.
+>
+> Elevation API'nin gerçekten etkin olup olmadığını **API'ler ve Hizmetler >
+> Etkin API'ler ve hizmetler** listesinden denetleyebilirsiniz. Bütçe
+> oluştururken çıkan "Services" (Servisler) filtresinde de yalnızca o
+> kapsamda kullanılan servisler listelenir; Elevation API orada
+> görünmüyorsa büyük olasılıkla henüz etkinleştirilmemiştir.
+
 6. Anahtarın yanındaki kalem simgesine basıp **kısıtlayın**:
    - **API kısıtlamaları**: "Anahtarı kısıtla" seçip yalnızca
      **Elevation API**'yi işaretleyin.
@@ -496,6 +508,8 @@ Google Cloud konsolunda **Faturalandırma > Bütçeler ve uyarılar**
 2. Bütçeye bir ad verin (örn. "Elevation API aylık sınır").
 3. **Kapsam** bölümünde Elevation API'yi etkinleştirdiğiniz projeyi seçin.
    Tüm projeleri değil, yalnızca o projeyi seçmek daha isabetli uyarı verir.
+   Aynı ekrandaki **Servisler** filtresini **boş bırakın**; zorunlu değildir
+   ve boş bırakıldığında bütçe projedeki tüm harcamayı kapsar.
 4. **Tutar** bölümüne aylık üst sınırınızı yazın (örn. 200 TL).
 5. **Eylemler** bölümünde eşikleri işaretleyin: %50, %90, %100. Her eşikte
    faturalandırma yöneticilerine e-posta gider.
@@ -797,7 +811,8 @@ python -m unittest discover -s testler -v
 |---|---|
 | `sunucuya erişilemedi` | Kurum vekil sunucusu (proxy) ayarlarını denetleyin. `HTTPS_PROXY` ortam değişkeni ayarlıysa araç bunu kendiliğinden kullanır. Erişim yoksa `--kaynak yerel` ile kendi SYM verinizi kullanın |
 | `HTTP 429` / işlem çok yavaş | OpenTopoData açık sunucusu saniyede 1 istek kabul eder. Aralığı büyütün, alanı küçültün ya da kurum içi sunucu kurun |
-| Google `REQUEST_DENIED` | Elevation API etkin mi, anahtar kısıtları uygun mu, faturalandırma açık mı denetleyin |
+| Google `REQUEST_DENIED` | Elevation API etkin mi, anahtar kısıtları uygun mu, faturalandırma açık mı denetleyin. En sık nedeni, anahtarın ve etkinleştirilen API'nin farklı projelerde olmasıdır |
+| Bütçe ekranındaki servis listesinde Elevation API yok | O projede henüz etkinleştirilmemiştir. **API'ler ve Hizmetler > Kitaplık** yolundan etkinleştirin |
 | `nokta sayısı güvenlik sınırını aşıyor` | Aralığı büyütün veya `--azami-nokta` değerini yükseltin. 1 km²'lik alanda 5 m aralık 40 000 nokta demektir |
 | NCN dosyası boş | Noktaların kotu okunamamış. `--ncn-kotsuz sifir` kullanın ya da kaynağın kapsama alanını denetleyin |
 | Netcad noktaları yanlış yere koyuyor | Netcad'deki "Nokta Oku" sütun eşlemesiyle `--ncn-sutun` düzeni aynı mı? Y sağa, X yukarı değerdir. Proje koordinat sistemi ile `--sistem` aynı mı? |
