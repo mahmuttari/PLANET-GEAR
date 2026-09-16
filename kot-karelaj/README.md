@@ -577,12 +577,37 @@ Düşürülecek iki değer:
 
 | Sınır | Öneri | Karşılığı |
 |---|---|---|
-| Günlük istek | 500 | Günde ~150.000 nokta; olağan kullanımın çok üstünde |
-| Dakikalık istek | 60 | Aracın varsayılan hızının üstünde, darboğaz yapmaz |
+| Günlük istek (*Requests per day*) | 300 | Günde ~90.000 nokta; olağan kullanımın çok üstünde |
+| Dakikalık istek (*Requests per minute*) | 60 | Aracın varsayılan hızının üstünde, darboğaz yapmaz |
 
 Sınır dolduğunda API `OVER_QUERY_LIMIT` ya da `OVER_DAILY_LIMIT` döner;
 araç bunu Türkçe bir iletiyle bildirir ve o noktaları kotsuz bırakır.
 Fatura büyümez.
+
+**Günlük sınır neden tam olarak 300?** Google Maps Platform'un Essentials
+katmanındaki her servis için aylık belirli sayıda ücretsiz çağrı hakkı
+vardır (bu yazının hazırlandığı sırada SKU başına aylık 10.000 çağrı).
+Günlük sınırı, **aylık azami toplam bu hakkın altında kalacak** şekilde
+seçerseniz en kötü durumda bile fatura sıfır olur:
+
+```
+300 istek/gün x 31 gün = 9.300 istek/ay  <  10.000 ücretsiz çağrı
+```
+
+Yani kota her gün sonuna kadar dolsa, anahtarınız sızsa, biri kötüye
+kullansa bile aylık ödemeniz **0** olur. Günlük sınırı 500 yaparsanız aylık
+azami 15.000 çağrıya çıkar; 5.000 çağrı ücretli olur ve Essentials
+katmanının 1.000 çağrı başına ücretiyle çarpılır.
+
+Ücretsiz çağrı hakkı ve birim fiyat zaman zaman değişir. Kendi hesabınıza
+uygulanan gerçek değerleri konsolda **Billing > Pricing** sayfasından
+görebilirsiniz; genel bilgi için
+[Google Maps Platform fiyatlandırma sayfasına](https://mapsplatform.google.com/pricing/)
+bakın. Ücretsiz hak değişirse günlük sınırı buna göre yeniden hesaplayın:
+
+```
+günlük sınır = aylık ücretsiz çağrı hakkı / 31  (aşağı yuvarlayın)
+```
 
 Bu iki ayarla, anahtarınız sızsa bile azami zarar önceden bellidir.
 
