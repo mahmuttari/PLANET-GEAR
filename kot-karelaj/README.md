@@ -407,16 +407,102 @@ kalkar.
 
 ### Google Elevation API
 
+Önce bir yanlış anlaşılmayı gidermek gerekir: **"Google Earth API" diye
+kullanılabilir bir servis yoktur.** Eskiden var olan Google Earth API
+(tarayıcı eklentisi) 2015'te kapatıldı. Google'ın arazi yüksekliği verisine
+bugün erişmenin yolu, Google Maps Platform bünyesindeki **Elevation API**'dir.
+Google Earth'ün gösterdiği yüzey ile aynı kaynaktan beslenir.
+
+#### Anahtar nasıl alınır
+
+1. [console.cloud.google.com](https://console.cloud.google.com) adresine
+   Google hesabınızla girin.
+2. Üstteki proje seçicisinden **Yeni Proje** oluşturun (örn. "ISU Kot
+   Karelaji") ve bu projeyi seçin.
+3. Sol menüden **Faturalandırma**'ya girip projeye bir faturalandırma hesabı
+   bağlayın. Elevation API, kullanım ücretsiz aralıkta kalsa bile
+   faturalandırma hesabı olmadan çalışmaz.
+4. Sol menüden **API'ler ve Hizmetler > Kitaplık** yolunu izleyin, arama
+   kutusuna **Elevation API** yazın, çıkan sonuca girip **Etkinleştir**
+   deyin.
+5. **API'ler ve Hizmetler > Kimlik Bilgileri** sayfasına gidin.
+   **Kimlik bilgileri oluştur > API anahtarı** deyin. Oluşan anahtarı
+   kopyalayın (`AIza...` ile başlar).
+6. Anahtarın yanındaki kalem simgesine basıp **kısıtlayın**:
+   - **API kısıtlamaları**: "Anahtarı kısıtla" seçip yalnızca
+     **Elevation API**'yi işaretleyin.
+   - **Uygulama kısıtlamaları**: **IP adresleri** seçip kurumunuzun dış IP
+     adresini yazın. Bu araç sunucu tarafından istek attığı için
+     "HTTP yönlendiren" (referrer) kısıtlaması **çalışmaz**.
+7. Kaydedin. Kısıtlamaların etkin olması birkaç dakika sürebilir.
+
+#### Anahtarı araca verme
+
+Üç yol vardır:
+
+**Harita arayüzünde:** Kot kaynağı olarak "Google Elevation API"yi seçin,
+açılan **Google API anahtarı** kutusuna yapıştırın.
+
+**Komut satırında:**
+
 ```bash
---kaynak google --google-anahtar ANAHTARINIZ
-# ya da ortam değişkeniyle:
-export GOOGLE_ELEVATION_ANAHTARI=...
+python karelaj.py uret --alan saha.kml --kaynak google --google-anahtar AIza...
 ```
 
-Google Cloud'da Elevation API'nin etkinleştirilmiş ve faturalandırmasının açık
-olması gerekir. Bu, Google Earth'te gördüğünüz arazi yüzeyinin **resmî ve
-lisanslı** erişim yoludur; araç Google Earth ekranını veya döşemelerini
-kazımaz.
+**Ortam değişkeniyle** (anahtarı her seferinde yazmamak için):
+
+```bash
+# Windows (PowerShell, yalnızca o pencere için)
+$env:GOOGLE_ELEVATION_ANAHTARI = "AIza..."
+
+# Windows (kalıcı)
+setx GOOGLE_ELEVATION_ANAHTARI "AIza..."
+
+# Linux / macOS
+export GOOGLE_ELEVATION_ANAHTARI="AIza..."
+```
+
+#### Maliyet ve kota
+
+Ücretlendirme **istek başınadır**, nokta başına değil. Bu araç varsayılan
+olarak **istek başına 300 nokta** gönderir (`--toplu` ile en çok 480'e
+çıkarılabilir). Buna göre:
+
+| Karelaj | Nokta sayısı | Gereken istek |
+|---|---|---|
+| 1 km² alan, 50 m aralık | ~400 | 2 |
+| 1 km² alan, 25 m aralık | ~1.600 | 6 |
+| 1 km² alan, 10 m aralık | ~10.000 | 34 |
+| 10 km² alan, 25 m aralık | ~16.000 | 54 |
+
+Google Maps Platform'un aylık ücretsiz kullanım hakkı ve birim fiyatları
+zaman zaman değişir; güncel değerleri
+[Google Maps Platform fiyatlandırma sayfasından](https://developers.google.com/maps/billing-and-pricing/pricing)
+denetleyin. Ayrıca Google Cloud konsolunda **Faturalandırma > Bütçeler ve
+uyarılar** bölümünden aylık bir üst sınır ve uyarı tanımlamanızı öneririm.
+
+Araç, okuduğu her kotu yerel önbelleğe yazar; aynı alanı yeniden
+çalıştırdığınızda o noktalar için tekrar istek atılmaz.
+
+#### Güvenlik
+
+- Anahtar bir paroladır. Depoya, ortak klasöre veya e-postaya koymayın.
+- Araç anahtarı **hiçbir çıktı dosyasına yazmaz**. Teknik rapordaki
+  "çalıştırılan komut" bölümünde bile `--google-anahtar ***` olarak
+  maskelenir.
+- Anahtar yalnızca sizin bilgisayarınızdan Google'a gider; arada başka bir
+  sunucu yoktur.
+- Kurum bilgisayarında kullanacaksanız anahtarı IP ile kısıtlamak, sızması
+  durumunda kötüye kullanımı engeller.
+
+#### Buna gerçekten gerek var mı?
+
+Çoğu durumda hayır. Google verisi de küresel bir modeldir ve Türkiye'de
+büyük ölçüde SRTM tabanlıdır; doğruluğu varsayılan OpenTopoData seçeneğinden
+belirgin biçimde daha iyi olmayabilir. Kesin kot gerektiren işlerde doğru
+yol, kurumun kendi hâlihazır SYM verisini kullanmaktır
+(`--kaynak yerel --sym ...`). Google seçeneği, özellikle "Google Earth'te
+gördüğüm kot ile aynısını istiyorum" denildiğinde anlamlıdır.
 
 ### Önbellek
 

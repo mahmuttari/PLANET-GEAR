@@ -50,10 +50,18 @@ jobs:
           Write-Host "Boyut: $([math]::Round((Get-Item $exe).Length / 1MB, 2)) MB"
 
           # Alt komutlar calisiyor mu?
-          & $exe sistemler | Select-Object -First 3
+          # Not: ciktiyi "| Select-Object -First N" ile kirpmayin; PowerShell
+          # ust surece dur sinyali gonderir ve $LASTEXITCODE bozulur.
+          $cikti = & $exe sistemler
           if ($LASTEXITCODE -ne 0) { throw "sistemler komutu basarisiz" }
-          & $exe donustur "40.7654,29.9408"
+          $cikti | Select-Object -First 3 | ForEach-Object { Write-Host $_ }
+          if ($cikti.Count -lt 30) { throw "sistemler ciktisi beklenenden kisa" }
+          if (-not ($cikti -match "ITRF96-TM30")) { throw "ITRF96-TM30 listelenmedi" }
+
+          $cikti = & $exe donustur "40.7654,29.9408"
           if ($LASTEXITCODE -ne 0) { throw "donustur komutu basarisiz" }
+          $cikti | ForEach-Object { Write-Host $_ }
+          if (-not ($cikti -match "495\.001")) { throw "donusum sonucu beklenen degerde degil" }
 
           # Ornek alandan gercek uretim
           & $exe uret --alan ornekler\izmit-ornek-saha.kml --aralik 100 `

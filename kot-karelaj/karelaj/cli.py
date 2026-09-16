@@ -16,6 +16,7 @@ Komut satırı arayüzü
 from __future__ import annotations
 
 import argparse
+import errno
 import io
 import os
 import shlex
@@ -533,8 +534,37 @@ def _dosyalari_yaz(secenekler, karelaj, konturlar, sessiz: bool) -> List[str]:
     return dosyalar
 
 
+# Raporda gizlenmesi gereken seçenekler
+GIZLI_SECENEKLER = ("--google-anahtar",)
+
+
 def _komut_metni() -> str:
-    return " ".join(shlex.quote(p) for p in sys.argv)
+    """
+    Çalıştırılan komutu rapora yazmak üzere biçimlendirir.
+
+    API anahtarı gibi gizli değerler maskelenir; rapor dosyası proje
+    klasöründe saklandığı, paylaşıldığı ve arşivlendiği için anahtarın
+    dosyaya düşmemesi gerekir.
+    """
+    parcalar: List[str] = []
+    gizle_sonraki = False
+    for parca in sys.argv:
+        if gizle_sonraki:
+            parcalar.append("***")
+            gizle_sonraki = False
+            continue
+        if parca in GIZLI_SECENEKLER:
+            parcalar.append(parca)
+            gizle_sonraki = True
+            continue
+        gizli_esit = next(
+            (s for s in GIZLI_SECENEKLER if parca.startswith(s + "=")), None
+        )
+        if gizli_esit:
+            parcalar.append(f"{gizli_esit}=***")
+            continue
+        parcalar.append(shlex.quote(parca))
+    return " ".join(parcalar)
 
 
 # ---------------------------------------------------------------------------
@@ -901,6 +931,30 @@ def cozumleyici_olustur() -> argparse.ArgumentParser:
     return ana
 
 
+def _boru_kapandi() -> None:
+    """
+    Çıktı borusu erken kapandığında kapanış uyarısını bastırır.
+
+    ``KotKarelaji.exe sistemler | more`` gibi bir kullanımda okuyan taraf
+    ilk sayfadan sonra çıkabilir. O noktadan sonra yazmaya çalışmak hata
+    verir ve Python, program kapanırken "Exception ignored" uyarısı basar.
+    Standart çıktı boş aygıta yönlendirilerek bu önlenir.
+    """
+    try:
+        bos = os.open(os.devnull, os.O_WRONLY)
+        os.dup2(bos, sys.stdout.fileno())
+    except (OSError, ValueError, AttributeError):
+        pass
+
+
+def _boru_hatasi_mi(hata: BaseException) -> bool:
+    """Hata, çıktı borusunun kapanmasından mı kaynaklanıyor?"""
+    if isinstance(hata, BrokenPipeError):
+        return True
+    # Windows kapanan boruyu bazen EINVAL ile bildirir
+    return isinstance(hata, OSError) and hata.errno in (errno.EPIPE, errno.EINVAL)
+
+
 def _pencereyi_acik_tut() -> None:
     """
     Paketlenmiş uygulamada hata iletisinin okunabilmesi için bekler.
@@ -961,6 +1015,9 @@ def main(argumanlar: Optional[Sequence[str]] = None) -> int:
         print("\nİşlem kullanıcı tarafından durduruldu.", file=sys.stderr)
         return 130
     except Exception as hata:  # paketlenmiş uygulamada izlemeyi göster
+        if _boru_hatasi_mi(hata):
+            _boru_kapandi()
+            return 0
         import traceback
 
         traceback.print_exc()

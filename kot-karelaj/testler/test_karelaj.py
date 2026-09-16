@@ -1382,6 +1382,50 @@ class CliTesti(unittest.TestCase):
                     sys.stdout, sys.stderr = eski_cikti, eski_hata
                 self.assertEqual(kod, 0, f"{komut[0]} dar kodlamada başarısız oldu")
 
+    def test_api_anahtari_rapora_yazilmaz(self):
+        """Komut satırında verilen API anahtarı rapora düz metin girmemeli."""
+        from karelaj.cli import _komut_metni
+
+        eski = sys.argv
+        try:
+            sys.argv = [
+                "karelaj", "uret", "--kaynak", "google",
+                "--google-anahtar", "AIzaGIZLIANAHTAR123", "--aralik", "25",
+            ]
+            metin = _komut_metni()
+            self.assertNotIn("AIzaGIZLIANAHTAR123", metin)
+            self.assertIn("--google-anahtar ***", metin)
+            self.assertIn("--aralik 25", metin)
+
+            sys.argv = ["karelaj", "uret", "--google-anahtar=AIzaGIZLIANAHTAR123"]
+            metin = _komut_metni()
+            self.assertNotIn("AIzaGIZLIANAHTAR123", metin)
+            self.assertIn("--google-anahtar=***", metin)
+        finally:
+            sys.argv = eski
+
+    def test_boru_erken_kapanirsa(self):
+        """
+        Çıktı borusu erken kapandığında (``... | more`` gibi) program
+        hata izlemesi basmadan sıfır dönmeli.
+        """
+        from karelaj.cli import main
+
+        class _KapaliBoru(io.TextIOBase):
+            def write(self, _metin):
+                raise BrokenPipeError(32, "Broken pipe")
+
+            def writable(self):
+                return True
+
+        eski_cikti = sys.stdout
+        try:
+            sys.stdout = _KapaliBoru()
+            kod = main(["sistemler"])
+        finally:
+            sys.stdout = eski_cikti
+        self.assertEqual(kod, 0)
+
     def test_komut_verilmeden(self):
         """Komut yazılmadan seçenek verilirse 'uret' varsayılmalı."""
         from karelaj.cli import main
