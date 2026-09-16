@@ -478,11 +478,49 @@ olarak **istek başına 300 nokta** gönderir (`--toplu` ile en çok 480'e
 Google Maps Platform'un aylık ücretsiz kullanım hakkı ve birim fiyatları
 zaman zaman değişir; güncel değerleri
 [Google Maps Platform fiyatlandırma sayfasından](https://developers.google.com/maps/billing-and-pricing/pricing)
-denetleyin. Ayrıca Google Cloud konsolunda **Faturalandırma > Bütçeler ve
-uyarılar** bölümünden aylık bir üst sınır ve uyarı tanımlamanızı öneririm.
+denetleyin.
 
 Araç, okuduğu her kotu yerel önbelleğe yazar; aynı alanı yeniden
 çalıştırdığınızda o noktalar için tekrar istek atılmaz.
+
+#### Harcamayı sınırlama: iki ayrı şey
+
+Bu ikisi karıştırılır ama farklı işler yapar. **İkisini birden kurun.**
+
+**1. Bütçe uyarısı — yalnızca haber verir, harcamayı durdurmaz.**
+
+Google Cloud konsolunda **Faturalandırma > Bütçeler ve uyarılar**
+(*Billing > Budgets & alerts*) yolunu izleyin:
+
+1. **Bütçe oluştur** (*Create budget*) düğmesine basın.
+2. Bütçeye bir ad verin (örn. "Elevation API aylık sınır").
+3. **Kapsam** bölümünde Elevation API'yi etkinleştirdiğiniz projeyi seçin.
+   Tüm projeleri değil, yalnızca o projeyi seçmek daha isabetli uyarı verir.
+4. **Tutar** bölümüne aylık üst sınırınızı yazın (örn. 200 TL).
+5. **Eylemler** bölümünde eşikleri işaretleyin: %50, %90, %100. Her eşikte
+   faturalandırma yöneticilerine e-posta gider.
+6. **Bitir** deyin.
+
+Önemli: bütçe dolduğunda Google **hizmeti kapatmaz**, yalnızca e-posta
+gönderir. Gerçek tavan için ikinci adım gerekir.
+
+**2. Kota sınırı — harcamayı fiilen durdurur.**
+
+**API'ler ve Hizmetler > Etkin API'ler ve hizmetler > Elevation API**
+yolunu izleyip **Kotalar ve sistem sınırları** (*Quotas & system limits*)
+sekmesine girin. Burada günlük ve dakikalık istek sınırlarını
+düşürebilirsiniz:
+
+| Sınır | Öneri | Karşılığı |
+|---|---|---|
+| Günlük istek | 500 | Günde ~150.000 nokta; olağan kullanımın çok üstünde |
+| Dakikalık istek | 60 | Aracın varsayılan hızının üstünde, darboğaz yapmaz |
+
+Sınır dolduğunda API `OVER_QUERY_LIMIT` ya da `OVER_DAILY_LIMIT` döner;
+araç bunu Türkçe bir iletiyle bildirir ve o noktaları kotsuz bırakır.
+Fatura büyümez.
+
+Bu iki ayarla, anahtarınız sızsa bile azami zarar önceden bellidir.
 
 #### Güvenlik
 
