@@ -46,6 +46,7 @@ from .kaynaklar import (
     KaynakHatasi,
     kaynak_olustur,
     kotlari_doldur,
+    yogunluk_uyarisi,
 )
 from .kontur import kontur_uret
 from .onbellek import KotOnbellegi, varsayilan_onbellek_yolu
@@ -358,8 +359,29 @@ def _dosya_adi(secenekler, alan: Alan) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _ncn_ayarini_coz(secenekler, kotsuz: Optional[str] = None):
+    return profil_coz(
+        secenekler.ncn_profil,
+        sutunlar=secenekler.ncn_sutun,
+        ayirac=secenekler.ncn_ayirac,
+        ondalik_xy=secenekler.ncn_ondalik,
+        ondalik_z=secenekler.ncn_ondalik_z,
+        baslik=True if secenekler.ncn_baslik else None,
+        kotsuz=kotsuz if kotsuz is not None else secenekler.ncn_kotsuz,
+        kodlama=secenekler.ncn_kodlama,
+        satir_sonu=secenekler.ncn_satir_sonu,
+        tirnak=secenekler.ncn_tirnak,
+        kod_no=secenekler.ncn_kod_no,
+    )
+
+
 def komut_uret(secenekler) -> int:
     sessiz = secenekler.sessiz
+    # Çıktı seçenekleri en başta doğrulanır: yanlış bir --bicim ya da NCN
+    # sütunu yüzünden dakikalarca kot indirip sonra hata vermek kabul edilemez.
+    bicimler = _bicimleri_coz(secenekler.bicim)
+    if "ncn" in bicimler:
+        _ncn_ayarini_coz(secenekler)
     alan = _alani_coz(secenekler)
     sistem = _sistemi_coz(secenekler, alan)
 
@@ -477,6 +499,9 @@ def _kotlari_oku(secenekler, karelaj, sessiz: bool):
         raise KullanimHatasi(str(hata)) from hata
 
     _yaz(f"Kot kaynağı   : {kaynak.tanim()}", sessiz)
+    yogunluk = yogunluk_uyarisi(kaynak, karelaj.ayar.aralik, len(karelaj.noktalar))
+    if yogunluk:
+        _yaz(f"  ! {yogunluk}", sessiz)
     if kaynak.cevrimici:
         istek = (len(karelaj.noktalar) + kaynak.toplu_boyut - 1) // kaynak.toplu_boyut
         _yaz(
@@ -531,19 +556,7 @@ def _dosyalari_yaz(secenekler, karelaj, konturlar, sessiz: bool) -> List[str]:
         kotsuz = secenekler.ncn_kotsuz
         if kotsuz is None and karelaj.eksik_kot_sayisi() == len(karelaj.noktalar):
             kotsuz = "sifir"
-        ayar = profil_coz(
-            secenekler.ncn_profil,
-            sutunlar=secenekler.ncn_sutun,
-            ayirac=secenekler.ncn_ayirac,
-            ondalik_xy=secenekler.ncn_ondalik,
-            ondalik_z=secenekler.ncn_ondalik_z,
-            baslik=True if secenekler.ncn_baslik else None,
-            kotsuz=kotsuz,
-            kodlama=secenekler.ncn_kodlama,
-            satir_sonu=secenekler.ncn_satir_sonu,
-            tirnak=secenekler.ncn_tirnak,
-            kod_no=secenekler.ncn_kod_no,
-        )
+        ayar = _ncn_ayarini_coz(secenekler, kotsuz)
         yol = os.path.join(secenekler.cikti, f"{temel}.ncn")
         adet = ncn_yaz(yol, karelaj.noktalar, ayar)
         dosyalar.append(yol)

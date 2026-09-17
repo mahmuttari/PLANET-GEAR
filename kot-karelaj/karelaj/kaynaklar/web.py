@@ -61,6 +61,13 @@ OPENTOPODATA_VERI_KUMELERI: Dict[str, Tuple[str, str, str]] = {
 }
 
 
+# Yoğunluk uyarısı için yaklaşık yatay çözünürlükler (m)
+_VERI_KUMESI_COZUNURLUK_M: Dict[str, float] = {
+    "srtm30m": 30.0, "srtm90m": 90.0, "aster30m": 30.0, "eudem25m": 25.0,
+    "mapzen": 30.0, "etopo1": 1800.0, "gebco2020": 450.0, "ned10m": 10.0,
+}
+
+
 # ---------------------------------------------------------------------------
 # Ortak HTTP yardımcıları
 # ---------------------------------------------------------------------------
@@ -188,6 +195,7 @@ class OpenTopoData(_HttpKaynak):
         self.ara_deger = ara_deger
         self.toplu_boyut = min(toplu_boyut, 100 if acik_sunucu else toplu_boyut)
         bilgi = OPENTOPODATA_VERI_KUMELERI.get(veri_kumesi)
+        self.cozunurluk_m = _VERI_KUMESI_COZUNURLUK_M.get(veri_kumesi)
         self.kimlik = f"opentopodata:{veri_kumesi}"
         self.ad = f"OpenTopoData / {bilgi[0] if bilgi else veri_kumesi}"
         self.cozunurluk = bilgi[1] if bilgi else "bilinmiyor"
@@ -234,6 +242,7 @@ class OpenElevation(_HttpKaynak):
         self.sunucu = sunucu.rstrip("/")
         self.toplu_boyut = toplu_boyut
         self.kimlik = "open-elevation:srtm30m"
+        self.cozunurluk_m = 30.0
         self.ad = "Open-Elevation (SRTM 30 m)"
         self.cozunurluk = "~30 m"
         self.dusey_datum = "EGM96 jeoidi (ortometrik)"
@@ -298,6 +307,7 @@ class GoogleElevation(_HttpKaynak):
         self.api_anahtari = api_anahtari
         self.toplu_boyut = max(1, min(toplu_boyut, 480))
         self.kimlik = "google:elevation"
+        self.cozunurluk_m = 30.0  # Türkiye'de büyük ölçüde SRTM tabanlı
         self.ad = "Google Maps Elevation API"
         self.cozunurluk = "değişken (Google Earth arazi verisi)"
         self.dusey_datum = "yerel ortalama deniz seviyesi (EGM96'ya yakın)"

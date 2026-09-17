@@ -85,6 +85,10 @@ class YerelSym(KotKaynagi):
         b = self._cozunurluk_ornegi
         birim = "derece" if self.sistem.cografi else "m"
         self.cozunurluk = f"{abs(b.piksel_x):g} x {abs(b.piksel_y):g} {birim}"
+        # Coğrafi rasterda dereceyi metreye yaklaşık çevir (orta enlemde)
+        self.cozunurluk_m = (
+            abs(b.piksel_x) * 111320.0 * 0.77 if self.sistem.cografi else abs(b.piksel_x)
+        )
         self.ad = (
             f"Yerel SYM: {os.path.basename(os.path.abspath(yol))}"
             f" ({len(self.dosyalar)} dosya, {self.sistem.kod})"

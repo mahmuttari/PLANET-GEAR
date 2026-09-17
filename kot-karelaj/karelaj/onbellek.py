@@ -12,6 +12,10 @@ Kot önbelleği
 * Günlük istek kotası olan servislerde (OpenTopoData 1000 istek/gün)
   kota boşa harcanmaz.
 
+Yalnızca **başarıyla okunmuş** kotlar saklanır. Başarısız istekler ve
+veri boşlukları önbelleğe yazılmaz; böylece geçici bir sorun (kota, hız
+sınırı, ağ) o noktaları kalıcı olarak kotsuz bırakmaz.
+
 Önbellek anahtarı; kaynak kimliği ile 1 cm çözünürlüğe yuvarlanmış
 enlem/boylam çiftidir.
 """
@@ -65,6 +69,10 @@ class KotOnbellegi:
                 )
                 """
             )
+            # Eski sürümler başarısız istekleri de "kot yok" olarak kaydediyordu
+            # ve bu noktalar bir daha hiç sorulmuyordu. Böyle kayıtlar açılışta
+            # silinir; böylece eski önbellekler kendiliğinden iyileşir.
+            self._baglanti.execute("DELETE FROM kotlar WHERE kot IS NULL")
             self._baglanti.commit()
         except (sqlite3.Error, OSError) as hata:
             # Önbellek hiçbir zaman işi durdurmamalıdır.
@@ -103,7 +111,8 @@ class KotOnbellegi:
                     parametreler.extend([e, b])
                 imlec = self._baglanti.execute(
                     f"SELECT enlem, boylam, kot FROM kotlar "
-                    f"WHERE kaynak = ? AND (enlem, boylam) IN ({yer_tutucu})",
+                    f"WHERE kaynak = ? AND kot IS NOT NULL "
+                    f"AND (enlem, boylam) IN ({yer_tutucu})",
                     parametreler,
                 )
                 for e, b, kot in imlec.fetchall():
@@ -126,6 +135,8 @@ class KotOnbellegi:
         simdi = int(time.time())
         satirlar = []
         for enlem, boylam, kot in kayitlar:
+            if kot is None:
+                continue  # başarısızlık ya da veri boşluğu önbelleklenmez
             e, b = self._anahtar(enlem, boylam)
             satirlar.append((kaynak, e, b, kot, simdi))
         if not satirlar:

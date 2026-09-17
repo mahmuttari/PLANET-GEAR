@@ -880,6 +880,20 @@ class KaynakTesti(unittest.TestCase):
             else:
                 os.environ["GOOGLE_ELEVATION_ANAHTARI"] = eski
 
+    def test_yogunluk_uyarisi(self):
+        """30 m çözünürlüklü kaynaktan 3 m aralıkla okumak uyarı üretmeli."""
+        from karelaj.kaynaklar import yogunluk_uyarisi
+
+        kaynak = OpenTopoData("srtm30m", sunucu=self.temel, istekler_arasi_sn=0)
+        self.assertEqual(kaynak.cozunurluk_m, 30.0)
+        uyari = yogunluk_uyarisi(kaynak, 3.0, 91563)
+        self.assertIsNotNone(uyari)
+        self.assertIn("10 kat", uyari)
+        self.assertIn("916 istek", uyari)
+        # Çözünürlüğe yakın aralıkta uyarı yok
+        self.assertIsNone(yogunluk_uyarisi(kaynak, 25.0, 1000))
+        self.assertIsNone(yogunluk_uyarisi(kaynak, 15.0, 1000))
+
     def test_kaynak_olustur_hatalari(self):
         with self.assertRaises(KaynakHatasi):
             kaynak_olustur("yok-boyle")
@@ -889,6 +903,93 @@ class KaynakTesti(unittest.TestCase):
             kaynak_olustur("yerel")
         with self.assertRaises(KaynakHatasi):
             kaynak_olustur("yerel", sym_yolu="/olmayan/yol.tif")
+
+    def test_basarisiz_istek_onbellegi_zehirlemez(self):
+        """
+        Bir tur başarısız olan noktalar önbelleğe 'kot yok' diye yazılmamalı;
+        sonraki turda yeniden sorulmalı ve bu kez okunmalı.
+
+        Kullanıcı senaryosu: 91.563 noktalık karelajda günlük kota dolunca
+        61.828 nokta kotsuz kalmış, sonraki çalıştırmada 0 istekle hepsi
+        'önbellekten' gelmiş ve yine kotsuz kalmıştı.
+        """
+        from karelaj.kaynaklar.temel import KotKaynagi
+
+        class _KaprisliKaynak(KotKaynagi):
+            kimlik = "test:kaprisli"
+            ad = "Kaprisli kaynak"
+            cevrimici = True
+            toplu_boyut = 2
+
+            def __init__(self):
+                self.cagri = 0
+                self.basarisiz_ol = True
+
+            def toplu_oku(self, koordinatlar):
+                self.cagri += 1
+                if self.basarisiz_ol and self.cagri >= 2:
+                    raise KaynakHatasi("günlük kota doldu")
+                return [e * 10.0 + b for e, b in koordinatlar]
+
+        def noktalar_uret():
+            return [
+                Nokta(no=str(i), saga=0.0, yukari=0.0, enlem=40.0 + i * 0.001,
+                      boylam=29.0, satir=0, sutun=i)
+                for i in range(6)
+            ]
+
+        klasor = tempfile.mkdtemp()
+        onbellek = KotOnbellegi(os.path.join(klasor, "o.sqlite"))
+        kaynak = _KaprisliKaynak()
+        try:
+            # 1. tur: ilk dilim okunur, sonrakiler kota nedeniyle başarısız
+            n1 = noktalar_uret()
+            ozet1 = kotlari_doldur(n1, kaynak, onbellek=onbellek)
+            self.assertEqual(ozet1.okunan, 2)
+            self.assertEqual(ozet1.eksik, 4)
+            self.assertTrue(any("kota" in u for u in ozet1.uyarilar))
+            # Yalnızca başarılı 2 nokta önbelleğe girmiş olmalı
+            self.assertEqual(onbellek.kayit_sayisi(), 2)
+
+            # 2. tur: kaynak düzeldi; eksik 4 nokta yeniden sorulmalı
+            kaynak.basarisiz_ol = False
+            n2 = noktalar_uret()
+            ozet2 = kotlari_doldur(n2, kaynak, onbellek=onbellek)
+            self.assertEqual(ozet2.onbellekten, 2)
+            self.assertEqual(ozet2.okunan, 6)
+            self.assertEqual(ozet2.eksik, 0)
+            self.assertGreater(ozet2.istek_sayisi, 0, "eksik noktalar yeniden sorulmadı")
+            self.assertEqual(onbellek.kayit_sayisi(), 6)
+        finally:
+            onbellek.kapat()
+
+    def test_art_arda_hatada_okuma_durur(self):
+        """Kaynak sürekli hata veriyorsa her dilim için yeniden denemek yerine durulmalı."""
+        from karelaj.kaynaklar.temel import ARDISIK_HATA_SINIRI, KotKaynagi
+
+        class _BozukKaynak(KotKaynagi):
+            kimlik = "test:bozuk"
+            ad = "Bozuk kaynak"
+            cevrimici = True
+            toplu_boyut = 1
+
+            def __init__(self):
+                self.cagri = 0
+
+            def toplu_oku(self, koordinatlar):
+                self.cagri += 1
+                raise KaynakHatasi("servis erişilemez")
+
+        noktalar = [
+            Nokta(no=str(i), saga=0.0, yukari=0.0, enlem=40.0 + i * 0.001,
+                  boylam=29.0, satir=0, sutun=i)
+            for i in range(50)
+        ]
+        kaynak = _BozukKaynak()
+        ozet = kotlari_doldur(noktalar, kaynak, onbellek=None)
+        self.assertEqual(kaynak.cagri, ARDISIK_HATA_SINIRI, "durmadan denemeye devam etti")
+        self.assertEqual(ozet.okunan, 0)
+        self.assertTrue(any("durduruldu" in u for u in ozet.uyarilar))
 
     def test_kotlari_doldur_ve_onbellek(self):
         klasor = tempfile.mkdtemp()
@@ -928,11 +1029,33 @@ class OnbellekTesti(unittest.TestCase):
             onbellek.topluca_yaz("k", [(40.75, 29.95, 123.4), (40.76, 29.96, None)])
             sonuc = onbellek.topluca_al("k", [(40.75, 29.95), (40.76, 29.96), (40.77, 29.97)])
             self.assertEqual(sonuc[0], 123.4)
-            self.assertIsNone(sonuc[1])
+            # Değersiz (None) kayıt saklanmaz; nokta "bilinmiyor" olarak kalır
+            self.assertNotIn(1, sonuc)
             self.assertNotIn(2, sonuc)
-            self.assertEqual(onbellek.kayit_sayisi(), 2)
-            self.assertEqual(onbellek.temizle("k"), 2)
+            self.assertEqual(onbellek.kayit_sayisi(), 1)
+            self.assertEqual(onbellek.temizle("k"), 1)
             self.assertEqual(onbellek.kayit_sayisi(), 0)
+
+    def test_eski_bos_kayitlar_acilista_silinir(self):
+        """Eski sürümlerin yazdığı 'kot yok' kayıtları açılışta temizlenmeli."""
+        import sqlite3
+
+        klasor = tempfile.mkdtemp()
+        yol = os.path.join(klasor, "o.sqlite")
+        with KotOnbellegi(yol) as onbellek:
+            onbellek.topluca_yaz("k", [(40.75, 29.95, 100.0)])
+        # Eski sürüm davranışını taklit et: doğrudan NULL satır ekle
+        baglanti = sqlite3.connect(yol)
+        baglanti.execute(
+            "INSERT INTO kotlar (kaynak, enlem, boylam, kot, zaman) VALUES (?, ?, ?, NULL, 0)",
+            ("k", 407600000, 299600000),
+        )
+        baglanti.commit()
+        baglanti.close()
+        with KotOnbellegi(yol) as onbellek:
+            self.assertEqual(onbellek.kayit_sayisi(), 1)
+            sonuc = onbellek.topluca_al("k", [(40.75, 29.95), (40.76, 29.96)])
+            self.assertEqual(sonuc, {0: 100.0})
 
     def test_devre_disi(self):
         onbellek = KotOnbellegi(etkin=False)
@@ -1402,8 +1525,12 @@ class CliTesti(unittest.TestCase):
     def test_hatali_bicim_ve_sistem(self):
         from karelaj.cli import main
 
+        # Yanlış çıktı biçimi kot okunmadan ÖNCE yakalanmalı (ağa çıkılmaz)
         self.assertEqual(
             main(["uret", "--sinir", self._sinir(), "--bicim", "olmayan", "--sessiz"]), 2
+        )
+        self.assertEqual(
+            main(["uret", "--sinir", self._sinir(), "--ncn-sutun", "no,olmayan", "--sessiz"]), 2
         )
         self.assertEqual(
             main(["uret", "--sinir", self._sinir(), "--sistem", "YOK-BOYLE", "--sessiz"]), 2

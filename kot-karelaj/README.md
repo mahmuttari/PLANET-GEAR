@@ -309,6 +309,24 @@ bırakılabilir.
 | `--siralama` | `kuzey-guney` | İlk satır en kuzeyde mi, en güneyde mi |
 | `--azami-nokta` | `500000` | Güvenlik sınırı |
 
+**Aralığı kaynağa göre seçin.** Karelaj aralığının, kot kaynağının
+çözünürlüğünden çok daha sık olması yeni bilgi üretmez; aynı hücrenin ara
+değeri tekrar tekrar okunur. Çevrimiçi kaynaklarda bu, istek sayısını ve
+kota tüketimini boşa katlar. Araç, aralık kaynağın çözünürlüğünün yarısından
+küçükse uyarır.
+
+| Kaynak | Çözünürlük | Anlamlı en sık aralık | 1 km² için istek |
+|---|---|---|---|
+| SRTM / ASTER (OpenTopoData, Google) | ~30 m | 15-30 m | 10-40 |
+| EU-DEM | ~25 m | 12-25 m | 16-64 |
+| Kurumun 1/1000 hâlihazırdan üretilmiş SYM | 1-5 m | 1-5 m | istek yok |
+
+Örnek: 82 ha'lık bir alanda 3 m aralık 91.563 nokta ve OpenTopoData'da 916
+istek demektir; açık sunucunun günlük 1.000 istek sınırına dayanır, tamamı
+30 m'lik verinin ara değeridir. Aynı alan 25 m aralıkla 1.300 nokta ve 13
+istektir. Daha sık karelaj gerekiyorsa doğru yol kurumun kendi SYM verisini
+kullanmaktır.
+
 **Tam kat hizalaması neden önemli?** 25 m aralık seçtiğinizde noktalar
 `…, 494 475, 494 500, 494 525, …` gibi yuvarlak sağa değerlere gelir. Aynı
 bölgede farklı zamanlarda üretilen karelajlar birbirine oturur, komşu
@@ -658,6 +676,13 @@ gördüğüm kot ile aynısını istiyorum" denildiğinde anlamlıdır.
 çalıştırdığınızda daha önce sorgulanmış noktalar tekrar indirilmez; yarıda
 kesilen iş kaldığı yerden sürer.
 
+Yalnızca **başarıyla okunmuş** kotlar saklanır. Kota dolması, hız sınırı ya
+da ağ kesintisi yüzünden okunamayan noktalar önbelleğe yazılmaz; sorun
+giderilince aynı komut yeniden çalıştırıldığında yalnızca o noktalar
+sorulur. Kaynak art arda üç istekte hata verirse okuma durdurulur ve kalan
+noktalar kotsuz bırakılır; kalan her dilim için yeniden deneyip saatlerce
+beklenmez.
+
 ```bash
 python karelaj.py onbellek              # durumu göster
 python karelaj.py onbellek --temizle    # tümünü sil
@@ -936,6 +961,7 @@ python -m unittest discover -s testler -v
 | Bütçe ekranındaki servis listesinde Elevation API yok | O projede henüz etkinleştirilmemiştir. **API'ler ve Hizmetler > Kitaplık** yolundan etkinleştirin |
 | `nokta sayısı güvenlik sınırını aşıyor` | Aralığı büyütün veya `--azami-nokta` değerini yükseltin. 1 km²'lik alanda 5 m aralık 40 000 nokta demektir |
 | NCN dosyası boş | Noktaların kotu okunamamış. `--ncn-kotsuz sifir` kullanın ya da kaynağın kapsama alanını denetleyin |
+| Çok sayıda nokta kotsuz, "0 istek, hepsi önbellekten" | Önceki çalıştırmada kota dolmuş ya da ağ kesilmiş. Aynı komutu yeniden çalıştırın; eksik noktalar yeniden sorulur. Aralık kaynağın çözünürlüğünden çok sıksa (örn. 30 m veride 3 m) aralığı büyütün |
 | Netcad noktaları yanlış yere koyuyor | Netcad'deki "Nokta Oku" sütun eşlemesiyle `--ncn-sutun` düzeni aynı mı? Y sağa, X yukarı değerdir. Proje koordinat sistemi ile `--sistem` aynı mı? |
 | Kotlar sistematik olarak kaymış | Düşey datum farkıdır. Sahadaki nivelman noktalarından farkı ölçüp `--kot-kaydirma` ile uygulayın |
 | `SYM dosyasında koordinat sistemi bilgisi yok` | `--dem-sistemi ITRF96-TM30` gibi açıkça belirtin |

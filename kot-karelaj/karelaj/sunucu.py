@@ -44,6 +44,7 @@ from .kaynaklar import (
     KaynakHatasi,
     kaynak_olustur,
     kotlari_doldur,
+    yogunluk_uyarisi,
 )
 from .kontur import kontur_uret
 from .onbellek import KotOnbellegi, varsayilan_onbellek_yolu
@@ -398,6 +399,7 @@ def _uret(govde: Dict[str, Any], cikti_klasoru: str) -> Dict[str, Any]:
         onbellek = KotOnbellegi(
             varsayilan_onbellek_yolu(), etkin=not govde.get("onbellek_yok")
         )
+        yogunluk = yogunluk_uyarisi(kaynak, ayar.aralik, len(karelaj.noktalar))
         try:
             kaynak_ozeti = kotlari_doldur(
                 karelaj.noktalar, kaynak, onbellek=onbellek, kot_kaydirma=kot_kaydirma
@@ -405,6 +407,8 @@ def _uret(govde: Dict[str, Any], cikti_klasoru: str) -> Dict[str, Any]:
         finally:
             onbellek.kapat()
             kaynak.kapat()
+        if yogunluk:
+            kaynak_ozeti.uyarilar.insert(0, yogunluk)
 
     kontur_araligi = _sayi_al(govde, "kontur", None, "Eş yükselti aralığı")
     konturlar = None
