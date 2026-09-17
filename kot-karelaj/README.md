@@ -98,15 +98,21 @@ Kurulum, Python ve yönetici yetkisi gerektirmeyen tek dosyalık bir uygulama
 
 ### Hazır dosyayı indirmek
 
-Depoya her gönderimde GitHub Actions bu dosyayı kendiliğinden üretir:
+En kolay yol **Sürümler** sayfasıdır; giriş yapmak gerekmez ve bağlantı
+hiç değişmez:
 
-1. GitHub'da depoyu açın, üstteki **Actions** sekmesine girin.
-2. Soldan **"Windows uygulaması (.exe) oluştur"** iş akışını seçin.
-3. En üstteki başarılı (yeşil tikli) çalışmaya tıklayın.
-4. Sayfanın altındaki **Artifacts** bölümünden **`KotKarelaji-windows`**
-   dosyasını indirin ve ZIP'i açın.
+- Sürüm sayfası: <https://github.com/mahmuttari/PLANET-GEAR/releases/tag/son-surum>
+- Doğrudan indirme: <https://github.com/mahmuttari/PLANET-GEAR/releases/download/son-surum/KotKarelaji.exe>
 
-ZIP'in içinden iki dosya çıkar:
+Depoya her gönderimde GitHub Actions uygulamayı yeniden derler ve bu sürümü
+günceller; dosya daima en son derlemeyi yansıtır.
+
+Aynı dosyalar çalışmanın **Artifacts** bölümünde de bulunur (**Actions**
+sekmesi > "Windows uygulaması (.exe) oluştur" > en üstteki yeşil tikli
+çalışma > sayfanın altı). Artefaktları indirmek için GitHub'a giriş yapmış
+olmanız gerekir; giriş yapmadan açılan artefakt bağlantısı 404 verir.
+
+Sürüm sayfasında (ya da artefakt ZIP'inin içinde) üç dosya vardır:
 
 | Dosya | Ne zaman? |
 |---|---|

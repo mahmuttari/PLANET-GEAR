@@ -1,8 +1,10 @@
 name: Windows uygulaması (.exe) oluştur
 
 # Kot karelajı aracının Windows'ta kurulum gerektirmeden çalışan tek
-# dosyalık sürümünü üretir. Üretilen dosya, çalışmanın "Artifacts"
-# bölümünden indirilir.
+# dosyalık sürümünü üretir ve "son-surum" etiketli sürüme ekler:
+#   https://github.com/mahmuttari/PLANET-GEAR/releases/tag/son-surum
+# Sürüm dosyaları herkese açık depoda giriş yapmadan indirilebilir ve
+# süresi dolmaz. Aynı dosyalar çalışmanın "Artifacts" bölümüne de konur.
 
 on:
   push:
@@ -14,7 +16,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   windows-exe:
@@ -176,3 +178,47 @@ jobs:
             kot-karelaj/dist/OKUBENI.txt
           retention-days: 90
           if-no-files-found: error
+
+      - name: Sürümü yayımla (son-surum)
+        if: github.event_name != 'pull_request'
+        working-directory: kot-karelaj
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $etiket = "son-surum"
+          $tarih = (Get-Date).ToUniversalTime().ToString("dd.MM.yyyy HH:mm")
+          $kisaSha = $env:GITHUB_SHA.Substring(0, 7)
+          $notlar = @"
+          ## Kot Karelajı - en son derleme
+
+          | | |
+          |---|---|
+          | Kaynak | ``$kisaSha`` (``$env:GITHUB_REF_NAME``) |
+          | Derleme | $tarih UTC |
+
+          **KotKarelaji.exe** - çift tıklayın, komut penceresi açılmaz, tarayıcıda harita arayüzü gelir.
+          **KotKarelaji-konsol.exe** - komut satırından kullanım için aynı program.
+          **OKUBENI.txt** - kısa kullanım notu.
+
+          Kurulum ve Python gerekmez. Çıktılar ``Belgeler\Kot Karelaji`` klasörüne yazılır.
+
+          Bu sürüm her gönderimde silinip yeniden oluşturulur; dosyalar daima en son derlemeyi yansıtır.
+          "@
+
+          # Eski sürümü ve etiketini kaldır (ilk çalıştırmada yoktur, hata bastırılır)
+          gh release delete $etiket --yes --cleanup-tag 2>$null
+          if ($LASTEXITCODE -ne 0) { Write-Host "Önceki sürüm yok, yenisi oluşturulacak." }
+          $global:LASTEXITCODE = 0
+
+          gh release create $etiket `
+            dist\KotKarelaji.exe dist\KotKarelaji-konsol.exe dist\OKUBENI.txt `
+            --title "Kot Karelajı (son sürüm)" `
+            --notes $notlar `
+            --prerelease `
+            --target $env:GITHUB_SHA
+          if ($LASTEXITCODE -ne 0) { throw "Sürüm oluşturulamadı" }
+
+          Write-Host "Sürüm yayımlandı:"
+          Write-Host "  https://github.com/$env:GITHUB_REPOSITORY/releases/tag/$etiket"
+          Write-Host "  https://github.com/$env:GITHUB_REPOSITORY/releases/download/$etiket/KotKarelaji.exe"
